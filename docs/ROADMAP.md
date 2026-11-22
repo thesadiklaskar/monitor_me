@@ -14,6 +14,17 @@ Monitor Me is delivered in **five major phases**. Each phase contains smaller in
 
 A feature can be implemented before its phase is complete, but its status must remain honest. "Completed" requires implementation and verification evidence, not just a specification.
 
+## User-Directed Linux MVP Release Sequence
+
+The agreed order is:
+
+1. **Phase 4 — Monitoring Dashboard:** complete the dashboard and operator workflows, then pass the Phase 4 acceptance gate.
+2. **Phase 5 — Firewall setup:** apply and verify the role-aware Linux firewall policy for the control plane and monitored hosts, including Docker/network exposure.
+3. **Phase 5 — Production shift:** deploy the verified control plane and agent workflow to the selected production VPS/VM with TLS, private data services, backups/restore, health checks, and rollback.
+4. **Owner-led local acceptance:** after Phase 4 and Phase 5, the project owner performs the first end-to-end local acceptance test before wider rollout or additional expansion work.
+
+For the first Linux MVP release, Phase 5 has two primary release deliverables: firewall setup and production deployment/shift. Windows/macOS collectors and fleet-scale validation remain broader roadmap work and must not be claimed as complete by a Linux-only production cutover.
+
 ---
 
 ## Phase 1 — Product Specification and Technical Blueprint
@@ -171,6 +182,14 @@ A feature can be implemented before its phase is complete, but its status must r
 ## Phase 5 — Cross-Platform Production and Scale
 
 **Status: Not Started**
+
+### Primary Linux MVP release deliverables
+
+**5A. Firewall setup** — implement and verify the role-aware UFW/firewalld policy documented in docs/PRODUCTION_FIREWALL.md. Control-plane public ingress must be limited to intended HTTPS/gRPC entry points and source-restricted SSH; agent-only monitored hosts need no inbound Monitor Me port. PostgreSQL, Redis, and internal application ports remain private. Preserve Docker networking, IPv4/IPv6 policy, and rollback capability.
+
+**5B. Production shift** — deploy the verified Linux-first control plane and agent workflow to the selected VPS/VM. Configure DNS/TLS/reverse proxy and the gRPC endpoint, secure secrets, keep PostgreSQL/Redis private, apply migrations, exercise backup/restore, health/readiness, restart/recovery, and document cutover/rollback. Do not enable broad external onboarding until the owner completes the planned local acceptance test.
+
+Windows/macOS support, signed cross-platform installers, and fleet-scale capacity work remain broader Phase 5 expansion/hardening requirements. A Linux-only cutover does not complete those items.
 
 ### Scope
 
