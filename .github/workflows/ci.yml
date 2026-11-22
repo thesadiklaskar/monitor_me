@@ -236,6 +236,45 @@ jobs:
           docker compose ps --all
           docker compose logs --no-color
           exit 1
+      - name: Create PostgreSQL durability canary
+        run: |
+          docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U monitor_me -d monitor_me <<'SQL'
+          WITH organization AS (
+            INSERT INTO organizations (name, slug)
+            VALUES ('PostgreSQL Recovery CI', 'postgres-recovery-ci')
+            RETURNING id
+          ),
+          server AS (
+            INSERT INTO servers (organization_id, name, hostname, status)
+            SELECT id, 'postgres-recovery-ci', 'postgres-recovery-ci', 'online'
+            FROM organization
+            RETURNING id, organization_id
+          ),
+          agent AS (
+            INSERT INTO agents (server_id, version, status)
+            SELECT id, 'ci-recovery', 'online'
+            FROM server
+            RETURNING id, server_id
+          ),
+          batch AS (
+            INSERT INTO telemetry_batches (
+              agent_id, batch_id, schema_version, payload_hash, collected_at, sample_count
+            )
+            SELECT id, 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 1,
+                   decode(repeat('ab', 32), 'hex'), now(), 1
+            FROM agent
+            RETURNING agent_id, batch_id
+          )
+          INSERT INTO telemetry_samples (
+            organization_id, server_id, agent_id, batch_id, metric_name,
+            value, unit, labels, observed_at, attribution_method
+          )
+          SELECT server.organization_id, server.id, agent.id, batch.batch_id,
+                 'host.cpu.utilization', 42, 'percent', '{}'::jsonb, now(), 'host_total'
+          FROM server
+          JOIN agent ON agent.server_id = server.id
+          JOIN batch ON batch.agent_id = agent.id;
+          SQL
       - name: Verify PostgreSQL outage and recovery
         shell: bash
         run: |
@@ -268,7 +307,7 @@ jobs:
           fi
           docker compose exec -T postgres \
             psql -v ON_ERROR_STOP=1 -U monitor_me -d monitor_me \
-            -Atc "SELECT count(*) > 0 FROM telemetry_samples;" | grep -qx t
+            -Atc "SELECT count(*) = 1 FROM telemetry_samples sample JOIN organizations organization ON organization.id = sample.organization_id WHERE organization.slug = 'postgres-recovery-ci' AND sample.batch_id = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';" | grep -qx t
       - name: Print logs on failure
         if: failure()
         run: docker compose logs --no-color
