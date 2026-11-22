@@ -126,11 +126,12 @@ jobs:
       - name: Generate local TLS certificate
         run: |
           mkdir -p .data/certs
-          openssl req -x509 -newkey rsa:2048 -nodes \\
-            -keyout .data/certs/server.key \\
-            -out .data/certs/server.crt \\
-            -days 2 -subj "/CN=localhost" \\
+          openssl req -x509 -newkey rsa:2048 -nodes \
+            -keyout .data/certs/server.key \
+            -out .data/certs/server.crt \
+            -days 2 -subj "/CN=localhost" \
             -addext "subjectAltName=DNS:localhost,IP:127.0.0.1"
+          chmod 644 .data/certs/server.crt .data/certs/server.key
 
 
       - name: Validate Compose configuration
