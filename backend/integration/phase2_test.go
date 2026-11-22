@@ -20,10 +20,10 @@ import (
 
 	monitorv1 "github.com/WorkRCS/monitor_me/backend/gen/monitor/v1"
 	"github.com/WorkRCS/monitor_me/backend/internal/security"
+	"github.com/gorilla/websocket"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
-	"github.com/gorilla/websocket"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/status"
 )

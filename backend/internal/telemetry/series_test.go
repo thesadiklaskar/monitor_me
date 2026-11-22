@@ -42,31 +42,31 @@ func TestSeriesBucketCountUsesEpochAlignedBoundaries(t *testing.T) {
 	tests := []struct {
 		name string
 		from time.Time
-		to time.Time
+		to   time.Time
 		want int64
 	}{
 		{
 			name: "aligned one bucket",
 			from: time.Unix(0, 0),
-			to: time.Unix(1, 0),
+			to:   time.Unix(1, 0),
 			want: 1,
 		},
 		{
 			name: "offset range crosses two buckets",
 			from: time.Unix(0, 100_000_000),
-			to: time.Unix(1, 100_000_000),
+			to:   time.Unix(1, 100_000_000),
 			want: 2,
 		},
 		{
 			name: "exclusive endpoint on next boundary",
 			from: time.Unix(0, 0),
-			to: time.Unix(1, 1),
+			to:   time.Unix(1, 1),
 			want: 2,
 		},
 		{
 			name: "negative epoch floor division",
 			from: time.Unix(-2, 0),
-			to: time.Unix(-1, 0),
+			to:   time.Unix(-1, 0),
 			want: 1,
 		},
 	}
@@ -81,7 +81,7 @@ func TestSeriesBucketCountUsesEpochAlignedBoundaries(t *testing.T) {
 	query := RangeQuery{
 		OrganizationID: "org", ServerID: "server", MetricName: "host.cpu.utilization",
 		From: time.Unix(0, 100_000_000),
-		To: time.Unix(1, 100_000_000),
+		To:   time.Unix(1, 100_000_000),
 		Step: step, Limit: 1,
 	}
 	if err := ValidateRangeQuery(query, time.Unix(2, 0)); err == nil {
