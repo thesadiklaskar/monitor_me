@@ -268,6 +268,32 @@ func TestPhase2AuthenticationAndAgentLifecycle(t *testing.T) {
 		t.Fatalf("valid heartbeat was not accepted: response=%v error=%v", heartbeat, err)
 	}
 
+	// A process restart or network reconnect must reuse the persisted session credential.
+	if err := connection.Close(); err != nil {
+		t.Fatalf("close first gRPC connection: %v", err)
+	}
+	reconnectedConnection, err := grpc.NewClient(
+		grpcAddress,
+		grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{
+			RootCAs: roots, ServerName: "localhost", MinVersion: tls.VersionTLS12,
+		})),
+	)
+	if err != nil {
+		t.Fatalf("create reconnected TLS gRPC client: %v", err)
+	}
+	defer reconnectedConnection.Close()
+	agentClient = monitorv1.NewAgentControlClient(reconnectedConnection)
+	reconnectedHeartbeat, err := agentClient.ReportHeartbeat(ctx, &monitorv1.HeartbeatRequest{
+		AgentId: enrolled.GetAgentId(),
+		SessionToken: enrolled.GetSessionToken(),
+		AgentVersion: "0.1.0-test",
+		Capabilities: []string{"host.cpu", "host.memory"},
+		SentAtUnixMillis: time.Now().UnixMilli(),
+	})
+	if err != nil || !reconnectedHeartbeat.GetAccepted() {
+		t.Fatalf("heartbeat after reconnect was not accepted: response=%v error=%v", reconnectedHeartbeat, err)
+	}
+
 	// Reissue a single-use token for the same server and rotate its agent session.
 	rotationResponse := requestJSON(t, ctx, http.MethodPost,
 		baseURL+"/v1/servers/"+serverID+"/enrollment-token", bearer, map[string]any{})
