@@ -429,6 +429,22 @@ func TestPhase2AuthenticationAndAgentLifecycle(t *testing.T) {
 							},
 							ObservedAtUnixNanos: observedAt,
 						},
+						{
+							MetricName: "process.memory.rss", Value: 512, Unit: "bytes",
+							Labels: map[string]string{
+								"pid": "124", "process": "unmapped-worker",
+								"attribution_method": "unclassified",
+							},
+							ObservedAtUnixNanos: observedAt,
+						},
+						{
+							MetricName: "host.network.receive.bytes_per_second", Value: 0, Unit: "bytes/second",
+							Labels: map[string]string{
+								"interface": "shared-bridge",
+								"attribution_method": "shared",
+							},
+							ObservedAtUnixNanos: observedAt,
+						},
 					},
 				},
 			},
@@ -505,6 +521,37 @@ func TestPhase2AuthenticationAndAgentLifecycle(t *testing.T) {
 		conflictAck.GetAcknowledgement().GetAccepted() ||
 		conflictAck.GetAcknowledgement().GetRejectionCode() != "idempotency_conflict" {
 		t.Fatalf("reused idempotency key with changed data must be rejected: response=%v error=%v", conflictAck, err)
+	}
+
+	// The transport accepts one bounded batch at a time; oversized metric lists
+	// are rejected without inserting partial telemetry.
+	oversizedSamples := make([]*monitorv1.MetricSample, 4097)
+	oversizedObservedAt := time.Now().UTC().UnixNano()
+	for index := range oversizedSamples {
+		oversizedSamples[index] = &monitorv1.MetricSample{
+			MetricName: "host.cpu.utilization", Value: 50, Unit: "percent",
+			ObservedAtUnixNanos: oversizedObservedAt,
+		}
+	}
+	oversizedMessage := &monitorv1.AgentToServerMessage{
+		AgentId: enrolled.GetAgentId(), SessionToken: enrolled.GetSessionToken(),
+		Payload: &monitorv1.AgentToServerMessage_TelemetryBatch{
+			TelemetryBatch: &monitorv1.TelemetryBatch{
+				BatchId: "ffffffffffffffffffffffffffffffff",
+				CollectedAtUnixNanos: oversizedObservedAt,
+				SchemaVersion: 1,
+				Samples: oversizedSamples,
+			},
+		},
+	}
+	if err := stream.Send(oversizedMessage); err != nil {
+		t.Fatalf("send oversized telemetry batch: %v", err)
+	}
+	oversizedAck, err := stream.Recv()
+	if err != nil || oversizedAck.GetAcknowledgement() == nil ||
+		oversizedAck.GetAcknowledgement().GetAccepted() ||
+		oversizedAck.GetAcknowledgement().GetRejectionCode() != "invalid_batch" {
+		t.Fatalf("oversized batch must be rejected with a bounded validation response: response=%v error=%v", oversizedAck, err)
 	}
 	secondBatchID := "fedcba9876543210fedcba9876543210"
 	secondMessage := &monitorv1.AgentToServerMessage{
@@ -584,6 +631,21 @@ func TestPhase2AuthenticationAndAgentLifecycle(t *testing.T) {
 	if mappedProject != projectID || attributionMethod != "systemd" {
 		t.Fatalf("unexpected workload attribution: project=%s method=%s", mappedProject, attributionMethod)
 	}
+	var unclassifiedCount, sharedCount, hostTotalCount int
+	if err := database.QueryRowContext(ctx, `
+		SELECT
+			count(*) FILTER (WHERE attribution_method = 'unclassified'),
+			count(*) FILTER (WHERE attribution_method = 'shared'),
+			count(*) FILTER (WHERE attribution_method = 'host_total')
+		FROM telemetry_samples
+		WHERE agent_id = $1 AND batch_id = $2
+	`, enrolled.GetAgentId(), batchID).Scan(&unclassifiedCount, &sharedCount, &hostTotalCount); err != nil {
+		t.Fatalf("query explicit attribution categories: %v", err)
+	}
+	if unclassifiedCount != 1 || sharedCount != 1 || hostTotalCount != 1 {
+		t.Fatalf("shared, unclassified, and host-total resources must stay distinct: unclassified=%d shared=%d host_total=%d",
+			unclassifiedCount, sharedCount, hostTotalCount)
+	}
 
 	if err := stream.CloseSend(); err != nil {
 		t.Fatalf("close telemetry stream: %v", err)
@@ -595,8 +657,8 @@ func TestPhase2AuthenticationAndAgentLifecycle(t *testing.T) {
 	`, enrolled.GetAgentId(), batchID).Scan(&storedSamples); err != nil {
 		t.Fatalf("query persisted telemetry samples: %v", err)
 	}
-	if storedSamples != 3 {
-		t.Fatalf("the first idempotent batch and second unique batch must persist three samples, got %d", storedSamples)
+	if storedSamples != 5 {
+		t.Fatalf("the first idempotent batch and second unique batch must persist five samples, got %d", storedSamples)
 	}
 
 	revokeAgent := requestJSON(t, ctx, http.MethodPost,
