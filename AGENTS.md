@@ -40,6 +40,8 @@ These instructions apply to every contributor and automated coding agent working
 
 ## 5. Git and Commit Discipline
 
+This repository follows an explicit user instruction: make every change directly on the default main branch. Do not create another branch or open a pull request unless the user explicitly changes this instruction.
+
 Use Conventional Commits, for example:
 
 - `feat(agent): collect host memory metrics`
