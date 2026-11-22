@@ -123,6 +123,12 @@ jobs:
           go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.6.2
           sh scripts/generate-proto.sh
 
+      - name: Resolve dependencies for integration tests
+        working-directory: backend
+        run: |
+          go mod tidy
+          go mod verify
+
       - name: Generate local TLS certificate
         run: |
           mkdir -p .data/certs
