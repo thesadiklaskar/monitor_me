@@ -1,17 +1,21 @@
 GO_DIR := backend
+AGENT_DIR := agent
 WEB_DIR := web
 
-.PHONY: help tidy test vet fmt proto certs web-install web-lint web-typecheck web-build compose-up compose-down compose-logs db-migrate
+.PHONY: help tidy test vet fmt proto certs agent-test agent-vet agent-build web-install web-lint web-typecheck web-build compose-up compose-down compose-logs db-migrate
 
 help:
 	@printf '%s\n' \
 		'Available targets:' \
 		'  make tidy          Resolve and tidy Go modules' \
-		'  make test          Run Go unit tests' \
-		'  make vet           Run go vet' \
-		'  make fmt           Format Go source files' \
+		'  make test          Run backend Go tests' \
+		'  make vet           Run backend go vet' \
+		'  make fmt           Format backend and agent Go source files' \
 		'  make proto         Generate Go gRPC sources from the versioned schema' \
 		'  make certs         Generate a local development TLS certificate' \
+		'  make agent-test    Run native agent tests with the race detector' \
+		'  make agent-vet     Run native agent static analysis' \
+		'  make agent-build   Build the native monitoring agent' \
 		'  make web-install   Install frontend dependencies' \
 		'  make web-lint      Run frontend ESLint checks' \
 		'  make web-typecheck Run the TypeScript compiler' \
@@ -31,7 +35,7 @@ vet:
 	cd $(GO_DIR) && go vet ./...
 
 fmt:
-	cd $(GO_DIR) && gofmt -w $$(find . -name '*.go' -type f)
+	gofmt -w $$(find $(GO_DIR) $(AGENT_DIR) -name '*.go' -type f)
 
 proto:
 	go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.12
@@ -44,6 +48,15 @@ certs:
 	chmod 750 .data/certs
 	chmod 644 .data/certs/server.crt
 	chmod 640 .data/certs/server.key
+
+agent-test:
+	cd $(AGENT_DIR) && go test -race ./...
+
+agent-vet:
+	cd $(AGENT_DIR) && go vet ./...
+
+agent-build:
+	cd $(AGENT_DIR) && go build -trimpath ./cmd/monitor-agent
 
 web-install:
 	cd $(WEB_DIR) && npm install
