@@ -2,6 +2,7 @@ package agentcontrol
 
 import (
 	"context"
+	"log/slog"
 	"crypto/rand"
 	"crypto/sha256"
 	"database/sql"
@@ -10,12 +11,14 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"sync"
 	"strings"
 	"time"
 
 	monitorv1 "github.com/WorkRCS/monitor_me/backend/gen/monitor/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"github.com/WorkRCS/monitor_me/backend/internal/telemetry"
 )
 
 const (
@@ -35,8 +38,14 @@ type Service struct {
 }
 
 // NewService creates an agent-control service backed by PostgreSQL.
+var retentionWorkerOnce sync.Once
+
 func NewService(db *sql.DB) *Service {
-	return &Service{db: db}
+	service := &Service{db: db}
+	retentionWorkerOnce.Do(func() {
+		go telemetry.RunRetention(context.Background(), db, telemetry.DefaultRetentionPolicy(), slog.Default())
+	})
+	return service
 }
 
 // Enroll atomically consumes a scoped enrollment token, binds the agent to its
