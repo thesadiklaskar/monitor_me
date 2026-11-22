@@ -1,0 +1,93 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - "**"
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Go backend checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.27.4"
+          cache-dependency-path: backend/go.mod
+
+      - name: Format check
+        working-directory: backend
+        run: |
+          test -z "$(gofmt -l .)"
+
+      - name: Run unit tests
+        working-directory: backend
+        run: go test -race -cover ./...
+
+      - name: Run static analysis
+        working-directory: backend
+        run: go vet ./...
+
+      - name: Build API
+        working-directory: backend
+        run: go build -trimpath ./cmd/api
+
+  frontend:
+    name: Next.js frontend checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "26.13.0"
+
+      - name: Install dependencies
+        working-directory: web
+        run: npm install --no-audit --no-fund
+
+      - name: Run ESLint
+        working-directory: web
+        run: npm run lint
+
+      - name: Check TypeScript
+        working-directory: web
+        run: npm run typecheck
+
+      - name: Build frontend
+        working-directory: web
+        run: npm run build
+
+  compose:
+    name: Docker Compose validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Prepare local environment
+        run: cp .env.example .env
+
+      - name: Validate Compose configuration
+        run: docker compose config --quiet
+
+      - name: Build local services
+        run: docker compose build

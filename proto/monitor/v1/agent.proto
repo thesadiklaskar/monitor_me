@@ -1,0 +1,109 @@
+syntax = "proto3";
+
+package monitor.v1;
+
+option go_package = "github.com/WorkRCS/monitor_me/backend/gen/monitor/v1;monitorv1";
+
+// AgentControl defines the versioned control and telemetry contract between
+// a native host agent and the Monitor Me control plane.
+service AgentControl {
+  // Enroll exchanges a short-lived enrollment token for an agent identity.
+  rpc Enroll(EnrollRequest) returns (EnrollResponse);
+
+  // ReportHeartbeat updates agent liveness and capability information.
+  rpc ReportHeartbeat(HeartbeatRequest) returns (HeartbeatResponse);
+
+  // Stream carries telemetry and control messages over a bidirectional stream.
+  rpc Stream(stream AgentToServerMessage) returns (stream ServerToAgentMessage);
+}
+
+message EnrollRequest {
+  string enrollment_token = 1;
+  string agent_version = 2;
+  string operating_system = 3;
+  string architecture = 4;
+  string hostname = 5;
+  repeated string capabilities = 6;
+}
+
+message EnrollResponse {
+  string agent_id = 1;
+  string server_id = 2;
+  string session_id = 3;
+  int32 heartbeat_interval_seconds = 4;
+  string protocol_version = 5;
+}
+
+message HeartbeatRequest {
+  string agent_id = 1;
+  string session_id = 2;
+  string agent_version = 3;
+  repeated string capabilities = 4;
+  int64 sent_at_unix_millis = 5;
+}
+
+message HeartbeatResponse {
+  bool accepted = 1;
+  int64 server_time_unix_millis = 2;
+}
+
+message AgentToServerMessage {
+  string agent_id = 1;
+  string session_id = 2;
+
+  oneof payload {
+    TelemetryBatch telemetry_batch = 3;
+    AgentEvent event = 4;
+    AgentHealth health = 5;
+  }
+}
+
+message TelemetryBatch {
+  string batch_id = 1;
+  int64 collected_at_unix_nanos = 2;
+  uint32 schema_version = 3;
+  repeated MetricSample samples = 4;
+}
+
+message MetricSample {
+  string metric_name = 1;
+  double value = 2;
+  string unit = 3;
+  map<string, string> labels = 4;
+  int64 observed_at_unix_nanos = 5;
+}
+
+message AgentEvent {
+  string event_id = 1;
+  string event_type = 2;
+  string message = 3;
+  int64 occurred_at_unix_nanos = 4;
+}
+
+message AgentHealth {
+  uint64 queue_depth = 1;
+  uint64 spool_bytes = 2;
+  uint64 collector_error_count = 3;
+  int64 reported_at_unix_nanos = 4;
+}
+
+message ServerToAgentMessage {
+  oneof payload {
+    BatchAcknowledgement acknowledgement = 1;
+    AgentCommand command = 2;
+  }
+}
+
+message BatchAcknowledgement {
+  string batch_id = 1;
+  bool accepted = 2;
+  string rejection_code = 3;
+  string message = 4;
+}
+
+message AgentCommand {
+  string command_id = 1;
+  string command_type = 2;
+  bytes payload = 3;
+  int64 expires_at_unix_millis = 4;
+}
