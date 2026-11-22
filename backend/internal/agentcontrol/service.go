@@ -232,13 +232,6 @@ func (s *Service) ReportHeartbeat(ctx context.Context, request *monitorv1.Heartb
 	}, nil
 }
 
-// Stream is reserved for Phase 3 telemetry delivery. Returning Unimplemented
-// is deliberate: Phase 2 authenticates agents and verifies liveness but does
-// not acknowledge telemetry that is not yet durably persisted.
-func (s *Service) Stream(monitorv1.AgentControl_StreamServer) error {
-	return status.Error(codes.Unimplemented, "telemetry streaming is introduced in Phase 3")
-}
-
 func validEnrollmentRequest(request *monitorv1.EnrollRequest) bool {
 	return len(request.GetEnrollmentToken()) >= 32 &&
 		len(request.GetEnrollmentToken()) <= 128 &&

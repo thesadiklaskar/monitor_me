@@ -361,14 +361,61 @@ func TestPhase2AuthenticationAndAgentLifecycle(t *testing.T) {
 
 	stream, err := agentClient.Stream(ctx)
 	if err != nil {
-		if status.Code(err) != codes.Unimplemented {
-			t.Fatalf("telemetry stream should explicitly report unimplemented, got %v", err)
+		t.Fatalf("open authenticated telemetry stream: %v", err)
+	}
+	collectedAt := time.Now().UTC().UnixNano()
+	observedAt := collectedAt
+	batchID := "0123456789abcdef0123456789abcdef"
+	telemetryMessage := func(value float64) *monitorv1.AgentToServerMessage {
+		return &monitorv1.AgentToServerMessage{
+			AgentId: enrolled.GetAgentId(), SessionToken: enrolled.GetSessionToken(),
+			Payload: &monitorv1.AgentToServerMessage_TelemetryBatch{
+				TelemetryBatch: &monitorv1.TelemetryBatch{
+					BatchId: batchID, CollectedAtUnixNanos: collectedAt, SchemaVersion: 1,
+					Samples: []*monitorv1.MetricSample{{
+						MetricName: "host.memory.used", Value: value, Unit: "bytes",
+						Labels: map[string]string{"source": "phase3-integration"},
+						ObservedAtUnixNanos: observedAt,
+					}},
+				},
+			},
 		}
-	} else {
-		_, err = stream.Recv()
-		if status.Code(err) != codes.Unimplemented {
-			t.Fatalf("telemetry stream should explicitly report unimplemented, got %v", err)
-		}
+	}
+	if err := stream.Send(telemetryMessage(1048576)); err != nil {
+		t.Fatalf("send first telemetry batch: %v", err)
+	}
+	firstAck, err := stream.Recv()
+	if err != nil || firstAck.GetAcknowledgement() == nil || !firstAck.GetAcknowledgement().GetAccepted() {
+		t.Fatalf("committed telemetry batch was not acknowledged: response=%v error=%v", firstAck, err)
+	}
+	if err := stream.Send(telemetryMessage(1048576)); err != nil {
+		t.Fatalf("send retry of telemetry batch: %v", err)
+	}
+	retryAck, err := stream.Recv()
+	if err != nil || retryAck.GetAcknowledgement() == nil || !retryAck.GetAcknowledgement().GetAccepted() {
+		t.Fatalf("idempotent telemetry retry was not acknowledged: response=%v error=%v", retryAck, err)
+	}
+	if err := stream.Send(telemetryMessage(2097152)); err != nil {
+		t.Fatalf("send conflicting telemetry batch: %v", err)
+	}
+	conflictAck, err := stream.Recv()
+	if err != nil || conflictAck.GetAcknowledgement() == nil ||
+		conflictAck.GetAcknowledgement().GetAccepted() ||
+		conflictAck.GetAcknowledgement().GetRejectionCode() != "idempotency_conflict" {
+		t.Fatalf("reused idempotency key with changed data must be rejected: response=%v error=%v", conflictAck, err)
+	}
+	if err := stream.CloseSend(); err != nil {
+		t.Fatalf("close telemetry stream: %v", err)
+	}
+	var storedSamples int
+	if err := database.QueryRowContext(ctx, `
+		SELECT count(*) FROM telemetry_samples
+		WHERE agent_id = $1 AND batch_id = $2
+	`, enrolled.GetAgentId(), batchID).Scan(&storedSamples); err != nil {
+		t.Fatalf("query persisted telemetry samples: %v", err)
+	}
+	if storedSamples != 1 {
+		t.Fatalf("idempotent retries must persist one sample, got %d", storedSamples)
 	}
 
 	revokeAgent := requestJSON(t, ctx, http.MethodPost,
