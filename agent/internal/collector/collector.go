@@ -56,8 +56,8 @@ func NewProcCollector(root string) *ProcCollector {
 	}
 	return &ProcCollector{
 		root: root, startedAt: time.Now(),
-		previousCPU: make(map[string]cpuCounters),
-		previousDisk: make(map[string]diskCounters),
+		previousCPU:     make(map[string]cpuCounters),
+		previousDisk:    make(map[string]diskCounters),
 		previousNetwork: make(map[string]networkCounters),
 	}
 }
@@ -388,14 +388,14 @@ func parseNetworkDev(raw string) (map[string]networkCounters, error) {
 }
 
 type processMemory struct {
-	pid int
+	pid  int
 	name string
-	rss int64
+	rss  int64
 }
 
 type processSnapshot struct {
 	count int
-	top []processMemory
+	top   []processMemory
 }
 
 func readProcesses(procRoot string) (processSnapshot, error) {

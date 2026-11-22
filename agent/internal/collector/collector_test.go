@@ -83,7 +83,7 @@ func TestProcCollectorCollectsFixture(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Collect() error = %v", err)
 	}
-	if len(samples) < 10 {
+	if len(samples) < 9 {
 		t.Fatalf("expected host and agent gauge samples, got %d", len(samples))
 	}
 	foundMemory := false

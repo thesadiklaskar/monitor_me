@@ -23,10 +23,10 @@ func Load() (Config, error) {
 	cfg := Config{
 		Version:            env("MONITOR_AGENT_VERSION", "0.1.0-dev"),
 		CollectionInterval: 500 * time.Millisecond,
-		ProcRoot:            env("MONITOR_PROC_ROOT", "/proc"),
-		SpoolDirectory:      env("MONITOR_SPOOL_DIR", "./.monitor-me/spool"),
-		SpoolMaxBytes:       64 << 20,
-		LogLevel:            strings.ToLower(env("MONITOR_LOG_LEVEL", "info")),
+		ProcRoot:           env("MONITOR_PROC_ROOT", "/proc"),
+		SpoolDirectory:     env("MONITOR_SPOOL_DIR", "./.monitor-me/spool"),
+		SpoolMaxBytes:      64 << 20,
+		LogLevel:           strings.ToLower(env("MONITOR_LOG_LEVEL", "info")),
 	}
 	if raw := os.Getenv("MONITOR_COLLECTION_INTERVAL"); raw != "" {
 		interval, err := time.ParseDuration(raw)
