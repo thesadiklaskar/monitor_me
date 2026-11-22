@@ -52,11 +52,27 @@ func ValidateRangeQuery(query RangeQuery, now time.Time) error {
 	}
 	// Reject oversized bucket grids instead of scanning a long range and silently
 	// truncating the response at LIMIT.
-	requiredPoints := (query.To.Sub(query.From) + query.Step - 1) / query.Step
-	if requiredPoints > time.Duration(query.Limit) {
+	requiredPoints := seriesBucketCount(query.From, query.To, query.Step)
+	if requiredPoints > int64(query.Limit) {
 		return errors.New("series range and step would exceed the requested point limit")
 	}
 	return nil
+}
+
+// seriesBucketCount mirrors PostgreSQL date_bin's epoch-aligned bucket boundaries.
+func seriesBucketCount(from, to time.Time, step time.Duration) int64 {
+	stepNanos := int64(step)
+	firstBucket := floorDivision(from.UnixNano(), stepNanos)
+	lastBucket := floorDivision(to.Add(-time.Nanosecond).UnixNano(), stepNanos)
+	return lastBucket - firstBucket + 1
+}
+
+func floorDivision(value, divisor int64) int64 {
+	quotient, remainder := value/divisor, value%divisor
+	if remainder != 0 && value < 0 {
+		quotient--
+	}
+	return quotient
 }
 
 // QueryRange uses PostgreSQL date_bin for bounded server-side aggregation.
