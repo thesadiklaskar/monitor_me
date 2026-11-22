@@ -19,7 +19,28 @@ This file is the authoritative resume point for Monitor Me. Read it before makin
 | Implementation status | Phases 1–3 phase gates are complete and CI-verified. The Linux agent, durable WAL, TLS gRPC ingestion, PostgreSQL history/retention, authorized live delivery, workload attribution, and benchmarks are verified. The overall MVP is not complete because dashboard/login/Add Server and browser-facing views remain Phase 4 work. Several non-UI feature requirements remain In Progress/Planned in the acceptance matrix. |
 | Last source commit covered by latest successful CI run | af3bab3ec5f273bbbf3006d4efa122db7cccdb5c |
 | Latest verified CI run | [#45043161542 — success](https://github.com/WorkRCS/monitor_me/actions/runs/45043161542); all four jobs passed, including PostgreSQL outage/recovery canary |
-| Next action | Implement the authenticated Next.js login/session flow and server inventory page using the verified auth and server APIs; include logout, empty/loading/error states, and the Add Server one-time enrollment-token flow. |
+| Next action | On 2026-11-23, start Phase 4 from docs/PHASE_4_EXECUTION_PLAN.md: implement the authenticated dashboard, server inventory/Add Server flow, real Linux metric views, live/history charts, and remaining Phase 4 operator workflows; verify each slice before changing status. |
+
+## Next Work Session — 2026-11-23
+
+**Target:** Phase 4 — Dashboard and Operational Features. No Phase 4 implementation is claimed yet; its current status remains Not Started.
+
+### Ordered release plan
+
+1. Complete and verify Phase 4 Monitoring Dashboard and operator workflows.
+2. Complete Phase 5 firewall setup for the Linux control-plane and agent-only host roles, following docs/PRODUCTION_FIREWALL.md.
+3. Complete the controlled production deployment/shift, including TLS, secrets, private PostgreSQL/Redis, migrations, backups/restore, health checks, and rollback.
+4. After Phase 4 and Phase 5, the project owner performs the first local end-to-end acceptance test before wider rollout or additional expansion work.
+
+Phase 5 has two primary release deliverables for this Linux-first MVP: **(a) firewall setup** and **(b) production shift**. Windows/macOS support and fleet-scale work remain separate broader roadmap items; the Linux production cutover must not be represented as completing them.
+
+### Phase 4 resume point
+
+Read docs/PHASE_4_EXECUTION_PLAN.md. The current frontend is still a foundation preview. Reuse the verified auth, server inventory, historical metric, and live-ticket APIs. Known gaps include project mapping administration, alert/notification workflows, and remote-action execution; implement and test these where required instead of presenting mock data.
+
+### Session boundary
+
+The next session is Phase 4 only. Do not start Phase 5 firewall work or production deployment until Phase 4 acceptance gates pass. Mark Phase 4 Completed only with full test and documentation evidence.
 
 ## Phase 1–3 Audit
 
@@ -30,7 +51,7 @@ The final Phase 1–3 audit passed all four jobs in [GitHub Actions run #4504316
 - Authenticated dashboard, server inventory UI, Add Server wizard and live metric views: Phase 4.
 - OS service registration and remaining AgentHealth telemetry samples: In Progress.
 - Workload mapping administration, full Docker Engine API discovery, process lifecycle/per-process CPU and persistent downsampled rollups: In Progress/Planned.
-- Windows/macOS agents, signed installers, staged fleet-scale testing, production operations, and role-aware Linux firewall setup for control-plane/agent hosts: Phase 5.
+- Role-aware Linux firewall setup and controlled production deployment/shift: Phase 5 primary Linux MVP release workstreams. Windows/macOS agents, signed installers, staged fleet-scale testing, and broader production operations remain Phase 5 expansion/hardening items.
 - Protobuf event/health/command messages are reserved; only authenticated telemetry batches are accepted by the current stream.
 
 ## Completed Phase 1 — Product Specification and Technical Blueprint
