@@ -61,7 +61,6 @@ func PublishCommittedBatch(ctx context.Context, publisher EventPublisher, organi
 		}
 		sort.Strings(keys)
 		labels := make(map[string]string)
-		var identity string
 		for index, key := range keys {
 			if index >= 12 {
 				break
