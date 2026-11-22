@@ -23,8 +23,8 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/credentials"
 	"github.com/gorilla/websocket"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/status"
 )
 
@@ -440,7 +440,7 @@ func TestPhase2AuthenticationAndAgentLifecycle(t *testing.T) {
 						{
 							MetricName: "host.network.receive.bytes_per_second", Value: 0, Unit: "bytes/second",
 							Labels: map[string]string{
-								"interface": "shared-bridge",
+								"interface":          "shared-bridge",
 								"attribution_method": "shared",
 							},
 							ObservedAtUnixNanos: observedAt,
@@ -537,10 +537,10 @@ func TestPhase2AuthenticationAndAgentLifecycle(t *testing.T) {
 		AgentId: enrolled.GetAgentId(), SessionToken: enrolled.GetSessionToken(),
 		Payload: &monitorv1.AgentToServerMessage_TelemetryBatch{
 			TelemetryBatch: &monitorv1.TelemetryBatch{
-				BatchId: "ffffffffffffffffffffffffffffffff",
+				BatchId:              "ffffffffffffffffffffffffffffffff",
 				CollectedAtUnixNanos: oversizedObservedAt,
-				SchemaVersion: 1,
-				Samples: oversizedSamples,
+				SchemaVersion:        1,
+				Samples:              oversizedSamples,
 			},
 		},
 	}
@@ -561,7 +561,7 @@ func TestPhase2AuthenticationAndAgentLifecycle(t *testing.T) {
 				BatchId: secondBatchID, CollectedAtUnixNanos: time.Now().UTC().UnixNano(), SchemaVersion: 1,
 				Samples: []*monitorv1.MetricSample{{
 					MetricName: "host.memory.used", Value: 2097152, Unit: "bytes",
-					Labels: map[string]string{"source": "phase3-reconnect"},
+					Labels:              map[string]string{"source": "phase3-reconnect"},
 					ObservedAtUnixNanos: time.Now().UTC().UnixNano(),
 				}},
 			},

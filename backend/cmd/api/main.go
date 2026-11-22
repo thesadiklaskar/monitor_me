@@ -86,7 +86,7 @@ func run(logger *slog.Logger) error {
 	}
 
 	httpServer := &http.Server{
-		Addr:              cfg.APIAddress,
+		Addr: cfg.APIAddress,
 		Handler: httpapi.NewRouter(cfg.ServiceVersion, dependencies, identity.NewStore(database), httpapi.LiveDependencies{
 			Cache: cache, Telemetry: telemetry.NewStore(database),
 		}),
