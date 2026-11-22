@@ -108,12 +108,38 @@ func TestPostgresRetentionKeepsIdempotencyRecordsLongerThanSamples(t *testing.T)
 		t.Fatalf("raw samples should expire before idempotency keys: samples=%d batches=%d",
 			sampleCount, batchCount)
 	}
+	var retainedCount, expiredCount int
+	if err := database.QueryRowContext(ctx, `
+		SELECT
+			count(*) FILTER (WHERE batch_id = $2),
+			count(*) FILTER (WHERE batch_id = $3)
+		FROM telemetry_batches
+		WHERE agent_id = $1
+	`, agentID, retainedBatchID, expiredBatchID).Scan(&retainedCount, &expiredCount); err != nil {
+		t.Fatalf("verify which idempotency record survived the first sweep: %v", err)
+	}
+	if retainedCount != 1 || expiredCount != 0 {
+		t.Fatalf("first sweep should retain only the 31-day batch: retained=%d expired=%d",
+			retainedCount, expiredCount)
+	}
 
+	// The retention sweep is global, so unrelated telemetry created by other
+	// tests may also expire when the simulated clock advances. Assert only this
+	// test agent's remaining idempotency records rather than the global delete count.
 	result, err = telemetry.PruneBatch(ctx, database, now.Add(91*24*time.Hour), policy)
 	if err != nil {
 		t.Fatalf("prune expired idempotency record: %v", err)
 	}
-	if result.BatchesDeleted != 1 {
-		t.Fatalf("90-day idempotency record was not removed after its retention age: %+v", result)
+	if result.BatchesDeleted < 1 {
+		t.Fatalf("expected the simulated 91-day sweep to delete at least one batch: %+v", result)
+	}
+	if err := database.QueryRowContext(ctx, `
+		SELECT count(*) FROM telemetry_batches WHERE agent_id = $1
+	`, agentID).Scan(&batchCount); err != nil {
+		t.Fatalf("count expired test idempotency records: %v", err)
+	}
+	if batchCount != 0 {
+		t.Fatalf("the retained 90-day idempotency record should expire after 91 days, got %d remaining",
+			batchCount)
 	}
 }

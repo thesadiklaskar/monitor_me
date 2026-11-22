@@ -744,15 +744,22 @@ func TestPhase2AuthenticationAndAgentLifecycle(t *testing.T) {
 	if err := stream.CloseSend(); err != nil {
 		t.Fatalf("close telemetry stream: %v", err)
 	}
-	var storedSamples int
+	var firstBatchSamples, secondBatchSamples int
 	if err := database.QueryRowContext(ctx, `
 		SELECT count(*) FROM telemetry_samples
 		WHERE agent_id = $1 AND batch_id = $2
-	`, enrolled.GetAgentId(), batchID).Scan(&storedSamples); err != nil {
-		t.Fatalf("query persisted telemetry samples: %v", err)
+	`, enrolled.GetAgentId(), batchID).Scan(&firstBatchSamples); err != nil {
+		t.Fatalf("query persisted first telemetry batch: %v", err)
 	}
-	if storedSamples != 5 {
-		t.Fatalf("the first idempotent batch and second unique batch must persist five samples, got %d", storedSamples)
+	if err := database.QueryRowContext(ctx, `
+		SELECT count(*) FROM telemetry_samples
+		WHERE agent_id = $1 AND batch_id = $2
+	`, enrolled.GetAgentId(), secondBatchID).Scan(&secondBatchSamples); err != nil {
+		t.Fatalf("query persisted second telemetry batch: %v", err)
+	}
+	if firstBatchSamples != 4 || secondBatchSamples != 1 {
+		t.Fatalf("idempotent batch must persist four samples and unique retry batch one: first=%d second=%d",
+			firstBatchSamples, secondBatchSamples)
 	}
 
 	revokeAgent := requestJSON(t, ctx, http.MethodPost,
