@@ -1,6 +1,6 @@
 # Project State
 
-This file is the authoritative resume point for Monitor Me. Update it whenever work changes phase, completion status, blockers, or the next action.
+This file is the authoritative resume point for Monitor Me. Read it before making changes and update it after every work session.
 
 ## Current Snapshot
 
@@ -10,73 +10,96 @@ This file is the authoritative resume point for Monitor Me. Update it whenever w
 | Repository | `WorkRCS/monitor_me` |
 | Default branch | `main` |
 | Repository visibility | Private |
-| Last completed phase | Phase 0 — Repository Foundation |
-| Current phase | Phase 1 — Product Requirements and Measurable Acceptance Criteria |
+| Completed phase | Phase 1 — Product Specification and Technical Blueprint |
+| Current phase | Phase 2 — Platform Foundation and Secure Connectivity |
 | Current phase status | Not Started |
-| Implementation status | No application code yet |
-| Last completed foundation commit before this state refresh | `5136d30c0c8317fe5b74bd6524803dbab06eada7` |
-| Next action | Create `docs/PRODUCT_REQUIREMENTS.md` from the agreed product brief, with testable acceptance criteria and an explicit MVP boundary. |
+| Implementation status | Product specification is complete; application implementation has not started |
+| Last completed phase deliverable commit | `526d0fec87491c6f87d493f12d8121f208761899` |
+| Next action | Design the repository layout and Phase 2 architecture decisions, then initialize the Go backend, Next.js frontend, PostgreSQL, Redis, and Docker Compose baseline in small buildable commits. |
 
-## Completed Work
+## Completed Phases
 
-### Phase 0 — Repository Foundation
+### Phase 1 — Product Specification and Technical Blueprint
 
-- [x] Confirmed repository identity, private visibility, default branch, and write access.
-- [x] Initialized `README.md` with product principles, technology baseline, and navigation.
-- [x] Established English-only and custom-monitoring-product rules.
-- [x] Defined the zero-to-production roadmap.
-- [x] Defined contributor/agent continuation rules.
-- [x] Created this resumable state record.
+**Status: Completed**
 
-**Foundation commits:**
+Deliverables created:
 
-- `919f5e99202c1f04718313c60bea254e90311bce` — Initialize README and engineering principles.
-- `522057605407da077f75b4335e487b0d4f7c70f9` — Add repository continuation and engineering rules.
-- `1176bf3fa3a5698c79ae1de4586059b1a105942e` — Define zero-to-production delivery phases.
-- `5136d30c0c8317fe5b74bd6524803dbab06eada7` — Add resumable project execution state.
+- [x] `docs/PRODUCT_REQUIREMENTS.md` — vision, users, MVP boundary, functional and non-functional requirements.
+- [x] `docs/METRIC_CATALOG.md` — metric names, units, collection semantics, calculations, and platform constraints.
+- [x] `docs/FEATURE_ACCEPTANCE_MATRIX.md` — feature-by-feature verification requirements and five-phase completion checks.
+- [x] `docs/ARCHITECTURE_OVERVIEW.md` — component responsibilities, data flow, Docker boundaries, storage, and security.
+- [x] Updated `docs/ROADMAP.md` — five major phases with scope and completion gates.
+- [x] Updated `README.md` — professional project overview, current feature status, architecture, technology, Docker model, roadmap, and document navigation.
+- [x] Updated `AGENTS.md` — README maintenance is mandatory whenever a feature or phase is verified.
+- [x] Defined the exact next action for Phase 2.
 
-**Verification:** All four foundation files were fetched successfully from the `main` branch after creation.
+### Phase 1 Commit References
 
-## Current Work
+| Deliverable | Commit |
+| --- | --- |
+| Product requirements | `5c4bf9b3684107bfb3884ebf26181013ed42ea4b` |
+| Metric catalog | `4f982c881823b9cdea6250432f96cdad407af94f` |
+| Feature acceptance matrix | `5bd649196345de671d58fa3d01a3187e6f689608` |
+| Architecture overview | `6d4719e81ab032c9f35f9631275212f78aceef7d` |
+| README update | `df5612381f74aa49367cf2ed625deb9225ff2879` |
+| Five-phase roadmap | `11a5f2112b8c2ce1381a9ae8f2f7ed77fc66a839` |
+| README maintenance rules | `526d0fec87491c6f87d493f12d8121f208761899` |
 
-### Phase 1 — Product Requirements and Measurable Acceptance Criteria
+**Verification status:** All Phase 1 specification documents were created successfully. Repository file reads and content checks are performed after the documentation updates. Phase 1 completion is documentation/requirements completion only; no backend, frontend, agent, or monitoring feature is implemented yet.
 
-**Status:** Not Started
+## Current Phase
 
-No Phase 1 implementation or requirements document has been committed yet.
+### Phase 2 — Platform Foundation and Secure Connectivity
 
-The phase must capture the agreed requirements for:
+**Status: Not Started**
 
-- One-click host enrollment and installation.
-- Overall host monitoring.
-- All Projects / individual Project switching.
-- CPU, memory, disk, network, process, and application telemetry.
-- Configurable 100–500ms collection targets and explicit timing semantics.
-- Historical storage, retention, and downsampling.
-- Custom dashboards and responsive real-time graphs.
-- Alerts, notifications, and secure remote actions.
-- Linux, Windows, and macOS capability differences.
-- Security, reliability, performance, and staged scale validation.
+Planned work:
+
+1. Define repository layout for Go backend, Go agent, and Next.js frontend.
+2. Add formatting, linting, tests, static checks, and CI.
+3. Initialize Go backend configuration, structured logging, health/readiness, and graceful shutdown.
+4. Initialize Next.js with TypeScript and Tailwind CSS.
+5. Add Docker Compose for frontend, backend, PostgreSQL, and Redis.
+6. Add PostgreSQL migrations and connection management.
+7. Add Redis for explicitly ephemeral live cache/coordination.
+8. Define versioned Protocol Buffers and gRPC services.
+9. Implement authentication and authorization foundations.
+10. Implement secure agent enrollment, identity, heartbeat, capabilities, reconnect, and revocation.
 
 ## Exact Resume Instructions
 
-Start with the next action below. Do not scaffold application code before Phase 1 requirements and acceptance criteria are clear.
+Start Phase 2 with repository structure and architecture decisions. Work in small, independently buildable slices.
 
-**Next action:**
-1. Create `docs/PRODUCT_REQUIREMENTS.md`.
-2. Translate the user-approved product brief into functional and non-functional requirements.
-3. Separate MVP scope from post-MVP/enterprise scope.
-4. Add measurable acceptance criteria for each feature.
-5. Define the supported OS capability matrix and required privileges.
-6. Define telemetry timestamp, unit, sampling, freshness, and accuracy semantics.
-7. Update the feature-to-test matrix and this state file.
-8. Commit the completed requirements slice using a Conventional Commit.
+The first implementation slice should:
 
-## Rules for Updating This File
+1. Define the root directory layout and service boundaries.
+2. Add pinned toolchain/runtime versions and minimal build/test commands.
+3. Create the smallest Go backend service with configuration, structured logging, health/readiness endpoints, and graceful shutdown.
+4. Add a minimal Next.js application shell.
+5. Add Docker Compose for local development with PostgreSQL and Redis health checks.
+6. Add a concise developer setup guide and tests for the initial service health behavior.
+7. Update the README immediately when any part becomes verified, and update the phase status only when its complete gate passes.
 
-- Keep the current phase and next action singular and unambiguous.
-- Record the exact commit SHA for completed work.
-- Mark a phase complete only after its roadmap completion gate passes.
-- If blocked, set the status to `Blocked` and record the concrete blocker and the action needed to unblock it.
-- Do not erase completed history; append a dated session entry when useful.
-- Use English only.
+Do not start the full monitoring collectors before the backend, data, protocol, and enrollment foundations are in place.
+
+## Repository Rules
+
+- English only in source code, comments, documentation, user-facing strings, logs, tests, and commits.
+- Use Go, Next.js/TypeScript, PostgreSQL, Redis, gRPC, Protocol Buffers, WebSocket, and Docker Compose according to documented responsibilities.
+- Build the monitoring product itself; do not embed Grafana, Prometheus, Zabbix, Netdata, or another ready-made monitoring platform.
+- Use native Go agents on monitored hosts; Docker is for the control-plane environment and optional container discovery, not a universal host-agent requirement.
+- Add meaningful comments for intent, invariants, security rules, and non-obvious logic; do not comment trivial lines mechanically.
+- Use Conventional Commits for every reviewable unit.
+- Update the feature acceptance matrix and README when a feature becomes verified.
+- Keep README, roadmap, and project state synchronized.
+- Never claim crash-free, lag-free, perfectly accurate, or million-host operation without reproducible evidence.
+
+## Session History
+
+### Phase 1 Closeout
+
+- Completed the product specification and technical blueprint.
+- Consolidated the delivery plan into five major phases as requested.
+- Established the README as the continuously maintained product guide.
+- Set Phase 2 as the exact next phase.
