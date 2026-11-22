@@ -93,3 +93,17 @@ At the end of every work session:
 6. Keep all state documentation in English.
 
 The project is complete only when all roadmap phases required for the agreed release are implemented, tested, documented, and validated against their acceptance criteria.
+
+
+## 10. README Is the Living Product Guide
+
+The README is a maintained product document, not a one-time placeholder.
+
+- Keep it professional, self-contained, and understandable to an engineer reviewing the repository for the first time.
+- Update the README whenever an individual feature reaches Verified status. Describe what the feature does, how it is used, and its actual support/limitations.
+- At every phase completion, update the README's current status, feature status table, architecture or workflow details affected by that phase, and next phase.
+- Keep planned, specified, in-progress, and verified capabilities clearly distinguished.
+- Never list a feature as available merely because its requirement or UI mock has been written.
+- Link detailed technical material to the relevant documents so README remains navigable without duplicating every implementation detail.
+- The README update is part of the feature/phase completion gate. Do not defer it to a final documentation sprint.
+- Before a release, compare every README claim with the feature acceptance matrix and test evidence.
