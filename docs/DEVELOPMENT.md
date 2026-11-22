@@ -1,6 +1,6 @@
 # Local Development
 
-This guide describes the current Phase 2 control plane and Phase 3 Linux telemetry implementation. It is for local development, not production deployment.
+This guide describes the Phase 1–3 implementation verified on main: the Phase 2 control plane and Phase 3 Linux telemetry path. Phase 4 dashboard work has not started. It is for local development, not production deployment.
 
 ## Toolchain Baseline
 
@@ -44,7 +44,7 @@ Compose starts PostgreSQL and Redis, runs all embedded SQL migrations in the one
 - PostgreSQL: localhost:5432
 - Redis: localhost:6379
 
-The API readiness endpoint requires PostgreSQL and Redis. Liveness is independent of these dependencies. The frontend is still a foundation shell and does not yet render monitoring dashboards.
+The API readiness endpoint requires PostgreSQL and Redis. Liveness is independent of these dependencies. Compose CI stops each dependency separately, verifies readiness becomes unhealthy, restarts the dependency, and verifies readiness recovers. The frontend is still a foundation shell and does not yet render monitoring dashboards.
 
 ## First owner and server enrollment
 

@@ -151,7 +151,7 @@ Linux may expose detailed counters through `/proc`, `/sys`, cgroups, and optiona
 Metric names, units, labels, and calculation semantics form a compatibility contract. Breaking changes require a documented schema/metric version change, migration plan, and dashboard compatibility review.
 
 
-## 12. Initial Linux Agent Source Semantics
+## Appendix A. Initial Linux Agent Source Semantics
 
 The first implemented Linux collector reads `/proc/stat`, `/proc/meminfo`, `/proc/diskstats`, `/proc/net/dev`, `/proc/uptime`, per-process `statm`/`comm`/`cgroup`, and `/proc/net/tcp`/`tcp6`. Its initial contract includes:
 
@@ -173,3 +173,19 @@ The first implemented Linux collector reads `/proc/stat`, `/proc/meminfo`, `/pro
 | `process.memory.rss` | bytes | Resident pages × OS page size | Up to 128 readable processes; not unique system memory |
 
 Process cgroup labels include `cgroup_path`, `workload_type`, `workload_selector`, and `attribution_method` when visible. A server/project mapping is required before a process sample receives a `project_id`; unmapped selectors remain `unclassified`, while aggregate host metrics remain `host_total`. The collector does not currently claim per-process CPU, filesystem capacity, application request latency, or eBPF metrics.
+
+## Appendix B. Phase 3 Agent-Health Coverage
+
+The Phase 3 agent reports its version, OS, architecture, capabilities, and liveness through the authenticated enrollment/heartbeat contract. The current Linux telemetry samples include agent uptime and agent RSS.
+
+The following entries in the target catalog are **not currently emitted as telemetry samples**:
+
+- agent.cpu.utilization
+- agent.collector.errors
+- agent.queue.depth
+- agent.spool.bytes
+- agent.last_successful_send
+
+The current sender has no separate in-memory work queue: it collects, persists batches to the bounded WAL, and sends at most 16 pending batches per delivery pass, waiting for each durable acknowledgement. Queue depth is therefore not a meaningful numeric zero; it is not an implemented metric. The protobuf AgentHealth message is reserved for a future health-reporting path and is not accepted by the current stream handler.
+
+Consumers must treat these metrics as unavailable until implemented. They must not synthesize zero values or infer health from a missing sample.

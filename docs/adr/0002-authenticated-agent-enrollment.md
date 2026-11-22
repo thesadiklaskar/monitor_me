@@ -49,7 +49,9 @@ The control plane must provide an initial owner bootstrap, authenticated operato
 
 ### Telemetry stream boundary
 
-The bidirectional stream is defined in the versioned protocol, but returns `UNIMPLEMENTED` until Phase 3 provides durable, idempotent telemetry ingestion. The server must never acknowledge telemetry that it has not durably stored.
+At the close of Phase 2, the bidirectional stream was intentionally left UNIMPLEMENTED. Phase 3 has since implemented authenticated telemetry-batch delivery: every batch is validated, keyed by agent ID and batch ID, persisted with a deterministic payload hash in a PostgreSQL transaction, and acknowledged only after commit.
+
+The current stream accepts TelemetryBatch payloads only. The protobuf AgentEvent and AgentHealth messages are reserved and are rejected by the current handler. The server-to-agent command message is also reserved; remote actions are not implemented. The server must never acknowledge telemetry that it has not durably stored.
 
 ## Verification
 
@@ -66,4 +68,4 @@ Phase 2 integration tests cover:
 
 ## Consequences
 
-The control plane can securely register its first operator, provision server identities, enroll agents, and track agent liveness. The monitoring telemetry stream remains intentionally unavailable until the durable Phase 3 ingestion path is implemented and tested.
+The control plane securely registers its first operator, provisions server identities, enrolls agents, and tracks liveness. The Phase 3 telemetry stream is now implemented and verified for telemetry batches. Health/event messages and remote commands remain reserved protocol extensions. The operator-facing dashboard workflows remain a separate Phase 4 deliverable.

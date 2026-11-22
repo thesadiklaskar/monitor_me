@@ -138,28 +138,35 @@ Collection interval, ingestion latency, backend processing latency, and browser 
 
 Performance goals must be validated using repeatable test workloads and documented hardware/software environments. Crash-free and loss-free operation cannot be guaranteed for every failure; failure modes and recovery boundaries must be explicit.
 
-## 10. Architecture Decisions Still Required
+## 10. Architecture Decision Status
 
-The following must be resolved and recorded in ADRs before or during Phase 2:
+### Resolved in Phases 2 and 3
 
-- Authentication/session implementation and organization tenancy model.
-- Exact gRPC enrollment handshake and credential rotation protocol.
-- Protocol version compatibility and payload limits.
-- PostgreSQL schema, partition strategy, and retention defaults.
-- Redis topology and behavior during cache outage.
-- Agent local spool format, encryption, quota, and acknowledgement semantics.
-- WebSocket fan-out design and authorization model.
-- Docker Engine access strategy and required permissions.
-- Remote-action allowlist and execution identity.
-- Installer signing and artifact distribution strategy.
+| Decision | Current decision | Evidence |
+| --- | --- | --- |
+| User authentication and organization tenancy | Opaque 256-bit bearer sessions; Argon2id password hashes; organization membership and role resolved from the active session | ADR 0002; identity integration tests |
+| Agent enrollment and credential rotation | One-use 15-minute enrollment token; TLS 1.2+ gRPC; stored token/session digests; stable agent identity across re-enrollment | ADR 0002; protocol contract; Compose integration |
+| Protocol compatibility and transport limits | Versioned monitor.v1; 1 MiB gRPC message bounds; 4,096 samples per telemetry batch; 128 concurrent streams; only telemetry-batch stream messages are currently accepted | Protocol contract; backend validation; integration tests |
+| Durable telemetry storage | PostgreSQL transaction stores batch hash and samples; ACK follows commit; duplicate ID/content is idempotent; changed content is rejected | Migration 000003; telemetry ingestion tests |
+| Retention and aggregation | 30-day raw samples, 90-day idempotency records; bounded query-time PostgreSQL date_bin aggregation; no persistent rollup tables or partitioning yet | Retention policy and PostgreSQL integration tests |
+| Redis role and outage behavior | Redis Pub/Sub is ephemeral live fan-out; PostgreSQL is durable source of truth; readiness checks both dependencies | ADR 0001; Compose outage/recovery checks |
+| Agent spool format, quota, and acknowledgement | Append-only JSONL WAL, fsync per batch, mode 0600 file/0700 directory, bounded quota, trailing-record recovery; remove only after matching accepted ACK | Agent spool implementation and transport tests |
+| Browser live fan-out | Organization-specific Redis channels; 30-second single-use session-bound tickets; 32-event subscriber queue; slow clients reconnect and query history | Live endpoint, ticket migration, tenant-isolation/reconnect tests |
 
+### Explicitly deferred decisions and integrations
+
+- **Spool encryption at rest:** the WAL is protected by restrictive filesystem permissions but is not application-encrypted. Use an encrypted host volume where at-rest encryption is required. A future key-provisioning design must not place a static encryption key beside the spool.
+- **Docker Engine API access:** Phase 3 identifies container/Systemd workload metadata from cgroups and does not mount or access the Docker socket. A later integration must use a narrowly scoped read-only runtime API or an equivalent capability boundary; unrestricted Docker socket access is not the default.
+- **Project mapping administration:** the ingestion path resolves configured server_project_mappings; user-facing create/review/correct workflows are not implemented yet.
+- **Remote actions:** arbitrary shell commands are not supported. Allowlisted command types, execution identity, replay protection, and audit workflow remain Phase 4 work; the protobuf command message is reserved.
+- **Installer signing and lifecycle:** signed artifacts, platform service registration, upgrades, rollback, and uninstall remain Phase 5 work.
 
 ## Phase 3 Implementation Status
 
 The Phase 3 data path now has an initial implementation: native Linux procfs agent -> TLS gRPC stream -> authenticated batch validation -> PostgreSQL transaction -> post-commit organization-scoped Redis Pub/Sub event. The agent retains each batch in a local JSONL WAL until the backend returns an acknowledgement. Redis notifications are ephemeral; historical metric values and batch idempotency hashes live in PostgreSQL.
 
-The browser live endpoint uses a 30-second single-use ticket derived from a valid user bearer session. The ticket is stored by hash and consumed once; WebSocket subscribers are isolated by organization and have a fixed-size outbound queue. Historical queries are authenticated and scoped to the user's organization and requested server. Slow clients reconnect with a fresh ticket and use the durable history endpoint to fill gaps.
+The browser live endpoint uses a 30-second single-use ticket derived from a valid user bearer session. The ticket is stored by hash and consumed once; WebSocket subscribers are isolated by organization and have a fixed-size outbound queue. Historical queries are authenticated and scoped to the user's organization and requested server. Slow clients reconnect with a fresh ticket and use the durable history endpoint to fill gaps. The stream currently accepts telemetry batches only; protobuf health/event/command payloads are reserved and are not handled by the server.
 
-This implementation is Linux-first. Windows/macOS collectors, full Docker Engine discovery, process CPU metrics, app request instrumentation, persistent rollup tables, dashboard UI, and production installers are not claimed as implemented.
+This implementation is Linux-first. Windows/macOS collectors, full Docker Engine discovery, process CPU metrics, remaining per-agent health samples listed in the metric catalog, app request instrumentation, persistent rollup tables, dashboard UI, and production installers are not claimed as implemented.
 
 **Verification:** the full Phase 3 control-plane, native agent, frontend foundation, and Docker Compose integration pipeline passed in [GitHub Actions run #45039191041](https://github.com/WorkRCS/monitor_me/actions/runs/45039191041).

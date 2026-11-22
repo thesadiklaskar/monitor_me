@@ -51,7 +51,7 @@ The long-term objective is an enterprise-oriented product with a straightforward
 | Backend implementation | **Phases 2–3 verified** | Authentication, organization-scoped APIs, TLS gRPC enrollment, durable telemetry ingestion, history, retention, and live transport pass CI |
 | Frontend implementation | **Foundation verified** | Next.js shell passes ESLint, TypeScript, and production build; product authentication and monitoring screens remain later-phase work |
 | Local platform stack | **Runtime verified** | PostgreSQL, Redis, migration runner, API, and web services start through Docker Compose |
-| Database and cache integration | **Runtime verified** | PostgreSQL remains durable; Redis dependency outage and recovery behavior are tested |
+| Database and cache integration | **Runtime verified** | PostgreSQL remains durable; Redis and PostgreSQL dependency outage/readiness recovery are tested |
 | Agent protocol and ingestion | **Phase 3 verified** | TLS enrollment, persisted session, heartbeat, reconnect/backoff, streaming batches, post-commit ACK, and idempotent PostgreSQL persistence pass end-to-end CI |
 | Native Linux host agent | **Phase 3 verified** | Native Go agent, Linux procfs metrics, TCP inventory, cgroup workload selectors, private session state, and crash-recoverable durable spool pass race-enabled CI tests |
 | Telemetry history and live transport | **Phase 3 verified** | Bounded PostgreSQL range query, 30-day raw retention, 90-day idempotency retention, one-use session-bound WebSocket tickets, cross-tenant isolation, and bounded subscriber queues pass CI |
@@ -75,7 +75,7 @@ The current Linux-first implementation provides a real telemetry path rather tha
 - **Live delivery:** post-commit latest-value events publish to organization-specific Redis Pub/Sub channels. Each event contains at most 128 metric points. Browsers exchange their bearer session for a 30-second, single-use ticket; only the ticket hash is stored. Tickets are invalidated when the parent user session is revoked. WebSocket output queues are bounded to 32 events; slow clients are disconnected and should reconnect and fetch durable history to catch up. Cross-organization delivery is covered by integration tests.
 - **Retention:** default raw samples are kept for 30 days; batch idempotency records for 90 days; expired live tickets are removed in bounded cleanup batches. Redis is notification/cache infrastructure, never the durable telemetry store.
 
-The Phase 3 implementation does **not** yet claim Windows/macOS collection, per-process CPU, eBPF, complete Docker Engine metadata, HTTP request latency/error instrumentation, persistent materialized rollups, or a dashboard UI. Those items remain in later delivery phases. Historical queries aggregate with PostgreSQL `date_bin`; persistent rollup tables are deferred until scale measurements justify them. A monitored Linux host does not need Docker installed.
+The Phase 3 implementation does **not** yet claim Windows/macOS collection, per-process CPU, eBPF, complete Docker Engine metadata, HTTP request latency/error instrumentation, persistent materialized rollups, the remaining AgentHealth samples (agent CPU, collector errors, spool size, pending queue depth, and last successful send), or a dashboard UI. The dashboard and user workflows are Phase 4; cross-platform collectors, installers, and production scale are Phase 5. Historical queries aggregate with PostgreSQL date_bin; persistent rollup tables are deferred until scale measurements justify them. A monitored Linux host does not need Docker installed.
 
 ## Phase 3 CI Benchmark Snapshot
 
@@ -276,6 +276,10 @@ The initial collection target is configurable in the 100ms–500ms range where h
 | 5 | Cross-Platform Production and Scale | Not started | Windows/macOS agents, signed lifecycle tooling, security hardening, benchmarks, production operations, and final as-built design |
 
 A phase is marked Completed only after implementation, acceptance tests, relevant security/failure checks, documentation, and Git commit requirements pass.
+
+## MVP Readiness
+
+Phases 1–3 are complete and their phase gates pass CI. This does **not** mean the first usable product MVP is released. The authenticated login UI, server inventory UI, Add Server installation/token wizard, overall server dashboard, and browser-facing live metric views are still Phase 4 work. The API, Linux agent, durable ingestion, history, and live transport are verified foundations for those workflows.
 
 ## Documentation Map
 
