@@ -149,3 +149,69 @@ func TestParseTCPTableCountsStatesAndListeningPorts(t *testing.T) {
 		t.Fatalf("unexpected TCP inventory: states=%v listeners=%v", counts, listeners)
 	}
 }
+
+func TestAgentCPUUtilizationUsesElapsedProcessCPUTime(t *testing.T) {
+	tests := []struct {
+		name     string
+		previous float64
+		current  float64
+		elapsed  time.Duration
+		want     float64
+		valid    bool
+	}{
+		{name: "half of one logical CPU", previous: 10, current: 10.5, elapsed: time.Second, want: 50, valid: true},
+		{name: "multithreaded process may exceed one core", previous: 2, current: 5, elapsed: 2 * time.Second, want: 150, valid: true},
+		{name: "counter reset", previous: 10, current: 9, elapsed: time.Second, valid: false},
+		{name: "zero elapsed interval", previous: 10, current: 11, elapsed: 0, valid: false},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got, ok := AgentCPUUtilization(test.previous, test.current, test.elapsed)
+			if ok != test.valid {
+				t.Fatalf("AgentCPUUtilization() valid = %v, want %v", ok, test.valid)
+			}
+			if ok && got != test.want {
+				t.Fatalf("AgentCPUUtilization() = %v, want %v", got, test.want)
+			}
+		})
+	}
+}
+
+func TestProcCollectorEmitsAgentCPUAfterBaselineSnapshot(t *testing.T) {
+	root := t.TempDir()
+	write := func(name, value string) {
+		t.Helper()
+		path := filepath.Join(root, name)
+		if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(value), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("stat", "cpu 100 0 50 850 0 0 0 0\ncpu0 100 0 50 850 0 0 0 0\n")
+	write("meminfo", "MemTotal: 1000 kB\nMemAvailable: 400 kB\n")
+	write("diskstats", "8 0 sda 10 0 20 0 5 0 40 0 0 0 0\n")
+	write("net/dev", "Inter-| Receive | Transmit\n face |bytes packets errs drop fifo frame compressed multicast|bytes packets errs drop fifo colls carrier compressed\n eth0: 100 10 1 0 0 0 0 0 200 20 2 0 0 0 0 0\n")
+	write("uptime", "100.25 20.0\n")
+	write("net/tcp", "  sl  local_address rem_address   st\n")
+	write("net/tcp6", "  sl  local_address                         remote_address                        st\n")
+	host := NewProcCollector(root)
+	if _, err := host.Collect(t.Context()); err != nil {
+		t.Fatalf("first collection baseline: %v", err)
+	}
+	time.Sleep(2 * time.Millisecond)
+	samples, err := host.Collect(t.Context())
+	if err != nil {
+		t.Fatalf("second collection: %v", err)
+	}
+	for _, sample := range samples {
+		if sample.Name == "agent.cpu.utilization" {
+			if sample.Unit != "percent" || sample.Value < 0 {
+				t.Fatalf("invalid process CPU sample: %+v", sample)
+			}
+			return
+		}
+	}
+	t.Fatal("expected process CPU utilization after the baseline snapshot")
+}

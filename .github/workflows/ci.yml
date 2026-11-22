@@ -108,6 +108,10 @@ jobs:
       - name: Build native agent
         working-directory: agent
         run: go build -trimpath -o /tmp/monitor-me-agent ./cmd/monitor-agent
+      - name: Validate Linux systemd service
+        run: |
+          sudo install -m 0755 /tmp/monitor-me-agent /usr/local/bin/monitor-agent
+          systemd-analyze verify agent/deploy/systemd/monitor-me-agent.service
       - name: Benchmark Linux collection and durable spool
         working-directory: agent
         run: go test -run '^$' -bench 'Benchmark(ProcCollectorCollect|CounterRate|SpoolAppend)' -benchmem -benchtime=3s ./internal/collector ./internal/spool

@@ -12,6 +12,8 @@ The native Go agent runs directly on a monitored Linux host. Docker is not requi
 - Counter-derived rates use actual monotonic elapsed time; counter resets and invalid intervals produce missing rates, not negative values.
 - Bounded append-only JSONL spool, fsync on append, private 0700 directory/0600 WAL file, quota enforcement, recovery of a truncated final record, and atomic acknowledgement compaction.
 - Optional TLS gRPC enrollment, persisted session credentials, heartbeat, reconnect/backoff, and local batch delivery. A batch is removed from the WAL only after the backend reports a durable commit.
+- Agent-health telemetry includes process CPU utilization, collector errors per interval, persistent WAL byte size and unacknowledged batch depth. Last successful send is omitted until a matching durable ACK has been received.
+- A hardened Linux systemd unit is provided at `agent/deploy/systemd/monitor-me-agent.service`; the monitored machine needs systemd but does not need Docker.
 
 Unsupported operating systems report only agent health/spool capabilities. Linux procfs collectors are not claimed on Windows or macOS.
 
@@ -81,3 +83,24 @@ The returned session is written once to the local state file. The parent directo
 When the spool reaches its configured quota, new appends fail with an observable error; already persisted batches remain intact. Delivery uses batches of up to 16 pending records per stream. Backend acknowledgements are sent only after PostgreSQL commits; a lost acknowledgement is safe because retries use the same batch ID and content hash.
 
 Redis live events are best-effort notifications. They are never treated as proof of durability. PostgreSQL history is the recovery path for reconnecting dashboards.
+
+## Linux systemd service
+
+Build and install the agent binary and unit:
+
+```sh
+cd agent
+go build -trimpath -o /tmp/monitor-agent ./cmd/monitor-agent
+sudo install -m 0755 /tmp/monitor-agent /usr/local/bin/monitor-agent
+sudo install -d -m 0700 /etc/monitor-me
+sudo install -m 0644 deploy/systemd/monitor-me-agent.service /etc/systemd/system/monitor-me-agent.service
+sudo install -m 0600 deploy/systemd/agent.env.example /etc/monitor-me/agent.env
+sudo install -m 0644 /path/to/server-ca.crt /etc/monitor-me/server-ca.crt
+sudo systemctl daemon-reload
+sudo systemctl enable --now monitor-me-agent
+sudo systemctl status monitor-me-agent
+```
+
+Edit `/etc/monitor-me/agent.env` with the organization's gRPC address and trusted CA path. Put a one-use enrollment token there only for initial enrollment, then remove that line after the private agent state file has been created. The unit runs as root because host-wide process inventory and RSS collection require access to process metadata across users; filesystem writes are confined to `/var/lib/monitor-me`. The WAL and session state inherit restrictive directory/file permissions.
+
+Follow logs with `journalctl -u monitor-me-agent -f`. Use `systemctl restart monitor-me-agent` to restart and `systemctl disable --now monitor-me-agent` to disable and stop the service.

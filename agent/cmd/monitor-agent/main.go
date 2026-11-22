@@ -10,6 +10,7 @@ import (
 
 	"github.com/WorkRCS/monitor_me/agent/internal/collector"
 	"github.com/WorkRCS/monitor_me/agent/internal/config"
+	"github.com/WorkRCS/monitor_me/agent/internal/health"
 	"github.com/WorkRCS/monitor_me/agent/internal/spool"
 	"github.com/WorkRCS/monitor_me/agent/internal/state"
 	"github.com/WorkRCS/monitor_me/agent/internal/transport"
@@ -47,6 +48,7 @@ func run(cfg config.Config, logger *slog.Logger) error {
 		return err
 	}
 	hostCollector := collector.NewProcCollector(cfg.ProcRoot)
+	healthState := health.New()
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
@@ -58,7 +60,7 @@ func run(cfg config.Config, logger *slog.Logger) error {
 		"transport_enabled", cfg.GRPCAddress != "",
 	)
 	if cfg.GRPCAddress != "" {
-		go runRemote(ctx, cfg, hostCollector.Capabilities(), store, logger)
+		go runRemote(ctx, cfg, hostCollector.Capabilities(), store, healthState, logger)
 	}
 
 	ticker := time.NewTicker(cfg.CollectionInterval)
@@ -74,6 +76,19 @@ func run(cfg config.Config, logger *slog.Logger) error {
 			return nil
 		case <-ticker.C:
 			samples, collectErr := hostCollector.Collect(ctx)
+			if collectErr != nil {
+				logger.Warn("one or more host collectors failed", "error", collectErr)
+			}
+			spoolBytes, pendingBatches, statsErr := store.Stats()
+			if statsErr != nil {
+				logger.Error("could not inspect telemetry spool", "error", statsErr)
+			} else {
+				// The snapshot is taken before this cycle's batch is appended, so
+				// depth and size can lag the current health batch by one interval.
+				samples = append(samples, healthState.Samples(
+					time.Now().UTC(), health.CollectorErrorCount(collectErr), spoolBytes, pendingBatches,
+				)...)
+			}
 			if len(samples) > 0 {
 				batch, batchErr := spool.NewBatch(samples, time.Now().UTC().UnixNano())
 				if batchErr == nil {
@@ -85,14 +100,11 @@ func run(cfg config.Config, logger *slog.Logger) error {
 					logger.Debug("telemetry batch persisted locally", "batch_id", batch.ID, "sample_count", len(samples))
 				}
 			}
-			if collectErr != nil {
-				logger.Warn("one or more host collectors failed", "error", collectErr)
-			}
 		}
 	}
 }
 
-func runRemote(ctx context.Context, cfg config.Config, capabilities []string, store *spool.Store, logger *slog.Logger) {
+func runRemote(ctx context.Context, cfg config.Config, capabilities []string, store *spool.Store, healthState *health.State, logger *slog.Logger) {
 	backoff := time.Second
 	for ctx.Err() == nil {
 		client, err := transport.Dial(cfg.GRPCAddress, cfg.TLSCAFile)
@@ -169,6 +181,10 @@ func runRemote(ctx context.Context, cfg config.Config, capabilities []string, st
 				callContext, cancel := context.WithTimeout(ctx, 8*time.Second)
 				sent, sendErr := client.SendPending(callContext, session, store)
 				cancel()
+				if sent > 0 {
+					healthState.MarkSuccessfulSend(time.Now().UTC())
+					logger.Debug("telemetry batches acknowledged by control plane", "batch_count", sent)
+				}
 				if sendErr != nil {
 					logger.Warn("telemetry delivery failed; reconnecting", "error", sendErr)
 					if status.Code(sendErr) == codes.Unauthenticated && cfg.EnrollmentToken != "" {
@@ -177,8 +193,6 @@ func runRemote(ctx context.Context, cfg config.Config, capabilities []string, st
 						}
 					}
 					connected = false
-				} else if sent > 0 {
-					logger.Debug("telemetry batches acknowledged by control plane", "batch_count", sent)
 				}
 			}
 		}

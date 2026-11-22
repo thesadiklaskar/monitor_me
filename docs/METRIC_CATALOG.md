@@ -86,10 +86,10 @@ Interface identity, state, and counter reset behavior must be recorded. Loopback
 | --- | --- | --- |
 | `host.uptime.seconds` | seconds, gauge | Time since host boot |
 | `agent.uptime.seconds` | seconds, gauge | Time since agent process start |
-| `agent.cpu.utilization` | percent | Agent process CPU consumption |
+| `agent.cpu.utilization` | percent | Agent process CPU consumption as a percentage of one logical CPU; multithreaded workloads may exceed 100% |
 | `agent.memory.rss` | bytes | Agent resident memory |
 | `agent.collector.errors` | count | Collector errors by collector and interval |
-| `agent.queue.depth` | samples or batches | Pending telemetry in memory |
+| `agent.queue.depth` | batches | Unacknowledged telemetry batches in the persistent local WAL; there is no separate in-memory ingestion queue |
 | `agent.spool.bytes` | bytes | Persistent local spool size |
 | `agent.last_successful_send` | timestamp | Last successful backend delivery |
 
@@ -176,16 +176,12 @@ Process cgroup labels include `cgroup_path`, `workload_type`, `workload_selector
 
 ## Appendix B. Phase 3 Agent-Health Coverage
 
-The Phase 3 agent reports its version, OS, architecture, capabilities, and liveness through the authenticated enrollment/heartbeat contract. The current Linux telemetry samples include agent uptime and agent RSS.
+The Linux agent emits the full AgentHealth metric list as ordinary telemetry samples. The protobuf AgentHealth message remains reserved and is not required for these samples.
 
-The following entries in the target catalog are **not currently emitted as telemetry samples**:
+- `agent.cpu.utilization`: process CPU seconds measured by the Go runtime and converted to percent of one logical CPU using elapsed time. The first sample is omitted until a baseline exists; resets/invalid intervals are omitted. Multithreaded processes may exceed 100%.
+- `agent.collector.errors`: count of leaf collector errors for the current collection interval.
+- `agent.queue.depth`: number of unacknowledged batches in the persistent WAL, not an in-memory queue.
+- `agent.spool.bytes`: current WAL file size in bytes.
+- `agent.last_successful_send`: Unix timestamp in seconds for the most recent matching accepted backend ACK observed during the current agent process lifetime. It is omitted until first delivery succeeds and is not persisted across agent restarts.
 
-- agent.cpu.utilization
-- agent.collector.errors
-- agent.queue.depth
-- agent.spool.bytes
-- agent.last_successful_send
-
-The current sender has no separate in-memory work queue: it collects, persists batches to the bounded WAL, and sends at most 16 pending batches per delivery pass, waiting for each durable acknowledgement. Queue depth is therefore not a meaningful numeric zero; it is not an implemented metric. The protobuf AgentHealth message is reserved for a future health-reporting path and is not accepted by the current stream handler.
-
-Consumers must treat these metrics as unavailable until implemented. They must not synthesize zero values or infer health from a missing sample.
+The health snapshot is collected before the current interval's combined telemetry batch is appended, so spool size and queue depth can lag that batch by one collection interval. Missing first-sample CPU or last-send timestamps are left absent rather than represented as zero.

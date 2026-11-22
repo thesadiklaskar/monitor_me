@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	runtimemetrics "runtime/metrics"
 	"sort"
 	"strconv"
 	"strings"
@@ -45,9 +46,11 @@ type ProcCollector struct {
 	root            string
 	startedAt       time.Time
 	previousAt      time.Time
-	previousCPU     map[string]cpuCounters
-	previousDisk    map[string]diskCounters
-	previousNetwork map[string]networkCounters
+	previousCPU             map[string]cpuCounters
+	previousDisk            map[string]diskCounters
+	previousNetwork         map[string]networkCounters
+	previousAgentCPUSeconds float64
+	hasPreviousAgentCPU     bool
 }
 
 func NewProcCollector(root string) *ProcCollector {
@@ -99,6 +102,17 @@ func (c *ProcCollector) Collect(ctx context.Context) ([]Sample, error) {
 	}
 
 	var collectionErrors []error
+	if cpuSeconds, ok := readAgentCPUSeconds(); ok {
+		if c.hasPreviousAgentCPU {
+			if utilization, valid := AgentCPUUtilization(c.previousAgentCPUSeconds, cpuSeconds, now.Sub(c.previousAt)); valid {
+				add("agent.cpu.utilization", utilization, "percent", nil)
+			}
+		}
+		c.previousAgentCPUSeconds = cpuSeconds
+		c.hasPreviousAgentCPU = true
+	} else {
+		collectionErrors = append(collectionErrors, errors.New("Go runtime process CPU counter is unavailable"))
+	}
 	cpuRaw, err := os.ReadFile(filepath.Join(c.root, "stat"))
 	if err != nil {
 		return nil, fmt.Errorf("read procfs CPU counters: %w", err)
@@ -515,4 +529,24 @@ func CounterRate(previous, current float64, elapsed time.Duration) (float64, boo
 		return 0, false
 	}
 	return (current - previous) / elapsed.Seconds(), true
+}
+
+
+// AgentCPUUtilization reports process CPU as a percentage of one logical CPU.
+// Multi-threaded workloads may legitimately exceed 100 percent.
+func AgentCPUUtilization(previous, current float64, elapsed time.Duration) (float64, bool) {
+	rate, ok := CounterRate(previous, current, elapsed)
+	if !ok {
+		return 0, false
+	}
+	return rate * 100, true
+}
+
+func readAgentCPUSeconds() (float64, bool) {
+	samples := []runtimemetrics.Sample{{Name: "/cpu/classes/total:cpu-seconds"}}
+	runtimemetrics.Read(samples)
+	if samples[0].Value.Kind() != runtimemetrics.KindFloat64 {
+		return 0, false
+	}
+	return samples[0].Value.Float64(), true
 }
