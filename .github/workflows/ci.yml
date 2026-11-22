@@ -178,6 +178,28 @@ jobs:
       - name: Verify dependency-aware readiness
         run: docker compose exec -T api wget -q -O - http://127.0.0.1:8080/health/ready
 
+      - name: Verify PostgreSQL durability during Redis outage and recovery
+        shell: bash
+        run: |
+          docker compose stop redis
+          if docker compose exec -T api wget -q -O - http://127.0.0.1:8080/health/ready; then
+            echo "API readiness must fail while the required Redis dependency is unavailable."
+            exit 1
+          fi
+          docker compose exec -T postgres \
+            psql -v ON_ERROR_STOP=1 -U monitor_me -d monitor_me \
+            -Atc "SELECT count(*) > 0 FROM users;" | grep -qx t
+          docker compose start redis
+          for attempt in $(seq 1 30); do
+            if docker compose exec -T api wget -q -O /dev/null http://127.0.0.1:8080/health/ready; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose ps --all
+          docker compose logs --no-color
+          exit 1
+
       - name: Print logs on failure
         if: failure()
         run: docker compose logs --no-color

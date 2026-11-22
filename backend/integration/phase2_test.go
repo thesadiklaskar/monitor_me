@@ -156,6 +156,61 @@ func TestPhase2AuthenticationAndAgentLifecycle(t *testing.T) {
 		t.Fatalf("unexpected enrollment token expiry: %s", serverResponse.Enrollment.ExpiresAt)
 	}
 
+	// A viewer cannot revoke an enrollment credential created by an owner.
+	viewerRevoke := requestJSON(t, ctx, http.MethodPost,
+		baseURL+"/v1/enrollment-tokens/"+serverResponse.Enrollment.TokenID+"/revoke",
+		viewerSession.AccessToken, map[string]any{})
+	if viewerRevoke.StatusCode != http.StatusForbidden {
+		t.Fatalf("viewer token revocation: expected 403, got %d", viewerRevoke.StatusCode)
+	}
+
+	// A member of a different organization must never see this server.
+	otherPassword := "second-organization-owner-password"
+	otherHash, err := security.HashPassword(otherPassword)
+	if err != nil {
+		t.Fatalf("hash second organization password: %v", err)
+	}
+	var otherOrganizationID, otherUserID string
+	if err := database.QueryRowContext(ctx, `
+		INSERT INTO organizations (name, slug)
+		VALUES ('Second Test Organization', 'second-test-organization')
+		RETURNING id::text
+	`).Scan(&otherOrganizationID); err != nil {
+		t.Fatalf("create second organization: %v", err)
+	}
+	if err := database.QueryRowContext(ctx, `
+		INSERT INTO users (email, display_name, password_hash)
+		VALUES ('second-owner@example.invalid', 'Second Organization Owner', $1)
+		RETURNING id::text
+	`, otherHash).Scan(&otherUserID); err != nil {
+		t.Fatalf("create second organization user: %v", err)
+	}
+	if _, err := database.ExecContext(ctx, `
+		INSERT INTO organization_memberships (organization_id, user_id, role)
+		VALUES ($1, $2, 'owner')
+	`, otherOrganizationID, otherUserID); err != nil {
+		t.Fatalf("create second organization membership: %v", err)
+	}
+	otherLogin := requestJSON(t, ctx, http.MethodPost, baseURL+"/v1/auth/login", "", map[string]any{
+		"email": "second-owner@example.invalid", "password": otherPassword,
+	})
+	if otherLogin.StatusCode != http.StatusOK {
+		t.Fatalf("second organization login: expected 200, got %d: %s", otherLogin.StatusCode, otherLogin.Body)
+	}
+	var otherSession apiResponse
+	decodeResponse(t, otherLogin.Body, &otherSession)
+	otherInventoryResponse := requestJSON(t, ctx, http.MethodGet, baseURL+"/v1/servers", otherSession.AccessToken, nil)
+	if otherInventoryResponse.StatusCode != http.StatusOK {
+		t.Fatalf("second organization inventory: expected 200, got %d", otherInventoryResponse.StatusCode)
+	}
+	var otherInventory struct {
+		Servers []json.RawMessage `json:"servers"`
+	}
+	decodeResponse(t, otherInventoryResponse.Body, &otherInventory)
+	if len(otherInventory.Servers) != 0 {
+		t.Fatalf("cross-organization inventory leak: received %d foreign servers", len(otherInventory.Servers))
+	}
+
 	certificatePEM, err := os.ReadFile(rootCAPath)
 	if err != nil {
 		t.Fatalf("read gRPC root certificate: %v", err)
