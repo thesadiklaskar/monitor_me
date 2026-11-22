@@ -236,6 +236,39 @@ jobs:
           docker compose ps --all
           docker compose logs --no-color
           exit 1
+      - name: Verify PostgreSQL outage and recovery
+        shell: bash
+        run: |
+          docker compose stop postgres
+          database_unavailable=0
+          for attempt in $(seq 1 15); do
+            if ! docker compose exec -T api wget -q -O /dev/null http://127.0.0.1:8080/health/ready; then
+              database_unavailable=1
+              break
+            fi
+            sleep 1
+          done
+          if [ "$database_unavailable" -ne 1 ]; then
+            echo "API readiness must fail while PostgreSQL is unavailable."
+            exit 1
+          fi
+          docker compose start postgres
+          database_recovered=0
+          for attempt in $(seq 1 30); do
+            if docker compose exec -T api wget -q -O /dev/null http://127.0.0.1:8080/health/ready; then
+              database_recovered=1
+              break
+            fi
+            sleep 2
+          done
+          if [ "$database_recovered" -ne 1 ]; then
+            docker compose ps --all
+            docker compose logs --no-color
+            exit 1
+          fi
+          docker compose exec -T postgres \
+            psql -v ON_ERROR_STOP=1 -U monitor_me -d monitor_me \
+            -Atc "SELECT count(*) > 0 FROM telemetry_samples;" | grep -qx t
       - name: Print logs on failure
         if: failure()
         run: docker compose logs --no-color

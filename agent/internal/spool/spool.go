@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"strings"
 
 	"github.com/WorkRCS/monitor_me/agent/internal/collector"
 )
@@ -275,7 +276,13 @@ func (s *Store) readLocked(limit int) ([]Batch, error) {
 }
 
 func validateBatch(batch Batch) error {
-	if len(batch.ID) != 32 || batch.CollectedAtUnixNanos <= 0 || batch.SchemaVersion != 1 ||
+	if len(batch.ID) != 32 || strings.ToLower(batch.ID) != batch.ID {
+		return errors.New("telemetry batch ID must be 32 lowercase hexadecimal characters")
+	}
+	if _, err := hex.DecodeString(batch.ID); err != nil {
+		return errors.New("telemetry batch ID must be hexadecimal")
+	}
+	if batch.CollectedAtUnixNanos <= 0 || batch.SchemaVersion != 1 ||
 		len(batch.Samples) == 0 || len(batch.Samples) > maxBatchSamples {
 		return errors.New("telemetry batch metadata is invalid")
 	}

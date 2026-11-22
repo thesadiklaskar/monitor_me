@@ -13,7 +13,8 @@ service AgentControl {
   // ReportHeartbeat validates an opaque agent session credential and refreshes liveness.
   rpc ReportHeartbeat(HeartbeatRequest) returns (HeartbeatResponse);
 
-  // Stream is reserved for Phase 3 durable telemetry ingestion.
+  // Stream accepts bounded telemetry batches and acknowledges only committed data.
+  // AgentEvent and AgentHealth payloads are reserved and are not accepted yet.
   rpc Stream(stream AgentToServerMessage) returns (stream ServerToAgentMessage);
 }
 
@@ -76,6 +77,7 @@ message MetricSample {
   int64 observed_at_unix_nanos = 5;
 }
 
+// AgentEvent is reserved for a future versioned event-ingestion path.
 message AgentEvent {
   string event_id = 1;
   string event_type = 2;
@@ -83,6 +85,8 @@ message AgentEvent {
   int64 occurred_at_unix_nanos = 4;
 }
 
+// AgentHealth is reserved for a future health-reporting path. Current agent
+// liveness is reported through the authenticated heartbeat RPC.
 message AgentHealth {
   uint64 queue_depth = 1;
   uint64 spool_bytes = 2;
@@ -104,6 +108,7 @@ message BatchAcknowledgement {
   string message = 4;
 }
 
+// AgentCommand is reserved for the future allowlisted remote-operation channel.
 message AgentCommand {
   string command_id = 1;
   string command_type = 2;

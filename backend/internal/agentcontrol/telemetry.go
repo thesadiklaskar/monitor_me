@@ -5,7 +5,6 @@ import (
 	"context"
 	"crypto/sha256"
 	"database/sql"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"io"
@@ -23,6 +22,7 @@ import (
 const maxTelemetryBatchSamples = 4096
 
 var (
+	batchIDPattern   = regexp.MustCompile("^[0-9a-f]{32}$")
 	metricNamePattern = regexp.MustCompile("^[a-zA-Z][a-zA-Z0-9_.-]{0,127}$")
 	labelKeyPattern   = regexp.MustCompile("^[a-zA-Z][a-zA-Z0-9_.-]{0,63}$")
 )
@@ -230,11 +230,8 @@ func (s *Service) persistTelemetryBatch(ctx context.Context, agentID, sessionTok
 }
 
 func validateTelemetryBatch(batch *monitorv1.TelemetryBatch) error {
-	if batch == nil || len(batch.GetBatchId()) != 32 {
-		return errors.New("telemetry batch ID must be 32 hexadecimal characters")
-	}
-	if _, err := hex.DecodeString(batch.GetBatchId()); err != nil {
-		return errors.New("telemetry batch ID must be hexadecimal")
+	if batch == nil || !batchIDPattern.MatchString(batch.GetBatchId()) {
+		return errors.New("telemetry batch ID must be 32 lowercase hexadecimal characters")
 	}
 	if batch.GetSchemaVersion() != 1 {
 		return errors.New("unsupported telemetry schema version")

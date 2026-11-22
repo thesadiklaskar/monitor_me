@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -106,5 +107,26 @@ func TestSpoolRecoveryKeepsCommittedRecordsAndDropsOnlyTruncatedTail(t *testing.
 	pending, err := recovered.Peek(10)
 	if err != nil || len(pending) != 1 || pending[0].ID != first.ID {
 		t.Fatalf("recovery did not preserve the committed batch: %#v, %v", pending, err)
+	}
+}
+
+func TestSpoolRejectsNonCanonicalBatchIdentifiers(t *testing.T) {
+	store, err := Open(t.TempDir(), 1<<20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	valid := fixtureBatch(t, 42)
+	uppercase := valid
+	uppercase.ID = strings.ToUpper(valid.ID)
+	if err := store.Append(uppercase); err == nil {
+		t.Fatal("uppercase batch IDs must be rejected before they enter the local WAL")
+	}
+	nonHexadecimal := valid
+	nonHexadecimal.ID = "gggggggggggggggggggggggggggggggg"
+	if err := store.Append(nonHexadecimal); err == nil {
+		t.Fatal("non-hexadecimal batch IDs must be rejected before they enter the local WAL")
+	}
+	if pending, err := store.Peek(10); err != nil || len(pending) != 0 {
+		t.Fatalf("invalid batch IDs must not alter the WAL: pending=%d error=%v", len(pending), err)
 	}
 }
