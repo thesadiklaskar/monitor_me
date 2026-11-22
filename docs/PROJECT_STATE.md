@@ -17,7 +17,7 @@ This file is the authoritative resume point for Monitor Me. Read it before makin
 | Current phase status | Not Started |
 | MVP status | Not complete — authenticated dashboard, server overview, Add Server UI, and live metric views remain Phase 4 requirements |
 | Implementation status | Phases 1–3 phase gates are complete and CI-verified. The Linux agent, durable WAL, TLS gRPC ingestion, PostgreSQL history/retention, authorized live delivery, workload attribution, and benchmarks are verified. The overall MVP is not complete because dashboard/login/Add Server and browser-facing views remain Phase 4 work. Several non-UI feature requirements remain In Progress/Planned in the acceptance matrix. |
-| Latest main commit | af3bab3ec5f273bbbf3006d4efa122db7cccdb5c |
+| Last source commit covered by latest successful CI run | af3bab3ec5f273bbbf3006d4efa122db7cccdb5c |
 | Latest verified CI run | [#45043161542 — success](https://github.com/WorkRCS/monitor_me/actions/runs/45043161542); all four jobs passed, including PostgreSQL outage/recovery canary |
 | Next action | Implement the authenticated Next.js login/session flow and server inventory page using the verified auth and server APIs; include logout, empty/loading/error states, and the Add Server one-time enrollment-token flow. |
 
@@ -30,7 +30,7 @@ The final Phase 1–3 audit passed all four jobs in [GitHub Actions run #4504316
 - Authenticated dashboard, server inventory UI, Add Server wizard and live metric views: Phase 4.
 - OS service registration and remaining AgentHealth telemetry samples: In Progress.
 - Workload mapping administration, full Docker Engine API discovery, process lifecycle/per-process CPU and persistent downsampled rollups: In Progress/Planned.
-- Windows/macOS agents, signed installers, staged fleet-scale testing and production operations: Phase 5.
+- Windows/macOS agents, signed installers, staged fleet-scale testing, production operations, and role-aware Linux firewall setup for control-plane/agent hosts: Phase 5.
 - Protobuf event/health/command messages are reserved; only authenticated telemetry batches are accepted by the current stream.
 
 ## Completed Phase 1 — Product Specification and Technical Blueprint
