@@ -37,8 +37,8 @@ func (api *API) createLiveTicket(writer http.ResponseWriter, request *http.Reque
 		return
 	}
 	writeJSON(writer, http.StatusCreated, map[string]any{
-		"ticket": ticket.Token,
-		"expires_at": ticket.ExpiresAt,
+		"ticket":             ticket.Token,
+		"expires_at":         ticket.ExpiresAt,
 		"expires_in_seconds": 30,
 		"single_use": true,
 	})

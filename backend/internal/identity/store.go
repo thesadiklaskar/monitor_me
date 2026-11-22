@@ -261,7 +261,6 @@ func (s *Store) Logout(ctx context.Context, principal Principal) error {
 	return nil
 }
 
-
 type LiveTicket struct {
 	Token     string
 	ExpiresAt time.Time

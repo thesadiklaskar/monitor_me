@@ -36,9 +36,12 @@ func (api *API) metrics(writer http.ResponseWriter, request *http.Request) {
 	principal := principalFromRequest(request)
 	query := telemetry.RangeQuery{
 		OrganizationID: principal.OrganizationID,
-		ServerID: request.PathValue("serverID"),
-		MetricName: queryValues.Get("metric"),
-		From: from, To: to, Step: step, Limit: limit,
+		ServerID:       request.PathValue("serverID"),
+		MetricName:     queryValues.Get("metric"),
+		From:           from,
+		To:             to,
+		Step:           step,
+		Limit:          limit,
 	}
 	points, err := api.telemetry.QueryRange(request.Context(), query)
 	if err != nil {
@@ -47,10 +50,10 @@ func (api *API) metrics(writer http.ResponseWriter, request *http.Request) {
 	}
 	writeJSON(writer, http.StatusOK, map[string]any{
 		"server_id": query.ServerID,
-		"metric": query.MetricName,
-		"from": query.From,
-		"to": query.To,
-		"step": query.Step.String(),
-		"points": points,
+		"metric":  query.MetricName,
+		"from":    query.From,
+		"to":      query.To,
+		"step":    query.Step.String(),
+		"points":  points,
 	})
 }
