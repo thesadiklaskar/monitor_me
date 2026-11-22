@@ -67,6 +67,12 @@ func (api *API) liveStream(writer http.ResponseWriter, request *http.Request) {
 		return
 	}
 	defer connection.Close()
+	// net/http's WriteTimeout also covers the upgrade handshake. Clear that
+	// inherited deadline after hijacking; this handler applies bounded deadlines
+	// explicitly to every subsequent WebSocket write.
+	if err := connection.UnderlyingConn().SetWriteDeadline(time.Time{}); err != nil {
+		return
+	}
 	connection.SetReadLimit(1024)
 	_ = connection.SetReadDeadline(time.Now().Add(60 * time.Second))
 	connection.SetPongHandler(func(string) error {

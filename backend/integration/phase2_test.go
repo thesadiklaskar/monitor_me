@@ -10,7 +10,9 @@ import (
 	"crypto/x509"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -404,6 +406,63 @@ func TestPhase2AuthenticationAndAgentLifecycle(t *testing.T) {
 	}
 	defer liveConnection.Close()
 
+	// A ticket is invalid as soon as its parent user session is logged out.
+	revokedTicketResponse := requestJSON(t, ctx, http.MethodPost,
+		baseURL+"/v1/live/ticket", viewerSession.AccessToken, map[string]any{})
+	if revokedTicketResponse.StatusCode != http.StatusCreated {
+		t.Fatalf("create live ticket for logout test: expected 201, got %d: %s",
+			revokedTicketResponse.StatusCode, revokedTicketResponse.Body)
+	}
+	var revokedTicket struct {
+		Ticket string `json:"ticket"`
+	}
+	decodeResponse(t, revokedTicketResponse.Body, &revokedTicket)
+	logoutViewer := requestJSON(t, ctx, http.MethodPost,
+		baseURL+"/v1/auth/logout", viewerSession.AccessToken, map[string]any{})
+	if logoutViewer.StatusCode != http.StatusNoContent {
+		t.Fatalf("revoke viewer session: expected 204, got %d: %s", logoutViewer.StatusCode, logoutViewer.Body)
+	}
+	revokedTicketURL := "ws" + strings.TrimPrefix(baseURL, "http") +
+		"/v1/live/ws?ticket=" + url.QueryEscape(revokedTicket.Ticket)
+	revokedTicketConnection, revokedTicketResult, revokedTicketErr :=
+		websocket.DefaultDialer.DialContext(ctx, revokedTicketURL, liveHeaders)
+	if revokedTicketErr == nil {
+		_ = revokedTicketConnection.Close()
+		t.Fatal("a ticket must not outlive its revoked parent user session")
+	}
+	if revokedTicketResult == nil || revokedTicketResult.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("ticket from a revoked session should return 401: response=%v error=%v",
+			revokedTicketResult, revokedTicketErr)
+	}
+	if revokedTicketResult.Body != nil {
+		revokedTicketResult.Body.Close()
+	}
+
+	// A separate organization's valid ticket may subscribe successfully, but it
+	// must never receive telemetry events published for this organization.
+	foreignTicketResponse := requestJSON(t, ctx, http.MethodPost,
+		baseURL+"/v1/live/ticket", otherSession.AccessToken, map[string]any{})
+	if foreignTicketResponse.StatusCode != http.StatusCreated {
+		t.Fatalf("create foreign organization live ticket: expected 201, got %d: %s",
+			foreignTicketResponse.StatusCode, foreignTicketResponse.Body)
+	}
+	var foreignTicket struct {
+		Ticket string `json:"ticket"`
+	}
+	decodeResponse(t, foreignTicketResponse.Body, &foreignTicket)
+	foreignLiveURL := "ws" + strings.TrimPrefix(baseURL, "http") +
+		"/v1/live/ws?ticket=" + url.QueryEscape(foreignTicket.Ticket)
+	foreignLiveConnection, foreignLiveResponse, err :=
+		websocket.DefaultDialer.DialContext(ctx, foreignLiveURL, liveHeaders)
+	if err != nil {
+		if foreignLiveResponse != nil && foreignLiveResponse.Body != nil {
+			foreignLiveResponse.Body.Close()
+		}
+		t.Fatalf("connect foreign organization live stream: response=%v error=%v",
+			foreignLiveResponse, err)
+	}
+	defer foreignLiveConnection.Close()
+
 	collectedAt := time.Now().UTC().UnixNano()
 	observedAt := collectedAt
 	batchID := "0123456789abcdef0123456789abcdef"
@@ -472,6 +531,17 @@ func TestPhase2AuthenticationAndAgentLifecycle(t *testing.T) {
 	if liveEvent.Type != "telemetry.batch" || liveEvent.OrganizationID != registered.User.OrganizationID ||
 		liveEvent.ServerID != serverID || liveEvent.BatchID != batchID {
 		t.Fatalf("live event has incorrect tenant or batch scope: %+v", liveEvent)
+	}
+	if err := foreignLiveConnection.SetReadDeadline(time.Now().Add(250 * time.Millisecond)); err != nil {
+		t.Fatal(err)
+	}
+	_, _, foreignReadErr := foreignLiveConnection.ReadMessage()
+	if foreignReadErr == nil {
+		t.Fatal("telemetry from one organization must not reach another organization's subscriber")
+	}
+	var networkError net.Error
+	if !errors.As(foreignReadErr, &networkError) || !networkError.Timeout() {
+		t.Fatalf("foreign live subscription ended unexpectedly instead of remaining isolated: %v", foreignReadErr)
 	}
 	_ = liveConnection.Close()
 

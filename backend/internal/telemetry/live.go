@@ -102,7 +102,12 @@ func PublishCommittedBatch(ctx context.Context, publisher EventPublisher, organi
 	if len(encoded) > 256<<10 {
 		return fmt.Errorf("live telemetry event exceeds the 256KiB publication limit")
 	}
+	return publisher.Publish(ctx, LiveChannel(organizationID), string(encoded))
+}
+
+// LiveChannel isolates Redis Pub/Sub events by organization without exposing
+// the raw organization identifier in Redis channel names.
+func LiveChannel(organizationID string) string {
 	digest := sha256.Sum256([]byte(organizationID))
-	channel := "monitor:live:organization:" + hex.EncodeToString(digest[:16])
-	return publisher.Publish(ctx, channel, string(encoded))
+	return "monitor:live:organization:" + hex.EncodeToString(digest[:16])
 }
