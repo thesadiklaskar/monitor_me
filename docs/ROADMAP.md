@@ -1,412 +1,199 @@
 # Zero-to-Production Roadmap
 
-This roadmap turns the product vision into independently deliverable phases. Each phase has an explicit boundary and a completion gate. The project must remain buildable and resumable after every completed phase.
+Monitor Me is delivered in **five major phases**. Each phase contains smaller independently reviewable tasks and has a clear completion gate. The repository must remain understandable and resumable between sessions.
 
-## Delivery Status
+## Overall Phase Status
 
-- [x] Phase 0 — Repository foundation
-- [ ] Phase 1 — Product requirements and measurable acceptance criteria
-- [ ] Phase 2 — Architecture and security decisions
-- [ ] Phase 3 — Backend and frontend foundations
-- [ ] Phase 4 — Persistent data model and storage
-- [ ] Phase 5 — Agent identity, enrollment, and communication protocol
-- [ ] Phase 6 — Linux host agent and core telemetry
-- [ ] Phase 7 — Reliable ingestion and live data distribution
-- [ ] Phase 8 — Frontend application, authentication, and server inventory
-- [ ] Phase 9 — Real-time dashboard and custom visualization
-- [ ] Phase 10 — Project-level resource attribution and switching
-- [ ] Phase 11 — Process, port, connection, and application telemetry
-- [ ] Phase 12 — Alert rules, event processing, and notifications
-- [ ] Phase 13 — Secure remote actions
-- [ ] Phase 14 — Windows and macOS agents
-- [ ] Phase 15 — One-click installers, upgrades, and uninstall
-- [ ] Phase 16 — Security, integration, and end-to-end hardening
-- [ ] Phase 17 — Performance, reliability, and scale validation
-- [ ] Phase 18 — Production deployment and operations
-- [ ] Phase 19 — Final documentation and as-built system design
+| Phase | Name | Status |
+| --- | --- | --- |
+| 1 | Product Specification and Technical Blueprint | **Completed** |
+| 2 | Platform Foundation and Secure Connectivity | Not Started |
+| 3 | Monitoring Agent and Telemetry Data Engine | Not Started |
+| 4 | Dashboard and Operational Features | Not Started |
+| 5 | Cross-Platform Production and Scale | Not Started |
+
+A feature can be implemented before its phase is complete, but its status must remain honest. "Completed" requires implementation and verification evidence, not just a specification.
 
 ---
 
-## Phase 0 — Repository Foundation
+## Phase 1 — Product Specification and Technical Blueprint
 
-**Status:** Completed
+**Status: Completed**
 
-### Scope
-- Initialize the private repository with project principles.
-- Establish English-only documentation and code rules.
-- Establish phase gates, commit standards, and continuation instructions.
-- Record the zero-to-production roadmap and exact resume point.
+### Scope delivered
 
-### Completion gate
-- README, repository instructions, roadmap, and project state exist.
-- The project has one unambiguous next action.
-- All initial documentation is written in English.
-
-## Phase 1 — Product Requirements and Measurable Acceptance Criteria
-
-**Status:** Not Started
-
-### Scope
-- Convert the initial product brief into precise functional requirements.
-- Define the target users and primary workflows.
-- Define an MVP boundary separately from later enterprise capabilities.
-- Define the supported operating-system and feature-capability matrix.
-- Define metric names, units, timestamps, sampling semantics, and accuracy expectations.
-- Define server, project, agent, user, and organization concepts.
-- Define dashboard, alert, remote-action, and installation acceptance criteria.
-- Define scale goals as staged test targets, not unsupported guarantees.
+- Defined product vision, primary users, core workflows, and product principles.
+- Defined initial MVP and post-MVP/enterprise scope.
+- Converted the original feature brief into stable functional requirement IDs and acceptance criteria.
+- Defined host, process, disk, network, application, and agent-health metric semantics.
+- Defined timestamps, counter-delta calculations, sampling constraints, and missing-data behavior.
+- Defined the five-phase delivery plan.
+- Documented the proposed component architecture, data flow, Docker boundaries, persistence responsibilities, and security boundaries.
+- Updated README as the project landing page and current status summary.
+- Established feature acceptance and resumable project-state records.
 
 ### Deliverables
+
 - `docs/PRODUCT_REQUIREMENTS.md`
 - `docs/METRIC_CATALOG.md`
-- A feature-to-test acceptance matrix.
+- `docs/FEATURE_ACCEPTANCE_MATRIX.md`
+- `docs/ARCHITECTURE_OVERVIEW.md`
+- Updated `README.md`, `docs/ROADMAP.md`, and `docs/PROJECT_STATE.md`
 
 ### Completion gate
-- Every MVP feature has an observable acceptance test.
-- Cross-platform limitations and required privileges are documented.
-- API latency and HTTP error-rate collection requirements are explicitly defined, including the need for application, proxy, or supported tracing instrumentation.
-- Sampling interval and end-to-end latency are defined as separate measurements.
-- The MVP and post-MVP scope are agreed.
 
-## Phase 2 — Architecture and Security Decisions
+- [x] Product scope and MVP boundary are documented.
+- [x] Functional requirements have stable IDs and acceptance criteria.
+- [x] Metric names, units, sources, and limitations are documented.
+- [x] Architecture and data flow are documented.
+- [x] Go, Next.js, PostgreSQL, Redis, Docker Compose, gRPC, Protocol Buffers, and WebSocket responsibilities are explicit.
+- [x] Docker control-plane use is distinguished from native host-agent installation.
+- [x] README accurately describes the current implementation status.
+- [x] Feature matrix and next phase are recorded.
 
-**Status:** Not Started
+## Phase 2 — Platform Foundation and Secure Connectivity
+
+**Status: Not Started**
 
 ### Scope
-- Define system boundaries and deployment topology.
-- Define the initial modular monolith/service boundaries; avoid premature microservices.
-- Design agent enrollment, identity, transport security, and revocation.
-- Design telemetry delivery, retry, idempotency, backpressure, and durable buffering.
-- Design PostgreSQL partitioning, retention, and downsampling.
-- Define Redis cache semantics and failure behavior.
-- Define remote-action threat model and permission model.
-- Record major choices as Architecture Decision Records (ADRs).
 
-### Deliverables
-- High-level component and data-flow diagrams.
-- Initial threat model.
-- ADRs for major architecture decisions.
-- Deployment topology for local development and first production deployment.
+1. Establish repository layout for the Go backend, native Go agent, and Next.js application.
+2. Add baseline formatting, linting, unit-test, static-check, and CI workflows.
+3. Initialize the Go backend with configuration, structured logging, health/readiness endpoints, and graceful shutdown.
+4. Initialize the Next.js/TypeScript frontend with an accessible application shell.
+5. Add local Docker Compose orchestration for the backend, frontend, PostgreSQL, and Redis.
+6. Add versioned PostgreSQL migrations and tested connection management.
+7. Integrate Redis for documented ephemeral cache/coordination use cases.
+8. Define the versioned Protocol Buffer schema and gRPC service contract.
+9. Implement user authentication and server-side authorization foundations.
+10. Implement secure agent enrollment, identity binding, heartbeat, revocation, and capability reporting.
 
 ### Completion gate
-- Critical data flows and trust boundaries are documented.
-- Failure modes and recovery behavior are documented.
-- No critical architecture decision depends on an unverified performance claim.
 
-## Phase 3 — Backend and Frontend Foundations
+- [ ] Backend and frontend build from a clean checkout.
+- [ ] Docker Compose starts the full local control-plane stack with health checks.
+- [ ] PostgreSQL migrations work on a clean database and are version-controlled.
+- [ ] Redis is optional to durable storage; a cache outage does not corrupt persisted records.
+- [ ] Authentication and authorization tests pass.
+- [ ] Valid enrollment succeeds; expired, revoked, and invalid credentials fail.
+- [ ] An agent can authenticate, report heartbeat/capabilities, reconnect, and be revoked in integration tests.
+- [ ] Protocol compatibility and configuration are documented.
+- [ ] README explains the implemented setup and features; state points to Phase 3.
 
-**Status:** Not Started
+## Phase 3 — Monitoring Agent and Telemetry Data Engine
+
+**Status: Not Started**
 
 ### Scope
-- Establish a maintainable repository layout.
-- Initialize the Go backend with configuration, structured logging, graceful shutdown, health, and readiness endpoints.
-- Initialize the Next.js and TypeScript frontend with a minimal application shell.
-- Add formatting, linting, unit-test, and CI workflows.
-- Add configuration examples without secrets.
-- Establish local developer workflows.
+
+1. Implement the native Go agent lifecycle, configuration, logging, and capability model.
+2. Implement Linux CPU and per-core collection.
+3. Implement Linux memory, swap, cache, and process RSS collection with correct semantics.
+4. Implement disk throughput, read/write operations, network throughput, and packet counters.
+5. Add uptime, agent health, collector errors, and process inventory.
+6. Implement counter-delta calculations, monotonic elapsed-time measurement, and counter-reset handling.
+7. Implement bounded in-memory queues and a persistent agent-side spool/WAL.
+8. Implement authenticated, versioned telemetry ingestion with validation, idempotency, batching, and backpressure.
+9. Persist telemetry in PostgreSQL and define retention/partition behavior.
+10. Implement live data fan-out to authorized WebSocket subscribers.
+11. Add Docker/Systemd discovery and cgroups-based project attribution where supported.
+12. Add port/connection metadata and the foundations for supported application instrumentation or proxy integrations.
+13. Add metric aggregation and downsampling after correctness tests.
 
 ### Completion gate
-- Backend and frontend build from a clean checkout.
-- Health/readiness checks behave correctly.
-- CI runs relevant formatting, lint, and test commands.
-- No credentials are committed.
 
-## Phase 4 — Persistent Data Model and Storage
+- [ ] Linux agent runs natively and reports its capabilities.
+- [ ] Core metrics have unit/fixture tests and comparisons against documented OS sources.
+- [ ] Rate calculations handle resets and elapsed-time changes without negative or fabricated values.
+- [ ] Agent buffering survives expected network interruption and process restart scenarios.
+- [ ] Ingestion has bounded queues, observable backpressure, idempotency, and tested overload behavior.
+- [ ] Historical data is durable in PostgreSQL; Redis is not the only copy.
+- [ ] Live delivery is authorized, bounded, and reconnectable.
+- [ ] Project attribution exposes its method and does not hide shared/unclassified resources.
+- [ ] Collection overhead and initial ingest performance are benchmarked.
+- [ ] README and state reflect only verified telemetry capabilities; state points to Phase 4.
 
-**Status:** Not Started
+## Phase 4 — Dashboard and Operational Features
+
+**Status: Not Started**
 
 ### Scope
-- Design PostgreSQL schemas for organizations, users, servers, agents, projects, metric definitions, metric samples, events, and audit records as required by the agreed MVP.
-- Add versioned migrations and rollback guidance.
-- Implement bounded connection pooling and batch-write paths.
-- Define time partitioning, indexes, retention, and downsampling strategy.
-- Define data consistency and idempotency keys.
-- Add Redis integration for explicitly ephemeral live state and cache use cases.
+
+1. Build server inventory, Add Server, server detail, and agent health pages.
+2. Build the overall host dashboard.
+3. Build the header-level All Projects / project selector and no-full-reload switching.
+4. Build custom Canvas/WebGL visualizations where benchmarks justify their use.
+5. Add time ranges, historical charts, query limits, and stale-data indicators.
+6. Add process, port, connection, workload, and application metric views.
+7. Add API latency and HTTP error dashboards through validated instrumentation/proxy integrations.
+8. Add alert rules, deduplication, recovery events, and notification delivery.
+9. Add authorized, allowlisted, audited restart/stop actions through the agent control channel.
+10. Complete the guided one-command installation workflow and user-facing operational guidance.
+11. Add user/role/project administration and audit views as required for the first production release.
 
 ### Completion gate
-- Migrations work on a clean database.
-- Repository tests cover reads, writes, duplicate ingestion, and failure paths.
-- Cache loss does not destroy durable telemetry.
-- Retention and partition behavior are tested.
 
-## Phase 5 — Agent Identity, Enrollment, and Communication Protocol
+- [ ] Dashboard values, units, scopes, and timestamps match backend test fixtures.
+- [ ] All Projects and individual project selection update all scoped panels and subscriptions without a full page reload.
+- [ ] Overall host totals remain distinct from project-attributed totals.
+- [ ] Graphs pass rendering tests on documented reference hardware and representative sample counts.
+- [ ] Historical queries are bounded and use appropriate aggregation/downsampling.
+- [ ] API metrics are validated against a controlled test application or proxy.
+- [ ] Alerts pass deterministic transition, deduplication, and recovery tests.
+- [ ] Notifications have observable delivery and retry state.
+- [ ] Remote actions enforce authorization, allowlists, timeouts, and audit logging.
+- [ ] Installation instructions are reproducible and do not expose credentials.
+- [ ] README reflects implemented operator workflows; state points to Phase 5.
 
-**Status:** Not Started
+## Phase 5 — Cross-Platform Production and Scale
+
+**Status: Not Started**
 
 ### Scope
-- Define versioned Protocol Buffer messages.
-- Establish authenticated gRPC communication over TLS.
-- Implement secure, expiring server enrollment.
-- Bind agent identity to a registered server.
-- Add heartbeats, capability reporting, protocol versioning, reconnect behavior, and credential revocation.
-- Define server-side validation for all agent payloads.
+
+1. Implement and test Windows native collectors.
+2. Implement and test macOS native collectors.
+3. Publish an OS/version/architecture capability matrix.
+4. Add signed, versioned installers, upgrades, rollback, uninstall, and credential rotation.
+5. Complete security review, tenant-isolation tests, dependency/static checks, and end-to-end hardening.
+6. Test agent, backend, PostgreSQL, Redis, and network failures with controlled fault injection.
+7. Add repeatable performance benchmarks for collection overhead, ingestion, storage, queries, alert delay, and browser rendering.
+8. Perform staged multi-agent load tests and document demonstrated capacity limits.
+9. Finalize retention, backups, restore, production deployment, and incident procedures.
+10. Reconcile every README feature status with source code and test evidence.
+11. Create the final Excalidraw as-built system design from the completed implementation and deployment configuration.
+12. Prepare a release checklist and final production documentation.
 
 ### Completion gate
-- An agent can enroll, authenticate, report health, reconnect, and be revoked in integration tests.
-- Invalid or expired credentials are rejected.
-- Protocol compatibility rules are documented.
 
-## Phase 6 — Linux Host Agent and Core Telemetry
-
-**Status:** Not Started
-
-### Scope
-- Build a small Go agent with explicit lifecycle and bounded resource use.
-- Collect CPU utilization and per-core counters.
-- Collect memory, swap, and relevant cache measurements.
-- Collect disk throughput and IOPS from supported OS interfaces.
-- Collect network throughput and packet counters.
-- Collect host identity, uptime, and agent health.
-- Implement monotonic counter-delta calculations and timestamping.
-- Add a configurable sampling interval; validate resource impact before selecting aggressive defaults.
-
-### Completion gate
-- Metric calculations are tested against known fixtures.
-- Units and semantics match the metric catalog.
-- Collector errors are isolated and visible.
-- Agent CPU and memory overhead are benchmarked on documented test hosts.
-- Linux support limitations are documented.
-
-## Phase 7 — Reliable Ingestion and Live Data Distribution
-
-**Status:** Not Started
-
-### Scope
-- Validate and ingest telemetry batches.
-- Implement bounded queues, backpressure, retry, and deduplication.
-- Implement an agent-side persistent spool/WAL with size limits and recovery.
-- Acknowledge batches only according to the agreed durability contract.
-- Distribute live metric updates to authorized dashboard subscribers.
-- Isolate slow consumers and prevent unbounded memory growth.
-
-### Completion gate
-- Network interruption and backend restart tests demonstrate recovery.
-- Duplicate batches do not create duplicate logical samples.
-- Queue limits and overload behavior are verified.
-- Data-loss boundaries are documented and tested.
-- Live updates are authorized and filtered by server/project scope.
-
-## Phase 8 — Frontend Application, Authentication, and Server Inventory
-
-**Status:** Not Started
-
-### Scope
-- Build the English-only application shell.
-- Implement sign-in and session handling using the architecture selected in Phase 2.
-- Implement organization and role-aware navigation.
-- Add server inventory, server details, agent status, and onboarding entry points.
-- Add loading, empty, error, and reconnecting states.
-
-### Completion gate
-- Core navigation works without page errors.
-- Protected views enforce authorization.
-- Server inventory reflects backend data.
-- UI behavior is covered by relevant tests.
-
-## Phase 9 — Real-Time Dashboard and Custom Visualization
-
-**Status:** Not Started
-
-### Scope
-- Build the custom metric visualization layer using Canvas/WebGL where measurement justifies it.
-- Implement live CPU, memory, disk, and network panels.
-- Add time ranges, pause/resume, units, tooltips, and historical queries.
-- Use bounded rendering windows and downsampled data for long ranges.
-- Keep the interface understandable without requiring users to learn complex query languages.
-
-### Completion gate
-- Dashboard data matches backend fixtures.
-- Rendering remains responsive under a documented sample volume.
-- Long-range views do not request or render every raw sample.
-- Reconnect and empty-data states behave correctly.
-
-## Phase 10 — Project-Level Resource Attribution and Switching
-
-**Status:** Not Started
-
-### Scope
-- Implement All Projects / Overall Server views.
-- Implement project creation and project-to-workload mapping.
-- Attribute resources using supported Linux cgroups, container metadata, and system service/process relationships.
-- Add project-scoped metric queries and live subscriptions.
-- Add instant project switching without a full page reload.
-- Clearly represent unclassified and shared host resources.
-
-### Completion gate
-- Project resource totals reconcile with host-level measurements within documented measurement boundaries.
-- Project switching updates every relevant panel and query scope.
-- Shared and unclassified resources are not silently assigned to a project.
-- Attribution behavior is tested with representative workloads.
-
-## Phase 11 — Process, Port, Connection, and Application Telemetry
-
-**Status:** Not Started
-
-### Scope
-- Add process inventory and per-process resource usage.
-- Add listening-port and connection metadata where supported.
-- Add optional eBPF-based Linux tracing behind capability checks.
-- Define application instrumentation or proxy integration for request latency and HTTP status/error rates.
-- Add application health checks and trace/metric correlation where in scope.
-
-### Completion gate
-- Platform capabilities and required privileges are visible.
-- Unsupported metrics are reported as unavailable, not fabricated.
-- API latency and HTTP error rates are validated against a controlled test application.
-- Collection overhead and privacy implications are documented.
-
-## Phase 12 — Alert Rules, Event Processing, and Notifications
-
-**Status:** Not Started
-
-### Scope
-- Implement threshold and condition-based alert rules.
-- Support scoped rules for servers and projects.
-- Add alert state transitions, deduplication, grouping, cooldowns, and recovery events.
-- Add notification channels selected during requirements and architecture phases.
-- Add alert history and delivery status.
-
-### Completion gate
-- Alert evaluation is deterministic and tested.
-- Duplicate events are controlled.
-- Recovery and notification failure behavior are documented.
-- Alert permissions and audit requirements are met.
-
-## Phase 13 — Secure Remote Actions
-
-**Status:** Not Started
-
-### Scope
-- Implement a small explicit command allowlist.
-- Support approved process/project restart and stop workflows.
-- Require authorization, least privilege, confirmation, timeouts, and audit records.
-- Use an authenticated bidirectional control channel.
-- Add safe handling for unavailable agents and partial failures.
-- Do not expose arbitrary remote shell execution.
-
-### Completion gate
-- Unauthorized actions are rejected.
-- Every attempted action is auditable.
-- Timeouts and retries cannot accidentally repeat non-idempotent actions.
-- Agent-side execution is restricted to approved operations.
-
-## Phase 14 — Windows and macOS Agents
-
-**Status:** Not Started
-
-### Scope
-- Implement OS-native collectors behind shared agent interfaces.
-- Add process, CPU, memory, disk, and network metrics supported by each OS.
-- Report platform-specific capability differences.
-- Add OS-specific packaging and integration tests.
-- Keep unsupported Linux-only features explicitly unavailable.
-
-### Completion gate
-- Supported collectors pass platform-specific tests.
-- Installation and upgrade behavior is verified on supported OS versions.
-- Cross-platform metrics have consistent documented semantics where possible.
-
-## Phase 15 — One-Click Installers, Upgrades, and Uninstall
-
-**Status:** Not Started
-
-### Scope
-- Generate short-lived, scoped enrollment commands from the dashboard.
-- Download signed, versioned agent packages.
-- Verify package signatures and checksums before installation.
-- Install and configure services using OS-native mechanisms.
-- Support upgrade, rollback, uninstall, and credential revocation.
-- Provide clear privilege and firewall requirements.
-
-### Completion gate
-- Clean-machine install, upgrade, rollback, and uninstall tests pass for each supported platform.
-- Invalid signatures and expired enrollment tokens are rejected.
-- Installation logs do not expose secrets.
-- Installation does not silently execute unverified artifacts.
-
-## Phase 16 — Security, Integration, and End-to-End Hardening
-
-**Status:** Not Started
-
-### Scope
-- Review authentication, authorization, tenant isolation, secrets, transport security, and audit controls.
-- Run dependency and static security checks.
-- Add integration and end-to-end coverage across agent, backend, database, cache, and frontend.
-- Test malformed input, slow consumers, resource exhaustion, and service restarts.
-- Document backup, restore, and incident procedures.
-
-### Completion gate
-- Critical security findings are resolved or explicitly accepted.
-- Tenant and project isolation tests pass.
-- Backup and restore procedures are exercised.
-- End-to-end release checks are repeatable.
-
-## Phase 17 — Performance, Reliability, and Scale Validation
-
-**Status:** Not Started
-
-### Scope
-- Establish reproducible benchmarks for collection overhead, ingest throughput, processing latency, storage throughput, query latency, and dashboard rendering.
-- Test progressively larger host counts and metric rates.
-- Profile Go services and frontend rendering.
-- Test backpressure, slow databases, Redis outages, packet loss, process crashes, and restarts.
-- Tune worker pools, batching, indexes, partitions, retention, and cache behavior based on evidence.
-- Define and publish measured service objectives.
-
-### Completion gate
-- Benchmark environment, workload, duration, versions, and results are recorded.
-- Bottlenecks have evidence-based fixes.
-- Resource limits and overload behavior are known.
-- Scale claims are limited to demonstrated test results.
-
-## Phase 18 — Production Deployment and Operations
-
-**Status:** Not Started
-
-### Scope
-- Define production topology and supported deployment modes.
-- Add deployment automation, configuration validation, secrets handling, TLS setup, migrations, and rollback.
-- Document capacity planning, backups, restore, upgrades, and incident response.
-- Add health/readiness checks and operational diagnostics.
-- Validate a clean production-like deployment.
-
-### Completion gate
-- A new environment can be deployed using documented steps.
-- Upgrade and rollback procedures are tested.
-- Backup restoration is demonstrated.
-- Operational ownership and known limitations are documented.
-
-## Phase 19 — Final Documentation and As-Built System Design
-
-**Status:** Not Started
-
-### Scope
-- Reconcile README feature status with the actual implementation and test evidence.
-- Publish installation, configuration, API, troubleshooting, security, and operations documentation.
-- Generate the final Excalidraw system design from the completed implementation.
-- Document components, data flows, storage, protocols, security boundaries, deployment, failure recovery, and scaling.
-- Perform a final repository and release review.
-
-### Completion gate
-- No feature is marked complete without implementation and verification evidence.
-- The Excalidraw design matches the actual deployed architecture.
-- README and release notes reflect the shipped product.
-- Known limitations and unsupported capabilities are explicit.
+- [ ] Windows and macOS support is tested for each documented OS/architecture combination.
+- [ ] Install, upgrade, rollback, and uninstall paths pass platform tests.
+- [ ] Security and tenant-isolation tests pass with no unresolved critical findings.
+- [ ] Recovery tests demonstrate documented behavior for supported failures.
+- [ ] Benchmark reports include environment, versions, workload, duration, and results.
+- [ ] Scale claims do not exceed demonstrated test capacity.
+- [ ] Production deployment, backup, and restore are exercised.
+- [ ] README feature statuses match verified shipped behavior.
+- [ ] Final Excalidraw diagrams match actual code, data flow, security, and deployment.
+- [ ] Final project state identifies the release commit and known limitations.
 
 ---
 
 ## Cross-Phase Definition of Done
 
-Every phase must satisfy all applicable items before it is marked complete:
+A feature or phase is not complete until all applicable conditions are satisfied:
 
-- [ ] Scope and acceptance criteria are satisfied.
-- [ ] Implementation is complete and integrated.
-- [ ] Unit, integration, and relevant end-to-end tests pass.
+- [ ] Scope and acceptance criteria are met.
+- [ ] Implementation is integrated; no placeholder is presented as finished functionality.
+- [ ] Relevant unit, integration, and end-to-end tests pass.
 - [ ] Formatting, linting, and static checks pass.
-- [ ] Security and failure paths are reviewed.
-- [ ] English documentation and code comments are updated.
-- [ ] README and project state are consistent.
-- [ ] Changes are committed with a descriptive Conventional Commit.
-- [ ] The next exact action is recorded in `docs/PROJECT_STATE.md`.
+- [ ] Security and failure paths are reviewed where relevant.
+- [ ] Comments explain intent, invariants, and non-obvious logic.
+- [ ] Documentation and feature acceptance status are updated.
+- [ ] README is updated to describe the verified feature and current phase status.
+- [ ] Git changes are committed using a descriptive Conventional Commit.
+- [ ] `docs/PROJECT_STATE.md` records the completed work, commit reference, blockers, and one exact next action.
 
-A phase can be split into smaller tasks, but its status must remain honest. A partially implemented phase is not complete.
+## Resume Rule
+
+Before making changes, read `README.md`, `AGENTS.md`, and `docs/PROJECT_STATE.md`. Continue from the exact next action in the project state. Never restart completed phases or mark a phase complete based solely on elapsed time or a partially implemented feature.
