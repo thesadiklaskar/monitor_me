@@ -9,10 +9,14 @@ import (
 	"strings"
 
 	"github.com/WorkRCS/monitor_me/backend/internal/identity"
+	redisv9 "github.com/redis/go-redis/v9"
+	"github.com/WorkRCS/monitor_me/backend/internal/telemetry"
 )
 
 type API struct {
 	identities *identity.Store
+	cache      *redisv9.Client
+	telemetry  *telemetry.Store
 }
 
 type principalContextKey struct{}

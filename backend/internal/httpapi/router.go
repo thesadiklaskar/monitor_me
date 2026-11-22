@@ -4,7 +4,9 @@ import (
 	"context"
 	"net/http"
 
+	redisv9 "github.com/redis/go-redis/v9"
 	"github.com/WorkRCS/monitor_me/backend/internal/identity"
+	"github.com/WorkRCS/monitor_me/backend/internal/telemetry"
 )
 
 // Dependency represents a backend service that must be reachable before the
@@ -14,8 +16,13 @@ type Dependency struct {
 	Check func(context.Context) error
 }
 
-// NewRouter registers health, authentication, and organization-scoped inventory routes.
-func NewRouter(version string, dependencies []Dependency, identities *identity.Store) http.Handler {
+type LiveDependencies struct {
+	Cache     *redisv9.Client
+	Telemetry *telemetry.Store
+}
+
+// NewRouter registers health, identity, inventory, telemetry, and live routes.
+func NewRouter(version string, dependencies []Dependency, identities *identity.Store, live ...LiveDependencies) http.Handler {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /health/live", healthHandler("ok", version, nil))
@@ -23,6 +30,10 @@ func NewRouter(version string, dependencies []Dependency, identities *identity.S
 
 	if identities != nil {
 		api := &API{identities: identities}
+		if len(live) > 0 {
+			api.cache = live[0].Cache
+			api.telemetry = live[0].Telemetry
+		}
 		mux.HandleFunc("POST /v1/auth/register", api.register)
 		mux.HandleFunc("POST /v1/auth/login", api.login)
 		mux.Handle("GET /v1/auth/me", api.requireAuth(http.HandlerFunc(api.me)))
@@ -32,6 +43,14 @@ func NewRouter(version string, dependencies []Dependency, identities *identity.S
 		mux.Handle("POST /v1/servers/{serverID}/enrollment-token", api.requireAuth(http.HandlerFunc(api.reissueEnrollmentToken)))
 		mux.Handle("POST /v1/enrollment-tokens/{tokenID}/revoke", api.requireAuth(http.HandlerFunc(api.revokeEnrollmentToken)))
 		mux.Handle("POST /v1/agents/{agentID}/revoke", api.requireAuth(http.HandlerFunc(api.revokeAgent)))
+
+		if api.telemetry != nil {
+			mux.Handle("GET /v1/servers/{serverID}/metrics", api.requireAuth(http.HandlerFunc(api.metrics)))
+		}
+		if api.cache != nil {
+			mux.Handle("POST /v1/live/ticket", api.requireAuth(http.HandlerFunc(api.createLiveTicket)))
+			mux.HandleFunc("GET /v1/live/ws", api.liveStream)
+		}
 	}
 
 	return mux
