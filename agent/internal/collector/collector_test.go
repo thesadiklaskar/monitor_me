@@ -78,6 +78,12 @@ func TestProcCollectorCollectsFixture(t *testing.T) {
 	write("diskstats", "8 0 sda 10 0 20 0 5 0 40 0 0 0 0\n")
 	write("net/dev", "Inter-| Receive | Transmit\n face |bytes packets errs drop fifo frame compressed multicast|bytes packets errs drop fifo colls carrier compressed\n eth0: 100 10 1 0 0 0 0 0 200 20 2 0 0 0 0 0\n")
 	write("uptime", "100.25 20.0\n")
+	write("net/tcp", "  sl  local_address rem_address   st\n"+
+		"   0: 0100007F:1F90 00000000:0000 0A 00000000:00000000 00:00000000 00000000 1000 0 12345\n")
+	write("net/tcp6", "  sl  local_address                         remote_address                        st\n")
+	write("123/statm", "100 10 0 0 0 0 0\n")
+	write("123/comm", "fixture-worker\n")
+	write("123/cgroup", "0::/system.slice/example.service\n")
 	collector := NewProcCollector(root)
 	samples, err := collector.Collect(t.Context())
 	if err != nil {
@@ -94,6 +100,17 @@ func TestProcCollectorCollectsFixture(t *testing.T) {
 	}
 	if !foundMemory {
 		t.Fatal("expected the documented memory-used gauge")
+	}
+	foundWorkload := false
+	for _, sample := range samples {
+		if sample.Name == "process.memory.rss" &&
+			sample.Labels["workload_type"] == "systemd" &&
+			sample.Labels["workload_selector"] == "/system.slice/example.service" {
+			foundWorkload = true
+		}
+	}
+	if !foundWorkload {
+		t.Fatal("expected process RSS to include explicit Systemd workload attribution")
 	}
 }
 

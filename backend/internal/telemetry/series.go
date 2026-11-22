@@ -10,9 +10,9 @@ import (
 )
 
 const (
-	minimumSeriesStep = 100 * time.Millisecond
-	maximumSeriesStep = 24 * time.Hour
-	maximumSeriesRange = 30 * 24 * time.Hour
+	minimumSeriesStep   = 100 * time.Millisecond
+	maximumSeriesStep   = 24 * time.Hour
+	maximumSeriesRange  = 30 * 24 * time.Hour
 	maximumSeriesPoints = 5000
 )
 
@@ -29,11 +29,11 @@ type RangeQuery struct {
 }
 
 type SeriesPoint struct {
-	Bucket       time.Time
-	Average      float64
-	Minimum      float64
-	Maximum      float64
-	SampleCount  int64
+	Bucket      time.Time
+	Average     float64
+	Minimum     float64
+	Maximum     float64
+	SampleCount int64
 }
 
 func ValidateRangeQuery(query RangeQuery, now time.Time) error {
@@ -49,6 +49,12 @@ func ValidateRangeQuery(query RangeQuery, now time.Time) error {
 	}
 	if query.Limit < 1 || query.Limit > maximumSeriesPoints {
 		return errors.New("series limit must be between 1 and 5000")
+	}
+	// Reject oversized bucket grids instead of scanning a long range and silently
+	// truncating the response at LIMIT.
+	requiredPoints := (query.To.Sub(query.From) + query.Step - 1) / query.Step
+	if requiredPoints > time.Duration(query.Limit) {
+		return errors.New("series range and step would exceed the requested point limit")
 	}
 	return nil
 }

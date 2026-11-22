@@ -21,9 +21,9 @@ type RetentionResult struct {
 
 func DefaultRetentionPolicy() RetentionPolicy {
 	return RetentionPolicy{
-		SampleAge: 30 * 24 * time.Hour,
+		SampleAge:      30 * 24 * time.Hour,
 		IdempotencyAge: 90 * 24 * time.Hour,
-		BatchSize: 5000,
+		BatchSize:      5000,
 	}
 }
 

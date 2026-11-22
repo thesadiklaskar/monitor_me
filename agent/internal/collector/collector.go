@@ -69,7 +69,8 @@ func (c *ProcCollector) Capabilities() []string {
 	}
 	return []string{
 		"host.cpu", "host.cpu.per_core", "host.memory", "host.swap",
-		"host.disk", "host.network", "host.uptime", "host.process_inventory",
+		"host.disk", "host.network", "host.network.tcp", "host.uptime",
+		"host.process_inventory", "workload.cgroup", "workload.systemd", "workload.container",
 		"agent.health", "agent.spool",
 	}
 }
