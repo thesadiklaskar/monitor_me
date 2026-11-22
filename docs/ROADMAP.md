@@ -186,6 +186,7 @@ A feature can be implemented before its phase is complete, but its status must r
 10. Reconcile every README feature status with source code and test evidence.
 11. Create the final Excalidraw as-built system design from the completed implementation and deployment configuration.
 12. Prepare a release checklist and final production documentation.
+13. Implement and verify role-aware Linux host firewall setup for production VPS/VM and local/LAN deployments: supported UFW/firewalld profiles, least-privilege ingress/egress, IPv4/IPv6 parity, Docker-aware port exposure, idempotent changes, diagnostics, and rollback. Agent-only monitored hosts must not receive unnecessary inbound rules.
 
 ### Completion gate
 
@@ -196,6 +197,8 @@ A feature can be implemented before its phase is complete, but its status must r
 - [ ] Benchmark reports include environment, versions, workload, duration, and results.
 - [ ] Scale claims do not exceed demonstrated test capacity.
 - [ ] Production deployment, backup, and restore are exercised.
+- [ ] Firewall profiles are tested on supported Linux distributions; agent-only hosts require no inbound Monitor Me ports, control-plane exposure is least-privilege, and PostgreSQL/Redis/internal app ports remain private.
+- [ ] Firewall changes are idempotent, preserve SSH access and Docker networking, cover intended IPv4/IPv6 paths, and have verification/rollback tests.
 - [ ] README feature statuses match verified shipped behavior.
 - [ ] Final Excalidraw diagrams match actual code, data flow, security, and deployment.
 - [ ] Final project state identifies the release commit and known limitations.
