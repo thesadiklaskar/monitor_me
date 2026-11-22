@@ -24,7 +24,7 @@ const (
 )
 
 var (
-	agentIDPattern = regexp.MustCompile("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$")
+	agentIDPattern    = regexp.MustCompile("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$")
 	capabilityPattern = regexp.MustCompile("^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$")
 )
 
@@ -147,11 +147,11 @@ func (s *Service) Enroll(ctx context.Context, request *monitorv1.EnrollRequest) 
 	}
 
 	return &monitorv1.EnrollResponse{
-		AgentId: agentID,
-		ServerId: serverID,
-		SessionToken: sessionToken,
-		HeartbeatIntervalSeconds: heartbeatPeriod,
-		ProtocolVersion: "monitor.v1",
+		AgentId:                    agentID,
+		ServerId:                   serverID,
+		SessionToken:               sessionToken,
+		HeartbeatIntervalSeconds:   heartbeatPeriod,
+		ProtocolVersion:            "monitor.v1",
 		SessionExpiresAtUnixMillis: sessionExpiry.UnixMilli(),
 	}, nil
 }
@@ -227,7 +227,7 @@ func (s *Service) ReportHeartbeat(ctx context.Context, request *monitorv1.Heartb
 	}
 
 	return &monitorv1.HeartbeatResponse{
-		Accepted: true,
+		Accepted:             true,
 		ServerTimeUnixMillis: time.Now().UTC().UnixMilli(),
 	}, nil
 }

@@ -32,10 +32,10 @@ func TestNormalizeCapabilitiesRejectsInvalidInput(t *testing.T) {
 func TestValidEnrollmentRequest(t *testing.T) {
 	request := &monitorv1.EnrollRequest{
 		EnrollmentToken: "0123456789012345678901234567890123456789012",
-		AgentVersion: "0.1.0",
+		AgentVersion:    "0.1.0",
 		OperatingSystem: "linux",
-		Architecture: "amd64",
-		Hostname: "node-01.example",
+		Architecture:    "amd64",
+		Hostname:        "node-01.example",
 	}
 	if !validEnrollmentRequest(request) {
 		t.Fatal("expected supported Linux enrollment request to be accepted")

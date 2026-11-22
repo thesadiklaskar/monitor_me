@@ -314,7 +314,7 @@ func (s *Store) CreateServer(ctx context.Context, principal Principal, name, hos
 	}
 
 	return IssuedServer{
-		Server: Server{ID: serverID, Name: name, Hostname: hostname, Status: "pending", CreatedAt: createdAt},
+		Server:            Server{ID: serverID, Name: name, Hostname: hostname, Status: "pending", CreatedAt: createdAt},
 		EnrollmentTokenID: tokenID, EnrollmentToken: token, TokenExpiresAt: expiresAt,
 	}, nil
 }

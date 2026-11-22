@@ -29,24 +29,24 @@ import (
 type apiResponse struct {
 	AccessToken string `json:"access_token"`
 	User struct {
-		ID string `json:"id"`
-		Role string `json:"role"`
+		ID             string `json:"id"`
+		Role           string `json:"role"`
 		OrganizationID string `json:"organization_id"`
 	} `json:"user"`
 	Server struct {
-		ID string `json:"id"`
+		ID     string `json:"id"`
 		Status string `json:"status"`
 	} `json:"server"`
 	Enrollment struct {
-		TokenID string `json:"token_id"`
-		Token string `json:"token"`
+		TokenID   string    `json:"token_id"`
+		Token     string    `json:"token"`
 		ExpiresAt time.Time `json:"expires_at"`
 	} `json:"enrollment"`
 }
 
 type httpResult struct {
 	StatusCode int
-	Body string
+	Body       string
 }
 
 func TestPhase2AuthenticationAndAgentLifecycle(t *testing.T) {
@@ -65,9 +65,9 @@ func TestPhase2AuthenticationAndAgentLifecycle(t *testing.T) {
 	defer database.Close()
 
 	registerBody := map[string]any{
-		"email": "phase2-owner@example.invalid",
-		"display_name": "Phase Two Owner",
-		"password": "a-strong-initial-password-2026",
+		"email":             "phase2-owner@example.invalid",
+		"display_name":      "Phase Two Owner",
+		"password":          "a-strong-initial-password-2026",
 		"organization_name": "Phase Two Test Organization",
 		"organization_slug": "phase-two-test-org",
 	}
@@ -178,7 +178,7 @@ func TestPhase2AuthenticationAndAgentLifecycle(t *testing.T) {
 
 	invalidEnrollment, err := agentClient.Enroll(ctx, &monitorv1.EnrollRequest{
 		EnrollmentToken: strings.Repeat("x", 43),
-		AgentVersion: "0.1.0-test", OperatingSystem: "linux", Architecture: "amd64", Hostname: "invalid-node",
+		AgentVersion:    "0.1.0-test", OperatingSystem: "linux", Architecture: "amd64", Hostname: "invalid-node",
 	})
 	if err == nil || status.Code(err) != codes.Unauthenticated {
 		t.Fatalf("invalid token should be unauthenticated; response=%v error=%v", invalidEnrollment, err)
@@ -186,11 +186,11 @@ func TestPhase2AuthenticationAndAgentLifecycle(t *testing.T) {
 
 	enrolled, err := agentClient.Enroll(ctx, &monitorv1.EnrollRequest{
 		EnrollmentToken: enrollmentToken,
-		AgentVersion: "0.1.0-test",
+		AgentVersion:    "0.1.0-test",
 		OperatingSystem: "linux",
-		Architecture: "amd64",
-		Hostname: "integration-node",
-		Capabilities: []string{"host.cpu", "host.memory", "host.disk", "host.cpu"},
+		Architecture:    "amd64",
+		Hostname:        "integration-node",
+		Capabilities:    []string{"host.cpu", "host.memory", "host.disk", "host.cpu"},
 	})
 	if err != nil {
 		t.Fatalf("valid TLS enrollment failed: %v", err)
@@ -203,7 +203,7 @@ func TestPhase2AuthenticationAndAgentLifecycle(t *testing.T) {
 	}
 
 	heartbeat, err := agentClient.ReportHeartbeat(ctx, &monitorv1.HeartbeatRequest{
-		AgentId: enrolled.GetAgentId(),
+		AgentId:      enrolled.GetAgentId(),
 		SessionToken: enrolled.GetSessionToken(),
 		AgentVersion: "0.1.0-test",
 		Capabilities: []string{"host.cpu", "host.memory"},
@@ -224,8 +224,8 @@ func TestPhase2AuthenticationAndAgentLifecycle(t *testing.T) {
 	oldSessionToken := enrolled.GetSessionToken()
 	rotatedAgent, err := agentClient.Enroll(ctx, &monitorv1.EnrollRequest{
 		EnrollmentToken: rotationResult.Enrollment.Token,
-		AgentVersion: "0.1.1-test", OperatingSystem: "linux", Architecture: "amd64",
-		Hostname: "integration-node", Capabilities: []string{"host.cpu"},
+		AgentVersion:    "0.1.1-test", OperatingSystem: "linux", Architecture: "amd64",
+		Hostname:        "integration-node", Capabilities: []string{"host.cpu"},
 	})
 	if err != nil {
 		t.Fatalf("re-enrollment with replacement token failed: %v", err)
@@ -242,7 +242,7 @@ func TestPhase2AuthenticationAndAgentLifecycle(t *testing.T) {
 
 	reusedEnrollment, err := agentClient.Enroll(ctx, &monitorv1.EnrollRequest{
 		EnrollmentToken: enrollmentToken,
-		AgentVersion: "0.1.0-test", OperatingSystem: "linux", Architecture: "amd64", Hostname: "integration-node",
+		AgentVersion:    "0.1.0-test", OperatingSystem: "linux", Architecture: "amd64", Hostname: "integration-node",
 	})
 	if err == nil || status.Code(err) != codes.Unauthenticated {
 		t.Fatalf("consumed token should not be reusable; response=%v error=%v", reusedEnrollment, err)
@@ -258,7 +258,7 @@ func TestPhase2AuthenticationAndAgentLifecycle(t *testing.T) {
 	}
 	expiredResponse, err := agentClient.Enroll(ctx, &monitorv1.EnrollRequest{
 		EnrollmentToken: expiredServer.Enrollment.Token,
-		AgentVersion: "0.1.0-test", OperatingSystem: "linux", Architecture: "amd64", Hostname: "expired-node",
+		AgentVersion:    "0.1.0-test", OperatingSystem: "linux", Architecture: "amd64", Hostname: "expired-node",
 	})
 	if err == nil || status.Code(err) != codes.Unauthenticated {
 		t.Fatalf("expired token should be unauthenticated; response=%v error=%v", expiredResponse, err)
@@ -272,7 +272,7 @@ func TestPhase2AuthenticationAndAgentLifecycle(t *testing.T) {
 	}
 	revokedResponse, err := agentClient.Enroll(ctx, &monitorv1.EnrollRequest{
 		EnrollmentToken: revokedServer.Enrollment.Token,
-		AgentVersion: "0.1.0-test", OperatingSystem: "linux", Architecture: "amd64", Hostname: "revoked-node",
+		AgentVersion:    "0.1.0-test", OperatingSystem: "linux", Architecture: "amd64", Hostname: "revoked-node",
 	})
 	if err == nil || status.Code(err) != codes.Unauthenticated {
 		t.Fatalf("revoked token should be unauthenticated; response=%v error=%v", revokedResponse, err)
@@ -296,7 +296,7 @@ func TestPhase2AuthenticationAndAgentLifecycle(t *testing.T) {
 		t.Fatalf("agent revocation: expected 204, got %d: %s", revokeAgent.StatusCode, revokeAgent.Body)
 	}
 	revokedHeartbeat, err := agentClient.ReportHeartbeat(ctx, &monitorv1.HeartbeatRequest{
-		AgentId: enrolled.GetAgentId(),
+		AgentId:      enrolled.GetAgentId(),
 		SessionToken: enrolled.GetSessionToken(),
 		AgentVersion: "0.1.0-test",
 	})

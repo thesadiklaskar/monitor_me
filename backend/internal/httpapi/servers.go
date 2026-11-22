@@ -32,10 +32,10 @@ func (api *API) createServer(writer http.ResponseWriter, request *http.Request) 
 				"status": server.Status, "created_at": server.CreatedAt,
 			},
 			"enrollment": map[string]any{
-				"token_id": server.EnrollmentTokenID,
-				"token": server.EnrollmentToken,
+				"token_id":   server.EnrollmentTokenID,
+				"token":      server.EnrollmentToken,
 				"expires_at": server.TokenExpiresAt,
-				"protocol": "monitor.v1",
+				"protocol":   "monitor.v1",
 			},
 		})
 	}
@@ -55,8 +55,8 @@ func (api *API) reissueEnrollmentToken(writer http.ResponseWriter, request *http
 		writeJSON(writer, http.StatusCreated, map[string]any{
 			"server": map[string]any{"id": issued.ID, "name": issued.Name, "status": issued.Status},
 			"enrollment": map[string]any{
-				"token_id": issued.EnrollmentTokenID,
-				"token": issued.EnrollmentToken,
+				"token_id":   issued.EnrollmentTokenID,
+				"token":      issued.EnrollmentToken,
 				"expires_at": issued.TokenExpiresAt,
 				"protocol": "monitor.v1",
 			},

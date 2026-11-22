@@ -12,13 +12,13 @@ import (
 	"syscall"
 	"time"
 
-	redisclient "github.com/WorkRCS/monitor_me/backend/internal/cache/redis"
+	monitorv1 "github.com/WorkRCS/monitor_me/backend/gen/monitor/v1"
 	"github.com/WorkRCS/monitor_me/backend/internal/agentcontrol"
+	redisclient "github.com/WorkRCS/monitor_me/backend/internal/cache/redis"
 	"github.com/WorkRCS/monitor_me/backend/internal/config"
 	"github.com/WorkRCS/monitor_me/backend/internal/httpapi"
 	"github.com/WorkRCS/monitor_me/backend/internal/identity"
 	"github.com/WorkRCS/monitor_me/backend/internal/storage/postgres"
-	monitorv1 "github.com/WorkRCS/monitor_me/backend/gen/monitor/v1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 )

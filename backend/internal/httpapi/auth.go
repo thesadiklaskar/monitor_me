@@ -91,9 +91,9 @@ func (api *API) login(writer http.ResponseWriter, request *http.Request) {
 
 	writeJSON(writer, http.StatusOK, map[string]any{
 		"access_token": session.AccessToken,
-		"token_type": "Bearer",
-		"expires_at": session.ExpiresAt,
-		"user": session.User,
+		"token_type":   "Bearer",
+		"expires_at":   session.ExpiresAt,
+		"user":         session.User,
 	})
 }
 
