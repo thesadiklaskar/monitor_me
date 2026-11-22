@@ -50,6 +50,7 @@ No item may be marked Verified based only on a code stub, mock UI, or documentat
 | F-033 | Horizontal scale validation | P2 | Staged multi-agent load reports and identified capacity limits | Planned |
 | F-034 | Production operations and backup | P1 | Clean deployment, backup, restore, and rollback exercise | Planned |
 | F-035 | Final as-built Excalidraw design | P1 | Diagram reviewed against actual source, data flows, and deployment | Planned |
+| F-036 | Production Linux host firewall setup | P1 | Role-aware UFW/firewalld profiles, least-privilege ingress/egress, IPv4/IPv6, Docker port isolation, idempotency, SSH preservation, and rollback are tested; agent-only hosts have no inbound Monitor Me rules | Planned |
 
 ## Phase-Level Verification
 
@@ -115,6 +116,7 @@ No item may be marked Verified based only on a code stub, mock UI, or documentat
 - [ ] Security, recovery, and end-to-end tests pass.
 - [ ] Reproducible performance and capacity reports are published.
 - [ ] Production deployment, backup, and restore are tested.
+- [ ] Production firewall setup is tested for control-plane and agent-only host roles, IPv4/IPv6, Docker port exposure, SSH preservation, and rollback.
 - [ ] README and final Excalidraw design match the shipped implementation.
 
 ## Evidence Record
