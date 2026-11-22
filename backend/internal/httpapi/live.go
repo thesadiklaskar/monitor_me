@@ -9,6 +9,7 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/WorkRCS/monitor_me/backend/internal/identity"
+	"github.com/WorkRCS/monitor_me/backend/internal/telemetry"
 )
 
 var errSlowLiveClient = errors.New("live client exceeded its bounded output buffer")
@@ -141,5 +142,5 @@ func (api *API) liveStream(writer http.ResponseWriter, request *http.Request) {
 }
 
 func liveOrganizationChannel(organizationID string) string {
-	return "monitor:live:organization:" + identity.OrganizationChannelKey(organizationID)
+	return telemetry.LiveChannel(organizationID)
 }

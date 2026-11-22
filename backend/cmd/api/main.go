@@ -87,7 +87,9 @@ func run(logger *slog.Logger) error {
 
 	httpServer := &http.Server{
 		Addr:              cfg.APIAddress,
-		Handler:           httpapi.NewRouter(cfg.ServiceVersion, dependencies, identity.NewStore(database)),
+		Handler: httpapi.NewRouter(cfg.ServiceVersion, dependencies, identity.NewStore(database), httpapi.LiveDependencies{
+			Cache: cache, Telemetry: telemetry.NewStore(database),
+		}),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,
 		WriteTimeout:      15 * time.Second,
@@ -107,7 +109,7 @@ func run(logger *slog.Logger) error {
 		grpc.MaxSendMsgSize(1<<20),
 		grpc.MaxConcurrentStreams(128),
 	)
-	monitorv1.RegisterAgentControlServer(grpcServer, agentcontrol.NewService(database))
+	monitorv1.RegisterAgentControlServer(grpcServer, agentcontrol.NewService(database, telemetry.RedisPublisher{Client: cache}))
 
 	shutdownSignals, stopSignals := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stopSignals()
