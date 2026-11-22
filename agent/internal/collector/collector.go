@@ -214,7 +214,7 @@ func (c *ProcCollector) Collect(ctx context.Context) ([]Sample, error) {
 	}
 
 	tcpStates := make(map[string]float64)
-	tcpListeners := make(map[uint16]float64)
+	tcpListeners := make(map[string]float64)
 	for _, source := range []struct {
 		file   string
 		family string
@@ -239,10 +239,7 @@ func (c *ProcCollector) Collect(ctx context.Context) ([]Sample, error) {
 			tcpStates[key] += float64(count)
 		}
 		for port, count := range listeners {
-			key := uint16(port)
-			if source.family == "ipv6" {
-				key |= 0x8000
-			}
+			key := source.family + ":" + strconv.Itoa(int(port))
 			tcpListeners[key] += float64(count)
 		}
 	}
@@ -253,14 +250,9 @@ func (c *ProcCollector) Collect(ctx context.Context) ([]Sample, error) {
 		})
 	}
 	for key, count := range tcpListeners {
-		family := "ipv4"
-		port := key
-		if key&0x8000 != 0 {
-			family = "ipv6"
-			port = key & 0x7fff
-		}
+		parts := strings.SplitN(key, ":", 2)
 		add("host.network.tcp.listening_port", count, "sockets", map[string]string{
-			"family": family, "port": strconv.Itoa(int(port)),
+			"family": parts[0], "port": parts[1],
 		})
 	}
 
@@ -450,9 +442,13 @@ func parseNetworkDev(raw string) (map[string]networkCounters, error) {
 }
 
 type processMemory struct {
-	pid  int
-	name string
-	rss  int64
+	pid               int
+	name              string
+	rss               int64
+	cgroupPath        string
+	workloadType      string
+	workloadSelector  string
+	attributionMethod string
 }
 
 type processSnapshot struct {

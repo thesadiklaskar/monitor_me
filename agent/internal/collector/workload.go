@@ -23,6 +23,9 @@ func parseWorkloadCgroup(raw string) workloadAttribution {
 			continue
 		}
 		path := strings.TrimSpace(parts[2])
+		if len(path) > 256 {
+			path = path[:256]
+		}
 		if path == "" || path == "/" {
 			continue
 		}

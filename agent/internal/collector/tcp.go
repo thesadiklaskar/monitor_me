@@ -6,11 +6,6 @@ import (
 	"strings"
 )
 
-type tcpSnapshot struct {
-	stateCounts map[string]float64
-	listeners   map[uint16]float64
-}
-
 var tcpStateNames = map[string]string{
 	"01": "ESTABLISHED", "02": "SYN_SENT", "03": "SYN_RECV",
 	"04": "FIN_WAIT1", "05": "FIN_WAIT2", "06": "TIME_WAIT",
