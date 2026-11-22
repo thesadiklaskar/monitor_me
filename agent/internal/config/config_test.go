@@ -23,6 +23,45 @@ func TestLoadDefaultsAndOverrides(t *testing.T) {
 	}
 }
 
+func TestLoadAcceptsOfflineModeAndOptionalEnrollment(t *testing.T) {
+	t.Setenv("MONITOR_GRPC_ADDRESS", "")
+	t.Setenv("MONITOR_TLS_CA_FILE", "")
+	t.Setenv("MONITOR_ENROLLMENT_TOKEN", "")
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("offline agent configuration should be valid: %v", err)
+	}
+	if cfg.GRPCAddress != "" || cfg.TLSCAFile != "" {
+		t.Fatalf("offline configuration unexpectedly enables transport: %+v", cfg)
+	}
+
+	t.Setenv("MONITOR_GRPC_ADDRESS", "localhost:8443")
+	t.Setenv("MONITOR_TLS_CA_FILE", "/run/secrets/agent-ca.crt")
+	t.Setenv("MONITOR_ENROLLMENT_TOKEN", "scoped-enrollment-secret")
+	cfg, err = Load()
+	if err != nil {
+		t.Fatalf("connected agent configuration should be valid: %v", err)
+	}
+	if cfg.GRPCAddress != "localhost:8443" || cfg.TLSCAFile != "/run/secrets/agent-ca.crt" ||
+		cfg.EnrollmentToken != "scoped-enrollment-secret" {
+		t.Fatalf("unexpected transport settings: %+v", cfg)
+	}
+}
+
+func TestLoadRejectsPartialTransportConfiguration(t *testing.T) {
+	t.Setenv("MONITOR_GRPC_ADDRESS", "localhost:8443")
+	t.Setenv("MONITOR_TLS_CA_FILE", "")
+	if _, err := Load(); err == nil {
+		t.Fatal("gRPC without an explicit CA must be rejected")
+	}
+	t.Setenv("MONITOR_GRPC_ADDRESS", "")
+	t.Setenv("MONITOR_TLS_CA_FILE", "")
+	t.Setenv("MONITOR_ENROLLMENT_TOKEN", "not-usable-offline")
+	if _, err := Load(); err == nil {
+		t.Fatal("an enrollment token must not be accepted in offline mode")
+	}
+}
+
 func TestLoadRejectsUnsafeBounds(t *testing.T) {
 	t.Setenv("MONITOR_COLLECTION_INTERVAL", "10ms")
 	if _, err := Load(); err == nil {

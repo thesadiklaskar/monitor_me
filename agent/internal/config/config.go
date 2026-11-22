@@ -3,12 +3,14 @@ package config
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 )
 
-// Config contains bounded, non-secret runtime settings for the native agent.
+// Config contains bounded runtime settings for collection, local durability,
+// and optional authenticated delivery to the control plane.
 type Config struct {
 	Version            string
 	CollectionInterval time.Duration
@@ -16,9 +18,13 @@ type Config struct {
 	SpoolDirectory     string
 	SpoolMaxBytes      int64
 	LogLevel           string
+	GRPCAddress        string
+	TLSCAFile          string
+	EnrollmentToken    string
+	StateFile          string
 }
 
-// Load reads and validates environment configuration without echoing values.
+// Load reads and validates environment configuration without echoing secrets.
 func Load() (Config, error) {
 	cfg := Config{
 		Version:            env("MONITOR_AGENT_VERSION", "0.1.0-dev"),
@@ -27,7 +33,12 @@ func Load() (Config, error) {
 		SpoolDirectory:     env("MONITOR_SPOOL_DIR", "./.monitor-me/spool"),
 		SpoolMaxBytes:      64 << 20,
 		LogLevel:           strings.ToLower(env("MONITOR_LOG_LEVEL", "info")),
+		GRPCAddress:        os.Getenv("MONITOR_GRPC_ADDRESS"),
+		TLSCAFile:          os.Getenv("MONITOR_TLS_CA_FILE"),
+		EnrollmentToken:    os.Getenv("MONITOR_ENROLLMENT_TOKEN"),
 	}
+	cfg.StateFile = env("MONITOR_AGENT_STATE_FILE", filepath.Join(cfg.SpoolDirectory, "agent-state.json"))
+
 	if raw := os.Getenv("MONITOR_COLLECTION_INTERVAL"); raw != "" {
 		interval, err := time.ParseDuration(raw)
 		if err != nil || interval < 100*time.Millisecond || interval > time.Minute {
@@ -45,8 +56,17 @@ func Load() (Config, error) {
 	if cfg.Version == "" || len(cfg.Version) > 64 {
 		return Config{}, fmt.Errorf("MONITOR_AGENT_VERSION must contain 1 to 64 characters")
 	}
-	if cfg.ProcRoot == "" || cfg.SpoolDirectory == "" {
-		return Config{}, fmt.Errorf("MONITOR_PROC_ROOT and MONITOR_SPOOL_DIR must not be empty")
+	if cfg.ProcRoot == "" || cfg.SpoolDirectory == "" || cfg.StateFile == "" {
+		return Config{}, fmt.Errorf("MONITOR_PROC_ROOT, MONITOR_SPOOL_DIR, and MONITOR_AGENT_STATE_FILE must not be empty")
+	}
+	if (cfg.GRPCAddress == "") != (cfg.TLSCAFile == "") {
+		return Config{}, fmt.Errorf("MONITOR_GRPC_ADDRESS and MONITOR_TLS_CA_FILE must be configured together")
+	}
+	if cfg.GRPCAddress == "" && cfg.EnrollmentToken != "" {
+		return Config{}, fmt.Errorf("MONITOR_ENROLLMENT_TOKEN requires MONITOR_GRPC_ADDRESS and MONITOR_TLS_CA_FILE")
+	}
+	if len(cfg.EnrollmentToken) > 128 {
+		return Config{}, fmt.Errorf("MONITOR_ENROLLMENT_TOKEN exceeds the supported length")
 	}
 	switch cfg.LogLevel {
 	case "debug", "info", "warn", "error":
