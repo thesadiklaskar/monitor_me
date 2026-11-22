@@ -24,8 +24,8 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
-	"google.golang.org/grpc/status"
 	"github.com/gorilla/websocket"
+	"google.golang.org/grpc/status"
 )
 
 type apiResponse struct {
@@ -416,15 +416,15 @@ func TestPhase2AuthenticationAndAgentLifecycle(t *testing.T) {
 					Samples: []*monitorv1.MetricSample{
 						{
 							MetricName: "host.memory.used", Value: value, Unit: "bytes",
-							Labels: map[string]string{"source": "phase3-integration"},
+							Labels:              map[string]string{"source": "phase3-integration"},
 							ObservedAtUnixNanos: observedAt,
 						},
 						{
 							MetricName: "process.memory.rss", Value: 2048, Unit: "bytes",
 							Labels: map[string]string{
 								"pid": "123", "process": "fixture-worker",
-								"workload_type": "systemd",
-								"workload_selector": "/system.slice/example.service",
+								"workload_type":      "systemd",
+								"workload_selector":  "/system.slice/example.service",
 								"attribution_method": "systemd",
 							},
 							ObservedAtUnixNanos: observedAt,
@@ -544,10 +544,10 @@ func TestPhase2AuthenticationAndAgentLifecycle(t *testing.T) {
 	// The history endpoint is organization-scoped and uses bounded aggregation.
 	seriesValues := url.Values{
 		"metric": []string{"host.memory.used"},
-		"from": []string{time.Now().Add(-30 * time.Second).Format(time.RFC3339Nano)},
-		"to": []string{time.Now().Add(time.Second).Format(time.RFC3339Nano)},
-		"step": []string{"10s"},
-		"limit": []string{"10"},
+		"from":   []string{time.Now().Add(-30 * time.Second).Format(time.RFC3339Nano)},
+		"to":     []string{time.Now().Add(time.Second).Format(time.RFC3339Nano)},
+		"step":   []string{"10s"},
+		"limit":  []string{"10"},
 	}
 	seriesURL := baseURL + "/v1/servers/" + serverID + "/metrics?" + seriesValues.Encode()
 	seriesResponse := requestJSON(t, ctx, http.MethodGet, seriesURL, bearer, nil)

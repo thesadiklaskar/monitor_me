@@ -103,10 +103,10 @@ func BenchmarkPhase3PostgresIngestion(b *testing.B) {
 	samples := make([]*monitorv1.MetricSample, 64)
 	for index := range samples {
 		samples[index] = &monitorv1.MetricSample{
-			MetricName: "host.cpu.utilization",
-			Value: float64(index),
-			Unit: "percent",
-			Labels: map[string]string{"cpu": "cpu" + strconv.Itoa(index%8), "benchmark": "true"},
+			MetricName:          "host.cpu.utilization",
+			Value:               float64(index),
+			Unit:                "percent",
+			Labels:              map[string]string{"cpu": "cpu" + strconv.Itoa(index%8), "benchmark": "true"},
 			ObservedAtUnixNanos: time.Now().UnixNano(),
 		}
 	}
@@ -118,15 +118,15 @@ func BenchmarkPhase3PostgresIngestion(b *testing.B) {
 			b.Fatal(err)
 		}
 		batch := &monitorv1.TelemetryBatch{
-			BatchId: hex.EncodeToString(randomID[:]),
+			BatchId:              hex.EncodeToString(randomID[:]),
 			CollectedAtUnixNanos: time.Now().UnixNano(),
-			SchemaVersion: 1,
-			Samples: samples,
+			SchemaVersion:        1,
+			Samples:              samples,
 		}
 		message := &monitorv1.AgentToServerMessage{
-			AgentId: agentID,
+			AgentId:      agentID,
 			SessionToken: sessionToken,
-			Payload: &monitorv1.AgentToServerMessage_TelemetryBatch{TelemetryBatch: batch},
+			Payload:      &monitorv1.AgentToServerMessage_TelemetryBatch{TelemetryBatch: batch},
 		}
 		if err := stream.Send(message); err != nil {
 			b.Fatal(err)

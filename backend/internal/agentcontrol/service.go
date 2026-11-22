@@ -5,19 +5,19 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"database/sql"
-	"log/slog"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"regexp"
 	"strings"
 	"time"
 
 	monitorv1 "github.com/WorkRCS/monitor_me/backend/gen/monitor/v1"
+	"github.com/WorkRCS/monitor_me/backend/internal/telemetry"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"github.com/WorkRCS/monitor_me/backend/internal/telemetry"
 )
 
 const (
@@ -238,7 +238,6 @@ func (s *Service) ReportHeartbeat(ctx context.Context, request *monitorv1.Heartb
 		ServerTimeUnixMillis: time.Now().UTC().UnixMilli(),
 	}, nil
 }
-
 
 func (s *Service) publishCommittedBatch(ctx context.Context, organizationID, serverID, agentID string, batch *monitorv1.TelemetryBatch) {
 	if s.publisher == nil {
