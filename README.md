@@ -4,7 +4,7 @@
 
 The product is being built around its own native host agent, telemetry ingestion pipeline, metric model, project attribution, alert engine, and operator dashboard. It is intended for infrastructure engineers, platform teams, and organizations that need clear visibility into servers, workloads, and applications.
 
-> **Project setup:** **Completed** — repository structure, local development stack, database migrations, and the Phase 1–3 CI baseline are established and verified. **Product status:** Phases 1, 2 and 3 are complete. The final Phase 1–3 audit on `main` passed all four CI jobs in [GitHub Actions run #45043161542](https://github.com/WorkRCS/monitor_me/actions/runs/45043161542). The verified Linux-first implementation includes native host collection, a durable bounded agent WAL, TLS gRPC delivery, idempotent PostgreSQL history, bounded historical queries, retention, organization-scoped WebSocket delivery, and explicit cgroup/Systemd/container workload attribution. Phase 4 — Dashboard and Operational Features has not started; the frontend remains a foundation shell. Phase 5 production work, including firewall setup, is still planned. The setup baseline is complete; the operator-facing MVP is not yet released.
+> **Project setup:** **Completed** — repository structure, local development stack, database migrations, and the Phase 1–3 CI baseline are established and verified. **Product status:** Phases 1, 2 and 3 are complete. The final Phase 1–3 audit on `main` passed all four CI jobs in [GitHub Actions run #45043161542](https://github.com/WorkRCS/monitor_me/actions/runs/45045054465). The verified Linux-first implementation includes native host collection, a durable bounded agent WAL, TLS gRPC delivery, idempotent PostgreSQL history, bounded historical queries, retention, organization-scoped WebSocket delivery, and explicit cgroup/Systemd/container workload attribution. Phase 4 — Dashboard and Operational Features has not started; the frontend remains a foundation shell. Phase 5 production work, including firewall setup, is still planned. The setup baseline is complete; the operator-facing MVP is not yet released.
 
 ---
 
@@ -55,7 +55,7 @@ The long-term objective is an enterprise-oriented product with a straightforward
 | Local platform stack | **Runtime verified** | PostgreSQL, Redis, migration runner, API, and web services start through Docker Compose |
 | Database and cache integration | **Runtime verified** | PostgreSQL remains durable; Redis and PostgreSQL dependency outage/readiness recovery are tested |
 | Agent protocol and ingestion | **Phase 3 verified** | TLS enrollment, persisted session, heartbeat, reconnect/backoff, streaming batches, post-commit ACK, and idempotent PostgreSQL persistence pass end-to-end CI |
-| Native Linux host agent | **Phase 3 verified** | Native Go agent, Linux procfs metrics, TCP inventory, cgroup workload selectors, private session state, and crash-recoverable durable spool pass race-enabled CI tests |
+| Native Linux host agent | **Phase 3 verified** | Native Go agent with Linux host/process/TCP/cgroup collection, agent CPU and WAL/collector health samples, private session state, crash-recoverable spool, and a validated hardened systemd unit pass race-enabled CI checks |
 | Telemetry history and live transport | **Phase 3 verified** | Bounded PostgreSQL range query, 30-day raw retention, 90-day idempotency retention, one-use session-bound WebSocket tickets, cross-tenant isolation, and bounded subscriber queues pass CI |
 | Project/workload attribution | **Phase 3 verified (Linux mapping path)** | cgroup/Systemd/container selectors, exact server/project mappings, and explicit host-total/unclassified/shared attribution pass database integration tests; full Docker Engine discovery remains later work |
 | Monitoring dashboard | Not started | Planned for Phase 4 |
@@ -68,29 +68,27 @@ The long-term objective is an enterprise-oriented product with a straightforward
 
 The current Linux-first implementation provides a real telemetry path rather than a collector mock:
 
-- **Native Linux agent:** aggregate and per-core CPU, memory available/used/cache/swap, disk byte and operation rates, network byte/packet/error rates, host/agent uptime, process count, top-128 readable process RSS, TCP state counts, and listening-port metadata.
+- **Native Linux agent:** aggregate and per-core CPU, memory available/used/cache/swap, disk byte and operation rates, network byte/packet/error rates, host/agent uptime, process count, top-128 readable process RSS, TCP state counts, and listening-port metadata. It also emits process CPU utilization, collector errors per interval, durable WAL bytes and pending batch depth, and the last successful batch-ACK timestamp.
 - **Correct rate semantics:** counter deltas use actual monotonic elapsed time. Initial samples have no fabricated rate; resets and invalid intervals produce missing values rather than negative rates.
 - **Workload metadata:** process RSS samples include cgroup path and workload selector. Systemd units and container cgroup IDs are identified when present. Unmapped and shared resource labels remain explicit.
 - **Agent durability:** append-only JSONL local WAL, fsync per batch, 0600 file/0700 directory, configurable disk quota, restart recovery for a truncated trailing record, and atomic compaction after accepted acknowledgements.
-- **Secure delivery:** TLS gRPC enrollment with a short-lived one-use server token; session secret is persisted locally with private permissions. The agent reports heartbeats, retries with bounded backoff, and removes a revoked local session when re-enrollment credentials are available.
+- **Secure delivery:** TLS gRPC enrollment with a short-lived one-use server token; session secret is persisted locally with private permissions. The agent reports heartbeats, retries with bounded backoff, and removes a revoked local session when re-enrollment credentials are available. A hardened Linux systemd unit is provided with a protected environment file, private state directory, restrictive umask and filesystem/kernel protections. It runs as root for host-wide process metadata; a monitored Linux host does not need Docker.
 - **Durable ingestion:** the backend validates authenticated batches, limits message/sample/label sizes, stores batch hashes and telemetry samples in PostgreSQL in one transaction, and sends ACK only after commit. Same-payload retries are idempotent; changed content under the same batch ID is rejected.
 - **Historical query:** authenticated server-scoped range queries aggregate with PostgreSQL `date_bin`. The query enforces a 100ms minimum step, a 30-day raw range, a 5,000-point maximum and rejects a bucket grid that would be silently truncated.
 - **Live delivery:** post-commit latest-value events publish to organization-specific Redis Pub/Sub channels. Each event contains at most 128 metric points. Browsers exchange their bearer session for a 30-second, single-use ticket; only the ticket hash is stored. Tickets are invalidated when the parent user session is revoked. WebSocket output queues are bounded to 32 events; slow clients are disconnected and should reconnect and fetch durable history to catch up. Cross-organization delivery is covered by integration tests.
 - **Retention:** default raw samples are kept for 30 days; batch idempotency records for 90 days; expired live tickets are removed in bounded cleanup batches. Redis is notification/cache infrastructure, never the durable telemetry store.
 
-The Phase 3 implementation does **not** yet claim Windows/macOS collection, per-process CPU, eBPF, complete Docker Engine metadata, HTTP request latency/error instrumentation, persistent materialized rollups, the remaining AgentHealth samples (agent CPU, collector errors, spool size, pending queue depth, and last successful send), or a dashboard UI. The dashboard and user workflows are Phase 4; cross-platform collectors, installers, and production scale are Phase 5. Historical queries aggregate with PostgreSQL date_bin; persistent rollup tables are deferred until scale measurements justify them. A monitored Linux host does not need Docker installed.
+The Phase 3 implementation does **not** yet claim Windows/macOS collection, per-process CPU, eBPF, complete Docker Engine API discovery, HTTP request latency/error instrumentation, persistent materialized rollups, or a dashboard UI. The protobuf AgentHealth envelope remains reserved; its health fields are emitted as ordinary telemetry samples. The last-successful-send timestamp is process-local and absent after restart until a matching ACK arrives. The dashboard and user workflows are Phase 4; cross-platform collectors, signed installers and production scale are Phase 5. Historical queries aggregate with PostgreSQL `date_bin`; persistent rollup tables are deferred until scale measurements justify them. A monitored Linux host does not need Docker installed.
 
-## Phase 3 CI Benchmark Snapshot
-
-The verified [Phase 3 CI run #45039191041](https://github.com/WorkRCS/monitor_me/actions/runs/45039191041) executed the following benchmarks on a GitHub-hosted Ubuntu runner:
+The latest agent-health and systemd verification is [GitHub Actions run #45045054465](https://github.com/WorkRCS/monitor_me/actions/runs/45045054465). Its benchmark snapshot on a GitHub-hosted Ubuntu runner was:
 
 | Benchmark | Result | Workload |
 | --- | ---: | --- |
-| Linux proc collector | 5.33 ms/op; 1.03 MB/op; 5,163 allocs/op | Read host counters, processes, and workload metadata |
-| Counter-rate calculation | 3.68 ns/op; 0 allocs/op | One counter delta and monotonic elapsed-time calculation |
-| Agent spool append | 256 μs/op; 952 B/op; 12 allocs/op | Append and fsync a one-sample batch to the local WAL |
-| Live event preparation | 128 μs/op; 165.7 KB/op; 897 allocs/op | Collapse and encode a representative 96-sample event using an in-memory publisher |
-| TLS gRPC to PostgreSQL ingestion | 4.40 ms per 64-sample batch; 14,533 samples/sec | Authenticated TLS gRPC stream, PostgreSQL transaction, durable ACK, and Redis publication |
+| Linux proc collector | 5.21 ms/op; 1.04 MB/op; 5,192 allocs/op | Read host counters, processes, workload metadata and agent CPU |
+| Counter-rate calculation | 2.75 ns/op; 0 B/op | One counter delta and monotonic elapsed-time calculation |
+| Agent spool append | 393 μs/op; 984 B/op; 14 allocs/op | Append and fsync a one-sample batch to the local WAL |
+| Live event preparation | 137 μs/op; 165.7 KB/op; 897 allocs/op | Collapse and encode a representative 96-sample event using an in-memory publisher |
+| TLS gRPC to PostgreSQL ingestion | 4.27 ms per 64-sample batch; 14,980 samples/sec | Authenticated TLS gRPC stream, PostgreSQL transaction, durable ACK, and Redis publication |
 
 These figures describe one hosted CI runner and this benchmark workload only. They are not production capacity guarantees or evidence of million-host scale. Hardware, filesystem durability, database placement, network latency, metric cardinality, and write concurrency materially affect results. Phase 5 will add staged multi-agent capacity testing.
 
@@ -336,4 +334,4 @@ The final diagram must describe the system that was actually built, not an aspir
 
 ---
 
-**Current resume point:** Phases 1–3 are complete on `main`; Phase 4 and Phase 5 have not started. The final audit passed all four CI jobs in [GitHub Actions run #45043161542](https://github.com/WorkRCS/monitor_me/actions/runs/45043161542). No Phase 4 or Phase 5 implementation was started during this audit. Read [docs/PROJECT_STATE.md](docs/PROJECT_STATE.md) for the exact next action.
+**Current resume point:** Phases 1–3 are complete on `main`; Phase 4 and Phase 5 have not started. The final audit passed all four CI jobs in [GitHub Actions run #45043161542](https://github.com/WorkRCS/monitor_me/actions/runs/45045054465). No Phase 4 or Phase 5 implementation was started during this audit. Read [docs/PROJECT_STATE.md](docs/PROJECT_STATE.md) for the exact next action.

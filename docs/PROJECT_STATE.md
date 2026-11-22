@@ -17,8 +17,8 @@ This file is the authoritative resume point for Monitor Me. Read it before makin
 | Current phase status | Not Started |
 | MVP status | Not complete — authenticated dashboard, server overview, Add Server UI, and live metric views remain Phase 4 requirements |
 | Implementation status | Phases 1–3 phase gates are complete and CI-verified. The Linux agent, durable WAL, TLS gRPC ingestion, PostgreSQL history/retention, authorized live delivery, workload attribution, and benchmarks are verified. The overall MVP is not complete because dashboard/login/Add Server and browser-facing views remain Phase 4 work. Several non-UI feature requirements remain In Progress/Planned in the acceptance matrix. |
-| Last source commit covered by latest successful CI run | af3bab3ec5f273bbbf3006d4efa122db7cccdb5c |
-| Latest verified CI run | [#45043161542 — success](https://github.com/WorkRCS/monitor_me/actions/runs/45043161542); all four jobs passed, including PostgreSQL outage/recovery canary |
+| Last source commit covered by latest successful CI run | 2670ed2cf04705638df5c86d37fc3e0699f8a7a4 |
+| Latest verified CI run | [#45045054465 — success](https://github.com/WorkRCS/monitor_me/actions/runs/45045054465); all four jobs passed, including agent-health metrics and systemd verification |
 | Next action | On 2026-11-23, start Phase 4 from docs/PHASE_4_EXECUTION_PLAN.md: implement the authenticated dashboard, server inventory/Add Server flow, real Linux metric views, live/history charts, and remaining Phase 4 operator workflows; verify each slice before changing status. |
 
 ## Next Work Session — 2026-11-23
@@ -134,8 +134,8 @@ At the moment Phase 2 was closed, the frontend was a foundation shell and the na
 
 ### Delivered implementation
 
-- [x] Native Linux Go agent with validated configuration, JSON logging, graceful shutdown, and explicit capability reporting.
-- [x] Linux procfs aggregate/per-core CPU, memory/cache/swap, disk throughput/IOPS, network throughput/packets/errors, host/agent uptime, process count and top-128 process RSS.
+- [x] Native Linux Go agent with validated configuration, JSON logging, graceful shutdown, explicit capability reporting, and a hardened systemd unit validated with systemd-analyze.
+- [x] Linux procfs aggregate/per-core CPU, memory/cache/swap, disk throughput/IOPS, network throughput/packets/errors, host/agent uptime, process count and top-128 process RSS; process CPU and agent-health telemetry report collector errors, WAL byte size, pending WAL batches and last successful ACK timestamp.
 - [x] TCP connection-state counts, listening-port inventory, cgroup selectors, Systemd unit and container cgroup-ID recognition.
 - [x] Counter rates based on monotonic elapsed time; initial samples, resets, and invalid counter intervals never generate fabricated negative rates.
 - [x] Private append-only JSONL WAL with fsync, bounded disk quota, truncated-tail recovery, and atomic acknowledgement compaction.
@@ -147,7 +147,7 @@ At the moment Phase 2 was closed, the frontend was a foundation shell and the na
 - [x] 30-second single-use live tickets bound to user sessions, logout invalidation, cross-organization isolation, 32-message bounded subscriber queue, slow-client disconnect, and reconnect.
 - [x] Database attribution verifies mapped Systemd workload samples and keeps host-total, unclassified, and shared resource categories separate.
 - [x] CI benchmarks execute Linux collection, counter-rate calculation, WAL append, live event preparation, and real TLS gRPC-to-PostgreSQL ingestion.
-- [x] Redis and PostgreSQL dependency outage/readiness recovery are exercised in Compose CI. Persistent AgentHealth samples for CPU, collector errors, spool size and last successful send, and persistent downsampled rollups remain explicitly deferred.
+- [x] Redis and PostgreSQL dependency outage/readiness recovery are exercised in Compose CI. The protobuf AgentHealth envelope remains reserved; its health fields are emitted as ordinary telemetry samples. Persistent downsampled rollups remain a later scale optimization.
 
 ### Benchmark snapshot (GitHub-hosted Ubuntu runner)
 

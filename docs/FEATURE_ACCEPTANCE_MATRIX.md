@@ -16,7 +16,7 @@ No item may be marked Verified based only on a code stub, mock UI, or documentat
 | ID | Feature | Priority | Acceptance evidence | Current status |
 | --- | --- | --- | --- | --- |
 | F-001 | Add Server and scoped enrollment token | P0 | Server/token API and invalid/expired/revoked enrollment tests pass; dashboard wizard and installation instructions remain | In Progress |
-| F-002 | Native Go host agent lifecycle | P0 | Native foreground process, validated configuration, JSON logs, signal shutdown, heartbeat and capabilities are verified; OS service registration and full health telemetry remain | In Progress |
+| F-002 | Native Go host agent lifecycle | P0 | Native foreground process, validated configuration, JSON logs, signal shutdown, process CPU/collector/WAL health telemetry, and Linux systemd unit validation pass race-enabled CI checks | Verified |
 | F-003 | Host CPU and per-core metrics | P0 | Linux /proc/stat counter fixtures, reset tests, and documented source semantics | Verified |
 | F-004 | Host memory, swap, cache metrics | P0 | Unit and OS-specific semantics tests | Verified |
 | F-005 | Disk throughput and IOPS | P0 | Linux /proc/diskstats sector conversion, read/write operation and byte-rate fixtures, and reset tests | Verified |
@@ -80,13 +80,13 @@ No item may be marked Verified based only on a code stub, mock UI, or documentat
 - [x] Heartbeats update server/agent liveness and capability metadata.
 - [x] A new gRPC connection can reconnect with the existing session; re-enrollment preserves agent identity and invalidates previous sessions.
 - [x] Agent revocation rejects future heartbeat requests.
-- [x] The telemetry stream remains explicitly deferred until Phase 3 durable ingestion is implemented; no unpersisted telemetry is acknowledged.
+- [x] **Phase 2 closeout (historical):** the telemetry stream was deferred until Phase 3 implemented durable ingestion. The current stream accepts authenticated telemetry batches and acknowledges only after PostgreSQL commit.
 
 **CI evidence:** [GitHub Actions run #45030320358](https://github.com/WorkRCS/monitor_me/actions/runs/45030320358) — all three jobs passed: Go backend, Next.js frontend, and full Docker Compose integration.
 
 ### Phase 3 — Monitoring Agent and Telemetry Data Engine
 
-- [x] Native Linux agent builds, passes race-enabled tests/vet, runs natively, and reports host capabilities.
+- [x] Native Linux agent builds, passes race-enabled tests/vet, runs natively, reports capabilities, emits process CPU and agent-health samples, and its Linux systemd unit passes systemd-analyze verify.
 - [x] Aggregate/per-core CPU, memory/cache/swap, disk throughput/IOPS, network throughput/packets/errors, uptime, process RSS, TCP states, and listening ports pass fixture/source-semantics tests.
 - [x] Monotonic counter calculations handle initial samples, resets, and elapsed-time changes without negative or fabricated rates.
 - [x] Durable WAL survives reopen and partial-tail recovery; disk quota is bounded; unacknowledged, rejected, or mismatched batches remain queued.
@@ -96,7 +96,7 @@ No item may be marked Verified based only on a code stub, mock UI, or documentat
 - [x] WebSocket tickets are one-use, session-bound, invalidated on logout, isolated by organization, bounded for slow clients, and reconnectable.
 - [x] Workload mappings verify Systemd project attribution while keeping host-total, unclassified, and shared resources separate.
 - [x] Agent collection/WAL, live event preparation, and TLS gRPC/PostgreSQL ingestion benchmarks execute in CI.
-- [x] All Phase 3 gates passed in [GitHub Actions run #45043161542](https://github.com/WorkRCS/monitor_me/actions/runs/45043161542); all four jobs succeeded, including canonical batch-ID validation and PostgreSQL outage/recovery.
+- [x] All Phase 3 gates passed in [GitHub Actions run #45043161542](https://github.com/WorkRCS/monitor_me/actions/runs/45045054465); all four jobs succeeded, including canonical batch-ID validation and PostgreSQL outage/recovery.
 
 **Phase 3 boundaries:** Linux is the only implemented collector platform. Full Windows/macOS support, complete Docker Engine API discovery, per-process CPU, eBPF, HTTP request latency/error instrumentation, persistent materialized rollups, and dashboard UI remain later-phase work.
 

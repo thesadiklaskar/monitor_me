@@ -13,7 +13,7 @@
 | Phase 2 — Platform Foundation and Secure Connectivity | **Completed** | Authentication, tenancy, Postgres/Redis, migrations, TLS gRPC enrollment/heartbeat/reconnect and Compose checks pass CI |
 | Phase 3 — Monitoring Agent and Telemetry Data Engine | **Completed against its phase gate** | Native Linux agent, durable WAL, telemetry ingestion, history, retention, live delivery, workload attribution and benchmarks pass all Phase 3 acceptance gates |
 
-The final audited `main` commit passed all four jobs in [GitHub Actions run #45043161542 — success](https://github.com/WorkRCS/monitor_me/actions/runs/45043161542). This run includes strict lowercase batch-ID validation and a PostgreSQL restart canary; Compose confirmed that the designated telemetry sample remained stored after the database recovered.
+The final audited `main` commit passed all four jobs in [GitHub Actions run #45043161542 — success](https://github.com/WorkRCS/monitor_me/actions/runs/45045054465). This run includes strict lowercase batch-ID validation and a PostgreSQL restart canary; Compose confirmed that the designated telemetry sample remained stored after the database recovered.
 
 **Phase completion is not the same as product MVP completion.** The first usable operator-facing MVP is not yet complete: authenticated login UI, server inventory UI, Add Server wizard, overall server dashboard and browser-facing live metric views remain Phase 4 requirements. The acceptance matrix keeps individual unfinished requirements in In Progress or Planned rather than marking them verified.
 
@@ -55,11 +55,11 @@ The frontend remains a foundation shell; login and monitoring UI are not part of
 
 | Capability | Evidence |
 | --- | --- |
-| Native Linux Go agent, validated configuration, JSON logging and signal shutdown | agent/cmd/monitor-agent, agent/internal/config |
-| Host CPU/per-core, memory/cache/swap, disk throughput/IOPS, network throughput/packets/errors, uptime | agent/internal/collector and procfs fixture tests |
+| Native Linux Go agent, validated configuration, JSON logging, signal shutdown and systemd service | agent/cmd/monitor-agent, agent/internal/config, agent/deploy/systemd; systemd-analyze verify in CI |
+| Host CPU/per-core, memory/cache/swap, disk throughput/IOPS, network throughput/packets/errors, uptime and process CPU | agent/internal/collector and procfs/runtime CPU fixture tests |
 | Process count/top-128 RSS, TCP states/listening ports, cgroup/Systemd/container selectors | agent/internal/collector tests |
 | Counter-derived rates using monotonic elapsed time and reset handling | CounterRate and CPU/disk/network fixtures |
-| Persistent JSONL WAL, fsync, bounded quota, private permissions and truncated-tail recovery | agent/internal/spool race-enabled tests |
+| Persistent JSONL WAL, fsync, bounded quota, private permissions, truncated-tail recovery, pending-batch/byte health metrics | agent/internal/spool and agent/internal/health race-enabled tests |
 | TLS gRPC enrollment, private session persistence, heartbeat, reconnect/backoff and delivery | agent/internal/transport, Compose integration |
 | Bounded authenticated telemetry batches, validation, idempotency hash and post-commit ACK | backend/internal/agentcontrol/telemetry.go |
 | PostgreSQL history and bounded epoch-aligned date_bin query | backend/internal/telemetry/series.go, migration and integration tests |
@@ -75,7 +75,7 @@ The Phase 3 gate is complete. The stream accepts telemetry batches only; protobu
 | Feature | Matrix status | Remaining work |
 | --- | --- | --- |
 | Add Server / scoped enrollment | In Progress | API is verified; operator wizard and install guidance UI remain Phase 4 |
-| Native agent lifecycle | In Progress | Foreground/signal lifecycle works; OS service registration and complete AgentHealth samples remain |
+| Native agent lifecycle | Verified | Native foreground lifecycle, health metric samples, and hardened Linux systemd unit validation pass CI |
 | Server inventory | In Progress | Organization-scoped API works; dashboard inventory/stale/disconnected UI remains Phase 4 |
 | Docker/Systemd discovery | In Progress | cgroup/Systemd/container selectors work; full Docker Engine API discovery is not implemented |
 | Project attribution | In Progress | Database mapping is consumed; user-facing mapping administration is not implemented |

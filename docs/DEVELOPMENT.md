@@ -98,6 +98,8 @@ The agent writes its session credential into a mode-0600 state file within a mod
 
 ## Current Linux collector contract
 
+The native Linux agent reads procfs and Go runtime process-CPU metrics. Its health samples include per-interval collector error count, durable WAL size and pending-batch count, and the most recent accepted send timestamp. The timestamp is omitted after process restart until a new matching backend ACK arrives. A hardened systemd unit is provided in `agent/deploy/systemd/monitor-me-agent.service`; follow `agent/README.md` for setup and environment-file permissions.
+
 The initial native collector reads Linux procfs:
 
 | Area | Initial metrics or inventory |
@@ -106,7 +108,7 @@ The initial native collector reads Linux procfs:
 | Memory | Total, available, used, cache estimate, swap total/used |
 | Disk | Read/write bytes/sec and operations/sec by device |
 | Network | Receive/transmit bytes/sec, packets/sec, errors/sec by interface |
-| Host/agent | Host uptime, agent uptime, process count, agent RSS when visible |
+| Host/agent | Host uptime, agent uptime, process CPU, collector error count, WAL bytes/pending batches, last successful ACK timestamp, process count and agent RSS when visible |
 | Processes | Up to 128 readable processes, per-process RSS, cgroup labels |
 | TCP | Connection state counts by address family and listening-port inventory |
 | Workloads | cgroup path, Systemd unit names, Docker/container cgroup IDs where exposed |
