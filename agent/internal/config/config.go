@@ -12,10 +12,10 @@ import (
 type Config struct {
 	Version            string
 	CollectionInterval time.Duration
-	ProcRoot            string
-	SpoolDirectory      string
-	SpoolMaxBytes       int64
-	LogLevel            string
+	ProcRoot           string
+	SpoolDirectory     string
+	SpoolMaxBytes      int64
+	LogLevel           string
 }
 
 // Load reads and validates environment configuration without echoing values.
