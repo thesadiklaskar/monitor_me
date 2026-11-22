@@ -4,7 +4,7 @@
 
 The product is being built around its own native host agent, telemetry ingestion pipeline, metric model, project attribution, alert engine, and operator dashboard. It is intended for infrastructure engineers, platform teams, and organizations that need clear visibility into servers, workloads, and applications.
 
-> **Current status:** Phases 1, 2 and 3 are complete. The final Phase 1–3 audit on `main` passed all four CI jobs in [GitHub Actions run #45043161542](https://github.com/WorkRCS/monitor_me/actions/runs/45043161542). The verified Linux-first implementation includes native host collection, a durable bounded agent WAL, TLS gRPC delivery, idempotent PostgreSQL history, bounded historical queries, retention, organization-scoped WebSocket delivery, and explicit cgroup/Systemd/container workload attribution. Phase 4 — Dashboard and Operational Features has not started; the frontend remains a foundation shell.
+> **Project setup:** **Completed** — repository structure, local development stack, database migrations, and the Phase 1–3 CI baseline are established and verified. **Product status:** Phases 1, 2 and 3 are complete. The final Phase 1–3 audit on `main` passed all four CI jobs in [GitHub Actions run #45043161542](https://github.com/WorkRCS/monitor_me/actions/runs/45043161542). The verified Linux-first implementation includes native host collection, a durable bounded agent WAL, TLS gRPC delivery, idempotent PostgreSQL history, bounded historical queries, retention, organization-scoped WebSocket delivery, and explicit cgroup/Systemd/container workload attribution. Phase 4 — Dashboard and Operational Features has not started; the frontend remains a foundation shell. Phase 5 production work, including firewall setup, is still planned. The setup baseline is complete; the operator-facing MVP is not yet released.
 
 ---
 
@@ -18,6 +18,7 @@ The product is being built around its own native host agent, telemetry ingestion
 - [Docker and Deployment Model](#docker-and-deployment-model)
 - [Telemetry and Data Reliability](#telemetry-and-data-reliability)
 - [Security Principles](#security-principles)
+- [Production Firewall Requirements](#production-firewall-requirements)
 - [Five-Phase Delivery Roadmap](#five-phase-delivery-roadmap)
 - [Documentation Map](#documentation-map)
 - [Engineering and Contribution Standards](#engineering-and-contribution-standards)
@@ -44,6 +45,7 @@ The long-term objective is an enterprise-oriented product with a straightforward
 
 | Area | Status | Details |
 | --- | --- | --- |
+| Project setup baseline | **Completed** | Repository layout, documented toolchain, Docker Compose local stack, database migrations, and the four-job Phase 1–3 CI baseline are established and verified |
 | Product requirements | **Completed** | Functional requirements, MVP scope, and acceptance criteria documented |
 | Metric definitions | **Completed** | Names, units, calculations, timestamps, and platform limitations documented |
 | High-level architecture | **Completed** | Component boundaries, data flow, storage responsibilities, and security boundaries documented |
@@ -57,6 +59,7 @@ The long-term objective is an enterprise-oriented product with a straightforward
 | Telemetry history and live transport | **Phase 3 verified** | Bounded PostgreSQL range query, 30-day raw retention, 90-day idempotency retention, one-use session-bound WebSocket tickets, cross-tenant isolation, and bounded subscriber queues pass CI |
 | Project/workload attribution | **Phase 3 verified (Linux mapping path)** | cgroup/Systemd/container selectors, exact server/project mappings, and explicit host-total/unclassified/shared attribution pass database integration tests; full Docker Engine discovery remains later work |
 | Monitoring dashboard | Not started | Planned for Phase 4 |
+| Production firewall setup | Planned | Phase 5 will add role-aware Linux host firewall profiles for the control plane and monitored agents |
 | Production release | Not started | Planned for Phase 5 |
 
 **Status vocabulary:** Completed means implemented and verified for the documented environment. Specified means requirements are documented but implementation is not complete. Planned means work has not started. A design document or mock screen does not count as a working feature.
@@ -264,6 +267,11 @@ The initial collection target is configurable in the 100ms–500ms range where h
 - No unrestricted remote shell feature.
 - Signed and verified installer artifacts before execution.
 - Secrets are never committed to the repository or written to logs.
+- Production deployment uses a least-privilege host firewall: expose only intended HTTPS/gRPC entry points, restrict SSH to administrators, and keep database/cache ports private.
+
+## Production Firewall Requirements
+
+The production firewall policy is defined for two roles: a control-plane VPS/VM and agent-only monitored Linux hosts. Agent-only hosts require no inbound Monitor Me ports; they send outbound TLS gRPC to the control plane. The control plane normally exposes TCP 443 and TCP 8443, optional TCP 80 for ACME HTTP-01, and SSH only from a trusted administrator CIDR. PostgreSQL 5432, Redis 6379, API 8080, and web 3000 must remain private. See [Production Firewall Requirements](docs/PRODUCTION_FIREWALL.md) for UFW/firewalld examples, Docker firewall caveats, and local/LAN deployment rules. Firewall automation is a Phase 5 deliverable, not a currently implemented installer feature.
 
 ## Five-Phase Delivery Roadmap
 
@@ -273,7 +281,7 @@ The initial collection target is configurable in the 100ms–500ms range where h
 | 2 | Platform Foundation and Secure Connectivity | **Completed** | Go/Next.js foundation, PostgreSQL/Redis, migrations, owner authentication, organization authorization, TLS gRPC enrollment, heartbeat, reconnect, and revocation pass CI |
 | 3 | Monitoring Agent and Telemetry Data Engine | **Completed** | Linux host collection, durable spool, TLS gRPC ingestion, PostgreSQL history/retention, authorized live delivery, workload attribution, and CI benchmarks all verified |
 | 4 | Dashboard and Operational Features | Not started | Server/project dashboards, custom charts, application visibility, alerts, notifications, one-click installation workflow, and secure remote actions |
-| 5 | Cross-Platform Production and Scale | Not started | Windows/macOS agents, signed lifecycle tooling, security hardening, benchmarks, production operations, and final as-built design |
+| 5 | Cross-Platform Production and Scale | Not started | Windows/macOS agents, signed lifecycle tooling, role-aware Linux firewall setup, security hardening, benchmarks, production operations, and final as-built design |
 
 A phase is marked Completed only after implementation, acceptance tests, relevant security/failure checks, documentation, and Git commit requirements pass.
 
@@ -289,6 +297,7 @@ Phases 1–3 are complete and their phase gates pass CI. This does **not** mean 
 | [Metric Catalog](docs/METRIC_CATALOG.md) | Metric names, units, sources, calculations, and platform limitations |
 | [Feature Acceptance Matrix](docs/FEATURE_ACCEPTANCE_MATRIX.md) | Feature-by-feature verification criteria and evidence status |
 | [Architecture Overview](docs/ARCHITECTURE_OVERVIEW.md) | Components, data flow, storage, Docker boundaries, and security boundaries |
+| [Production Firewall Requirements](docs/PRODUCTION_FIREWALL.md) | Least-privilege firewall profiles for the control plane, agent hosts, Docker, and local/LAN deployments |
 | [Zero-to-Production Roadmap](docs/ROADMAP.md) | Five delivery phases and completion gates |
 | [Project State](docs/PROJECT_STATE.md) | Exact current phase, completed work, commit references, and next action |
 | [Repository Instructions](AGENTS.md) | Continuation, code quality, testing, security, and commit rules |
