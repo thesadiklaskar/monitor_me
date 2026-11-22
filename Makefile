@@ -1,7 +1,7 @@
 GO_DIR := backend
 WEB_DIR := web
 
-.PHONY: help tidy test vet fmt web-install web-lint web-typecheck web-build compose-up compose-down compose-logs db-migrate
+.PHONY: help tidy test vet fmt proto certs web-install web-lint web-typecheck web-build compose-up compose-down compose-logs db-migrate
 
 help:
 	@printf '%s\n' \
@@ -10,6 +10,8 @@ help:
 		'  make test          Run Go unit tests' \
 		'  make vet           Run go vet' \
 		'  make fmt           Format Go source files' \
+		'  make proto         Generate Go gRPC sources from the versioned schema' \
+		'  make certs         Generate a local development TLS certificate' \
 		'  make web-install   Install frontend dependencies' \
 		'  make web-lint      Run frontend ESLint checks' \
 		'  make web-typecheck Run the TypeScript compiler' \
@@ -30,6 +32,16 @@ vet:
 
 fmt:
 	cd $(GO_DIR) && gofmt -w $$(find . -name '*.go' -type f)
+
+proto:
+	go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.12
+	go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.6.2
+	sh scripts/generate-proto.sh
+
+certs:
+	mkdir -p .data/certs
+	openssl req -x509 -newkey rsa:2048 -nodes -keyout .data/certs/server.key -out .data/certs/server.crt -days 365 -subj "/CN=localhost" -addext "subjectAltName=DNS:localhost,IP:127.0.0.1"
+	chmod 644 .data/certs/server.crt .data/certs/server.key
 
 web-install:
 	cd $(WEB_DIR) && npm install
@@ -54,12 +66,3 @@ compose-logs:
 
 db-migrate:
 	docker compose run --rm migrate
-
-proto:
-	go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.12
-	go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.6.2
-	sh scripts/generate-proto.sh
-
-certs:
-	mkdir -p .data/certs
-	openssl req -x509 -newkey rsa:2048 -nodes -keyout .data/certs/server.key -out .data/certs/server.crt -days 365 -subj "/CN=localhost" -addext "subjectAltName=DNS:localhost,IP:127.0.0.1"
