@@ -12,8 +12,8 @@ import (
 	"math"
 	"os"
 	"path/filepath"
-	"sync"
 	"strings"
+	"sync"
 
 	"github.com/WorkRCS/monitor_me/agent/internal/collector"
 )

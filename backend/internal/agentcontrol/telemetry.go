@@ -22,7 +22,7 @@ import (
 const maxTelemetryBatchSamples = 4096
 
 var (
-	batchIDPattern   = regexp.MustCompile("^[0-9a-f]{32}$")
+	batchIDPattern    = regexp.MustCompile("^[0-9a-f]{32}$")
 	metricNamePattern = regexp.MustCompile("^[a-zA-Z][a-zA-Z0-9_.-]{0,127}$")
 	labelKeyPattern   = regexp.MustCompile("^[a-zA-Z][a-zA-Z0-9_.-]{0,63}$")
 )
