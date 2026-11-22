@@ -81,8 +81,8 @@ A feature can be implemented before its phase is complete, but its status must r
 - [x] Heartbeat updates liveness and bounded capability metadata; a new gRPC connection can resume with the persisted session credential.
 - [x] Agent revocation invalidates existing sessions.
 - [x] PostgreSQL migrations apply on a clean database; Redis availability, dependency-aware readiness, PostgreSQL durability during Redis outage, and readiness recovery are tested.
-- [x] The gRPC telemetry stream is deliberately left UNIMPLEMENTED until Phase 3 provides durable, idempotent telemetry persistence. The server does not acknowledge data it has not stored.
-- [x] A native agent workspace boundary is documented at agent/README.md; the working agent executable and collectors are Phase 3 deliverables.
+- [x] **Phase 2 closeout (historical):** the gRPC telemetry stream was deliberately left UNIMPLEMENTED because durable, idempotent ingestion belonged to Phase 3. Phase 3 has since implemented and verified telemetry-batch validation, PostgreSQL persistence, idempotency, and post-commit ACKs; see the Phase 3 completion gate below.
+- [x] **Phase 2 closeout (historical):** the native agent workspace boundary was documented at agent/README.md. Phase 3 has since delivered the Linux Go agent executable and procfs collectors.
 
 ### Completion gate
 
@@ -95,7 +95,7 @@ A feature can be implemented before its phase is complete, but its status must r
 - [x] User authentication, session lifecycle, organization authorization, and tenant isolation pass integration tests.
 - [x] TLS gRPC enrollment, heartbeat/capability reporting, reconnect, re-enrollment, and revocation pass integration tests.
 - [x] Invalid, expired, consumed, and revoked enrollment credentials are rejected.
-- [x] README, development guide, ADR, feature acceptance matrix, and project state record implemented behavior and Phase 3 as the next phase.
+- [x] **Phase 2 closeout (historical):** README, development guide, ADR, feature acceptance matrix, and project state recorded Phase 3 as the next phase. They now record Phases 1–3 as complete and Phase 4 as not started.
 
 **CI evidence:** [GitHub Actions run #45030320358](https://github.com/WorkRCS/monitor_me/actions/runs/45030320358) — all three jobs succeeded: Go backend checks, Next.js frontend checks, and Docker Compose integration. The run generated Protobuf sources, built the Go services, started the full stack, exercised user authentication and TLS agent enrollment, verified migrations and Redis connectivity, and tested Redis outage/recovery with durable PostgreSQL state.
 
