@@ -45,15 +45,15 @@ The long-term objective is an enterprise-oriented product with a straightforward
 | Area | Status | Details |
 | --- | --- | --- |
 | Product requirements | **Completed** | Functional requirements, MVP scope, and acceptance criteria documented |
-| Metric definitions | **Completed** | Names, units, calculations, timestamps, and limitations documented |
+| Metric definitions | **Completed** | Names, units, calculations, timestamps, and platform limitations documented |
 | High-level architecture | **Completed** | Component boundaries, data flow, storage responsibilities, and security boundaries documented |
-| Feature acceptance matrix | **Completed** | Planned features mapped to test evidence |
-| Backend implementation | **Foundation verified** | Go API, PostgreSQL and Redis clients, dependency-aware readiness, and migration runner pass CI; authentication and business APIs remain pending |
-| Frontend implementation | **Foundation verified** | Next.js app shell passes ESLint, TypeScript, and production build in CI; authentication and monitoring views remain pending |
-| Local platform stack | **Runtime verified** | Full Docker Compose startup, migration execution, API readiness, PostgreSQL schema, and Redis connectivity pass CI |
-| Database and cache integration | **Startup integration verified** | PostgreSQL pool, embedded migration runner, Redis client, and dependency health checks are verified; application repositories and cache-outage semantics remain pending |
-| Agent protocol runtime | **Contract drafted** | Versioned Protobuf contract exists; generated code, gRPC server, authentication, and enrollment are pending |
-| Host agent implementation | Not started | Planned for Phase 3 |
+| Feature acceptance matrix | **Completed** | Planned features mapped to implementation tests and CI evidence |
+| Backend implementation | **Phase 2 verified** | Go API, owner bootstrap, bearer sessions, organization-scoped inventory, role checks, and TLS gRPC enrollment/heartbeat pass CI |
+| Frontend implementation | **Foundation verified** | Next.js shell passes ESLint, TypeScript, and production build; product authentication and monitoring screens remain later-phase work |
+| Local platform stack | **Runtime verified** | PostgreSQL, Redis, migration runner, API, and web services start through Docker Compose |
+| Database and cache integration | **Runtime verified** | PostgreSQL remains durable; Redis dependency outage and recovery behavior are tested |
+| Agent protocol runtime | **Phase 2 verified** | Generated Protobuf contract, TLS gRPC, single-use enrollment, heartbeat, reconnect, and revocation pass integration tests |
+| Native host agent | **Planned** | Workspace boundary is defined; executable, collectors, and persistent spool begin in Phase 3 |
 | Monitoring dashboard | Not started | Planned for Phase 4 |
 | Production release | Not started | Planned for Phase 5 |
 
@@ -167,7 +167,7 @@ The API exposes `/health/live` and `/health/ready`. Liveness reports process hea
        - Alerts, events, and operations
 ```
 
-This is the proposed logical architecture. Deployment topology, schemas, protocol details, and service boundaries will be refined through implementation and documented Architecture Decision Records.
+The Phase 2 control plane currently implements owner bootstrap, bearer authentication, organization-scoped server inventory, enrollment-token lifecycle, and TLS-protected gRPC enrollment/heartbeat. Telemetry ingestion, collectors, WebSocket fan-out, dashboards, and operational workflows remain in their later phases. The diagram shows the intended end-state data flow, not a claim that every component is already implemented.
 
 ## Docker and Deployment Model
 
@@ -207,7 +207,7 @@ The initial collection target is configurable in the 100ms–500ms range where h
 | Phase | Name | Status | Main outcome |
 | --- | --- | --- | --- |
 | 1 | Product Specification and Technical Blueprint | **Completed** | Requirements, metric catalog, acceptance matrix, and architecture baseline |
-| 2 | Platform Foundation and Secure Connectivity | **In progress** | Go/Next.js foundation, PostgreSQL/Redis connectivity, automatic migrations, and full local Compose runtime checks pass CI; authentication and running gRPC enrollment remain in progress |
+| 2 | Platform Foundation and Secure Connectivity | **Completed** | Go/Next.js foundation, PostgreSQL/Redis, migrations, owner authentication, organization authorization, TLS gRPC enrollment, heartbeat, reconnect, and revocation pass CI |
 | 3 | Monitoring Agent and Telemetry Data Engine | Not started | Native Linux agent, core host metrics, durable spool, ingestion, historical storage, live distribution, and workload attribution |
 | 4 | Dashboard and Operational Features | Not started | Server/project dashboards, custom charts, application visibility, alerts, notifications, one-click installation workflow, and secure remote actions |
 | 5 | Cross-Platform Production and Scale | Not started | Windows/macOS agents, signed lifecycle tooling, security hardening, benchmarks, production operations, and final as-built design |
@@ -259,4 +259,4 @@ The final diagram must describe the system that was actually built, not an aspir
 
 ---
 
-**Current resume point:** Phase 2 is in progress on `phase-2/platform-foundation`. The initial platform foundation, PostgreSQL/Redis startup integration, automatic migrations, and full local Compose smoke tests are verified in [GitHub Actions run #45023682627](https://github.com/WorkRCS/monitor_me/actions/runs/45023682627). Read [docs/PROJECT_STATE.md](docs/PROJECT_STATE.md) for the exact next action.
+**Current resume point:** Phase 2 is complete on main; Phase 3 — Monitoring Agent and Telemetry Data Engine is next. The complete Phase 2 implementation passes [GitHub Actions run #45030320358](https://github.com/WorkRCS/monitor_me/actions/runs/45030320358) with all three CI jobs successful. Read [docs/PROJECT_STATE.md](docs/PROJECT_STATE.md) for the exact next action.
