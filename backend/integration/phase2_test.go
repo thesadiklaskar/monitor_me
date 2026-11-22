@@ -225,7 +225,7 @@ func TestPhase2AuthenticationAndAgentLifecycle(t *testing.T) {
 	rotatedAgent, err := agentClient.Enroll(ctx, &monitorv1.EnrollRequest{
 		EnrollmentToken: rotationResult.Enrollment.Token,
 		AgentVersion:    "0.1.1-test", OperatingSystem: "linux", Architecture: "amd64",
-		Hostname:        "integration-node", Capabilities: []string{"host.cpu"},
+		Hostname: "integration-node", Capabilities: []string{"host.cpu"},
 	})
 	if err != nil {
 		t.Fatalf("re-enrollment with replacement token failed: %v", err)
