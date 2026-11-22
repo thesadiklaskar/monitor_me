@@ -179,14 +179,14 @@ A feature can be implemented before its phase is complete, but its status must r
 3. Publish an OS/version/architecture capability matrix.
 4. Add signed, versioned installers, upgrades, rollback, uninstall, and credential rotation.
 5. Complete security review, tenant-isolation tests, dependency/static checks, and end-to-end hardening.
-6. Test agent, backend, PostgreSQL, Redis, and network failures with controlled fault injection.
-7. Add repeatable performance benchmarks for collection overhead, ingestion, storage, queries, alert delay, and browser rendering.
-8. Perform staged multi-agent load tests and document demonstrated capacity limits.
-9. Finalize retention, backups, restore, production deployment, and incident procedures.
-10. Reconcile every README feature status with source code and test evidence.
-11. Create the final Excalidraw as-built system design from the completed implementation and deployment configuration.
-12. Prepare a release checklist and final production documentation.
-13. Implement and verify role-aware Linux host firewall setup for production VPS/VM and local/LAN deployments: supported UFW/firewalld profiles, least-privilege ingress/egress, IPv4/IPv6 parity, Docker-aware port exposure, idempotent changes, diagnostics, and rollback. Agent-only monitored hosts must not receive unnecessary inbound rules.
+6. Implement and verify role-aware Linux host firewall setup for production VPS/VM and local/LAN deployments: supported UFW/firewalld profiles, least-privilege ingress/egress, IPv4/IPv6 parity, Docker-aware port exposure, idempotent changes, diagnostics, and rollback. Agent-only monitored hosts must not receive unnecessary inbound rules.
+7. Test agent, backend, PostgreSQL, Redis, and network failures with controlled fault injection.
+8. Add repeatable performance benchmarks for collection overhead, ingestion, storage, queries, alert delay, and browser rendering.
+9. Perform staged multi-agent load tests and document demonstrated capacity limits.
+10. Finalize retention, backups, restore, production deployment, and incident procedures.
+11. Reconcile every README feature status with source code and test evidence.
+12. Create the final Excalidraw as-built system design from the completed implementation and deployment configuration.
+13. Prepare a release checklist and final production documentation.
 
 ### Completion gate
 
