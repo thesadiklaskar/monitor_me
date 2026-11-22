@@ -28,6 +28,7 @@ var (
 const (
 	userSessionTTL     = 24 * time.Hour
 	enrollmentTokenTTL = 15 * time.Minute
+	liveTicketTTL      = 30 * time.Second
 )
 
 var (
@@ -258,6 +259,89 @@ func (s *Store) Logout(ctx context.Context, principal Principal) error {
 		return ErrUnauthorized
 	}
 	return nil
+}
+
+
+type LiveTicket struct {
+	Token     string
+	ExpiresAt time.Time
+}
+
+// CreateLiveTicket issues a short-lived, one-use ticket bound to the current session.
+func (s *Store) CreateLiveTicket(ctx context.Context, principal Principal) (LiveTicket, error) {
+	token, err := newOpaqueToken()
+	if err != nil {
+		return LiveTicket{}, fmt.Errorf("create live connection ticket: %w", err)
+	}
+	hash := sha256.Sum256([]byte(token))
+	expiresAt := time.Now().UTC().Add(liveTicketTTL)
+	var ticketID string
+	err = s.db.QueryRowContext(ctx, `
+		INSERT INTO live_stream_tickets (user_session_id, organization_id, token_hash, expires_at)
+		SELECT session.id, session.organization_id, $3, $4
+		FROM user_sessions session
+		JOIN organization_memberships membership
+		  ON membership.organization_id = session.organization_id
+		 AND membership.user_id = session.user_id
+		WHERE session.id = $1 AND session.user_id = $2 AND session.organization_id = $5
+		  AND session.revoked_at IS NULL AND session.expires_at > now()
+		RETURNING id::text
+	`, principal.SessionID, principal.UserID, hash[:], expiresAt, principal.OrganizationID).Scan(&ticketID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return LiveTicket{}, ErrUnauthorized
+	}
+	if err != nil {
+		return LiveTicket{}, fmt.Errorf("persist live connection ticket: %w", err)
+	}
+	return LiveTicket{Token: token, ExpiresAt: expiresAt}, nil
+}
+
+// ConsumeLiveTicket atomically spends a ticket and revalidates the parent session.
+func (s *Store) ConsumeLiveTicket(ctx context.Context, token string) (Principal, error) {
+	if len(token) < 32 || len(token) > 128 {
+		return Principal{}, ErrUnauthorized
+	}
+	hash := sha256.Sum256([]byte(token))
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return Principal{}, fmt.Errorf("begin live ticket exchange: %w", err)
+	}
+	defer tx.Rollback()
+
+	var principal Principal
+	err = tx.QueryRowContext(ctx, `
+		UPDATE live_stream_tickets ticket
+		SET consumed_at = now()
+		FROM user_sessions session
+		JOIN users user_account ON user_account.id = session.user_id
+		JOIN organizations organization ON organization.id = session.organization_id
+		JOIN organization_memberships membership
+		  ON membership.organization_id = session.organization_id
+		 AND membership.user_id = session.user_id
+		WHERE ticket.token_hash = $1
+		  AND ticket.user_session_id = session.id
+		  AND ticket.organization_id = session.organization_id
+		  AND ticket.consumed_at IS NULL
+		  AND ticket.expires_at > now()
+		  AND session.revoked_at IS NULL
+		  AND session.expires_at > now()
+		RETURNING session.id::text, session.user_id::text,
+		          session.organization_id::text, user_account.email,
+		          user_account.display_name, organization.name, membership.role
+	`, hash[:]).Scan(
+		&principal.SessionID, &principal.UserID, &principal.OrganizationID,
+		&principal.Email, &principal.DisplayName, &principal.Organization, &principal.Role,
+	)
+	if errors.Is(err, sql.ErrNoRows) {
+		return Principal{}, ErrUnauthorized
+	}
+	if err != nil {
+		return Principal{}, fmt.Errorf("consume live connection ticket: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return Principal{}, fmt.Errorf("commit live ticket exchange: %w", err)
+	}
+	return principal, nil
 }
 
 // CreateServer creates a pending server and its first scoped enrollment token atomically.

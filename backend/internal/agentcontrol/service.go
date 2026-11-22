@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"database/sql"
+	"log/slog"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -16,6 +17,7 @@ import (
 	monitorv1 "github.com/WorkRCS/monitor_me/backend/gen/monitor/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"github.com/WorkRCS/monitor_me/backend/internal/telemetry"
 )
 
 const (
@@ -31,12 +33,17 @@ var (
 // Service implements the versioned control-plane RPCs used during Phase 2.
 type Service struct {
 	monitorv1.UnimplementedAgentControlServer
-	db *sql.DB
+	db        *sql.DB
+	publisher telemetry.EventPublisher
 }
 
 // NewService creates an agent-control service backed by PostgreSQL.
-func NewService(db *sql.DB) *Service {
-	return &Service{db: db}
+func NewService(db *sql.DB, publishers ...telemetry.EventPublisher) *Service {
+	service := &Service{db: db}
+	if len(publishers) > 0 {
+		service.publisher = publishers[0]
+	}
+	return service
 }
 
 // Enroll atomically consumes a scoped enrollment token, binds the agent to its
@@ -230,6 +237,28 @@ func (s *Service) ReportHeartbeat(ctx context.Context, request *monitorv1.Heartb
 		Accepted:             true,
 		ServerTimeUnixMillis: time.Now().UTC().UnixMilli(),
 	}, nil
+}
+
+
+func (s *Service) publishCommittedBatch(ctx context.Context, organizationID, serverID, agentID string, batch *monitorv1.TelemetryBatch) {
+	if s.publisher == nil {
+		return
+	}
+	samples := make([]telemetry.LiveSample, 0, len(batch.GetSamples()))
+	for _, sample := range batch.GetSamples() {
+		samples = append(samples, telemetry.LiveSample{
+			MetricName: sample.GetMetricName(), Value: sample.GetValue(), Unit: sample.GetUnit(),
+			Labels: sample.GetLabels(), ObservedAtUnixNanos: sample.GetObservedAtUnixNanos(),
+		})
+	}
+	publishContext, cancel := context.WithTimeout(context.WithoutCancel(ctx), 2*time.Second)
+	defer cancel()
+	if err := telemetry.PublishCommittedBatch(
+		publishContext, s.publisher, organizationID, serverID, agentID, batch.GetBatchId(), samples,
+	); err != nil {
+		slog.Default().Warn("durable telemetry committed but live notification failed",
+			"server_id", serverID, "batch_id", batch.GetBatchId(), "error", err)
+	}
 }
 
 func validEnrollmentRequest(request *monitorv1.EnrollRequest) bool {

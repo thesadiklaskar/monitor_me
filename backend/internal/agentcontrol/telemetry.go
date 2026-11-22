@@ -149,6 +149,7 @@ func (s *Service) persistTelemetryBatch(ctx context.Context, agentID, sessionTok
 		if err := tx.Commit(); err != nil {
 			return false, "", status.Error(codes.Unavailable, "could not confirm duplicate telemetry batch")
 		}
+		s.publishCommittedBatch(ctx, organizationID, serverID, agentID, batch)
 		return true, "", nil
 	}
 
@@ -225,6 +226,7 @@ func (s *Service) persistTelemetryBatch(ctx context.Context, agentID, sessionTok
 	if err := tx.Commit(); err != nil {
 		return false, "", status.Error(codes.Unavailable, "could not commit telemetry batch")
 	}
+	s.publishCommittedBatch(ctx, organizationID, serverID, agentID, batch)
 	return true, "", nil
 }
 
