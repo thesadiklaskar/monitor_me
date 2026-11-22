@@ -101,8 +101,8 @@ func newPendingTestBatch(t *testing.T, store *spool.Store) spool.Batch {
 
 func TestSendPendingRetainsWALUntilMatchingAcceptedAcknowledgement(t *testing.T) {
 	tests := []struct {
-		name string
-		ack  streamAcknowledgement
+		name    string
+		ack     streamAcknowledgement
 		wantErr bool
 	}{
 		{
@@ -153,7 +153,7 @@ func TestSendPendingRetainsWALUntilMatchingAcceptedAcknowledgement(t *testing.T)
 			defer cancel()
 
 			sent, sendErr := client.SendPending(ctx, state.Credentials{
-				AgentID: "e9e3d6df-8cbe-4d48-92e6-450fb7c132a1",
+				AgentID:      "e9e3d6df-8cbe-4d48-92e6-450fb7c132a1",
 				SessionToken: "01234567890123456789012345678901",
 			}, store)
 			if test.wantErr && sendErr == nil {
