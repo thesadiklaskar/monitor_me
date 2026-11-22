@@ -374,7 +374,7 @@ func TestPhase2AuthenticationAndAgentLifecycle(t *testing.T) {
 					BatchId: batchID, CollectedAtUnixNanos: collectedAt, SchemaVersion: 1,
 					Samples: []*monitorv1.MetricSample{{
 						MetricName: "host.memory.used", Value: value, Unit: "bytes",
-						Labels: map[string]string{"source": "phase3-integration"},
+						Labels:              map[string]string{"source": "phase3-integration"},
 						ObservedAtUnixNanos: observedAt,
 					}},
 				},

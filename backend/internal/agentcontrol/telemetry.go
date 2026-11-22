@@ -100,14 +100,14 @@ func (s *Service) persistTelemetryBatch(ctx context.Context, agentID, sessionTok
 		SELECT a.server_id::text, s.organization_id::text
 		FROM agents a
 		JOIN servers s ON s.id = a.server_id
-		JOIN agent_sessions session ON session.agent_id = a.id
+		JOIN agent_sessions agent_session ON agent_session.agent_id = a.id
 		WHERE a.id = $1
 		  AND a.status <> 'revoked'
 		  AND s.status <> 'disabled'
-		  AND session.token_hash = $2
-		  AND session.revoked_at IS NULL
-		  AND session.expires_at > now()
-		FOR UPDATE OF a, session
+		  AND agent_session.token_hash = $2
+		  AND agent_session.revoked_at IS NULL
+		  AND agent_session.expires_at > now()
+		FOR UPDATE OF a, agent_session
 	`, agentID, sessionHash[:]).Scan(&serverID, &organizationID)
 	if errors.Is(err, sql.ErrNoRows) {
 		return false, "", status.Error(codes.Unauthenticated, "agent session is invalid, expired, or revoked")

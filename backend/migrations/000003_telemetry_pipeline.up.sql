@@ -31,7 +31,7 @@ CREATE TABLE telemetry_samples (
     FOREIGN KEY (server_id, organization_id)
         REFERENCES servers (id, organization_id) ON DELETE CASCADE,
     FOREIGN KEY (project_id, organization_id)
-        REFERENCES projects (id, organization_id) ON DELETE SET NULL
+        REFERENCES projects (id, organization_id) ON DELETE SET NULL (project_id)
 );
 
 CREATE INDEX telemetry_samples_server_metric_time_idx

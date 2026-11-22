@@ -10,11 +10,11 @@ import (
 
 func validCredentials() Credentials {
 	return Credentials{
-		AgentID: "e9e3d6df-8cbe-4d48-92e6-450fb7c132a1",
-		ServerID: "5c44c3e5-115b-4b81-84b7-07332f18a70f",
-		SessionToken: "01234567890123456789012345678901",
-		ProtocolVersion: "monitor.v1",
-		ExpiresAtUnixMillis: time.Now().Add(time.Hour).UnixMilli(),
+		AgentID:                  "e9e3d6df-8cbe-4d48-92e6-450fb7c132a1",
+		ServerID:                 "5c44c3e5-115b-4b81-84b7-07332f18a70f",
+		SessionToken:             "01234567890123456789012345678901",
+		ProtocolVersion:          "monitor.v1",
+		ExpiresAtUnixMillis:      time.Now().Add(time.Hour).UnixMilli(),
 		HeartbeatIntervalSeconds: 15,
 	}
 }

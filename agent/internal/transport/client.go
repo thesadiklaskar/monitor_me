@@ -74,11 +74,11 @@ func (c *Client) LoadOrEnroll(
 
 	response, err := c.rpc.Enroll(ctx, &monitorv1.EnrollRequest{
 		EnrollmentToken: cfg.EnrollmentToken,
-		AgentVersion: cfg.Version,
+		AgentVersion:    cfg.Version,
 		OperatingSystem: runtime.GOOS,
-		Architecture: runtime.GOARCH,
-		Hostname: hostname,
-		Capabilities: capabilities,
+		Architecture:    runtime.GOARCH,
+		Hostname:        hostname,
+		Capabilities:    capabilities,
 	})
 	if err != nil {
 		return state.Credentials{}, fmt.Errorf("enroll native agent over TLS: %w", err)
@@ -86,7 +86,7 @@ func (c *Client) LoadOrEnroll(
 	credentials := state.Credentials{
 		AgentID: response.GetAgentId(), ServerID: response.GetServerId(),
 		SessionToken: response.GetSessionToken(), ProtocolVersion: response.GetProtocolVersion(),
-		ExpiresAtUnixMillis: response.GetSessionExpiresAtUnixMillis(),
+		ExpiresAtUnixMillis:      response.GetSessionExpiresAtUnixMillis(),
 		HeartbeatIntervalSeconds: response.GetHeartbeatIntervalSeconds(),
 	}
 	if err := state.Save(cfg.StateFile, credentials); err != nil {
