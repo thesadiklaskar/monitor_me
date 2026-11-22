@@ -60,8 +60,14 @@ services:
       DATABASE_URL: "postgres://${POSTGRES_USER:-monitor_me}:${POSTGRES_PASSWORD:-local_only_change_me}@postgres:5432/${POSTGRES_DB:-monitor_me}?sslmode=disable"
       REDIS_ADDR: "redis:6379"
       REDIS_PASSWORD: "${REDIS_PASSWORD:-local_only_change_me}"
+      AGENT_GRPC_ADDR: ":8443"
+      AGENT_TLS_CERT_FILE: "/run/certs/server.crt"
+      AGENT_TLS_KEY_FILE: "/run/certs/server.key"
     ports:
       - "127.0.0.1:${API_PORT:-8080}:8080"
+      - "127.0.0.1:${AGENT_GRPC_PORT:-8443}:8443"
+    volumes:
+      - ./.data/certs:/run/certs:ro
     depends_on:
       postgres:
         condition: service_healthy
