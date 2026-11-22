@@ -624,7 +624,8 @@ func TestPhase2AuthenticationAndAgentLifecycle(t *testing.T) {
 	if err := database.QueryRowContext(ctx, `
 		SELECT project_id::text, attribution_method
 		FROM telemetry_samples
-		WHERE agent_id = $1 AND batch_id = $2 AND metric_name = 'process.memory.rss'
+		WHERE agent_id = $1 AND batch_id = $2
+		  AND metric_name = 'process.memory.rss' AND labels->>'pid' = '123'
 	`, enrolled.GetAgentId(), batchID).Scan(&mappedProject, &attributionMethod); err != nil {
 		t.Fatalf("query workload-attributed telemetry: %v", err)
 	}
