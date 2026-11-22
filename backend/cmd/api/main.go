@@ -68,7 +68,7 @@ func run(logger *slog.Logger) error {
 		PoolSize:     16,
 		MinIdleConns: 2,
 		DialTimeout:  3 * time.Second,
-		ReadTimeout:  2 * time.Second,
+		ReadTimeout:  -1,
 		WriteTimeout: 2 * time.Second,
 	})
 	if err != nil {

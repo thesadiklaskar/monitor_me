@@ -71,10 +71,13 @@ func PublishCommittedBatch(ctx context.Context, publisher EventPublisher, organi
 				value = value[:128]
 			}
 			labels[key] = value
-			identity += "|" + key + "=" + value
+		}
+		labelIdentity, err := json.Marshal(labels)
+		if err != nil {
+			return fmt.Errorf("encode live metric labels: %w", err)
 		}
 		sample.Labels = labels
-		latest[sample.MetricName+identity] = sample
+		latest[sample.MetricName+string(labelIdentity)] = sample
 	}
 	keys := make([]string, 0, len(latest))
 	for key := range latest {
