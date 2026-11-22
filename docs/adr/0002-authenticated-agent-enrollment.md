@@ -41,7 +41,8 @@ The control plane must provide an initial owner bootstrap, authenticated operato
 ### Transport
 
 - The gRPC server requires TLS 1.2 or newer.
-- Message send/receive sizes are bounded to 1 MiB and concurrent streams are bounded.
+- Message send/receive sizes are bounded to 1 MiB.
+- Concurrent HTTP/2 streams per gRPC connection are capped at 128.
 - Production deployments must mount an organization-managed certificate and private key through the secret manager.
 - Self-signed certificates are only for isolated local development and CI.
 - User HTTP APIs must be exposed over HTTPS by the production ingress or reverse proxy.

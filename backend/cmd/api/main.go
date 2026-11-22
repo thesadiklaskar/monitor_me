@@ -104,6 +104,7 @@ func run(logger *slog.Logger) error {
 		})),
 		grpc.MaxRecvMsgSize(1<<20),
 		grpc.MaxSendMsgSize(1<<20),
+		grpc.MaxConcurrentStreams(128),
 	)
 	monitorv1.RegisterAgentControlServer(grpcServer, agentcontrol.NewService(database))
 
