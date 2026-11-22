@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"testing"
@@ -24,6 +25,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/status"
+	"github.com/gorilla/websocket"
 )
 
 type apiResponse struct {
@@ -363,6 +365,45 @@ func TestPhase2AuthenticationAndAgentLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open authenticated telemetry stream: %v", err)
 	}
+
+	// Create a project mapping so ingestion proves that workload selectors are
+	// attributed only through an organization-scoped mapping.
+	var projectID string
+	if err := database.QueryRowContext(ctx, `
+		INSERT INTO projects (organization_id, name, slug)
+		VALUES ($1, 'Phase Three Project', 'phase-three-project')
+		RETURNING id::text
+	`, registered.User.OrganizationID).Scan(&projectID); err != nil {
+		t.Fatalf("create project for workload attribution: %v", err)
+	}
+	if _, err := database.ExecContext(ctx, `
+		INSERT INTO server_project_mappings (
+			organization_id, server_id, project_id, workload_type, workload_selector, attribution_method
+		)
+		VALUES ($1, $2, $3, 'systemd', '/system.slice/example.service', 'systemd')
+	`, registered.User.OrganizationID, serverID, projectID); err != nil {
+		t.Fatalf("create Systemd project mapping: %v", err)
+	}
+
+	ticketResponse := requestJSON(t, ctx, http.MethodPost, baseURL+"/v1/live/ticket", bearer, map[string]any{})
+	if ticketResponse.StatusCode != http.StatusCreated {
+		t.Fatalf("create live ticket: expected 201, got %d: %s", ticketResponse.StatusCode, ticketResponse.Body)
+	}
+	var liveTicket struct {
+		Ticket string `json:"ticket"`
+	}
+	decodeResponse(t, ticketResponse.Body, &liveTicket)
+	liveURL := "ws" + strings.TrimPrefix(baseURL, "http") + "/v1/live/ws?ticket=" + url.QueryEscape(liveTicket.Ticket)
+	liveHeaders := http.Header{"Origin": []string{baseURL}}
+	liveConnection, liveResponse, err := websocket.DefaultDialer.DialContext(ctx, liveURL, liveHeaders)
+	if err != nil {
+		if liveResponse != nil && liveResponse.Body != nil {
+			liveResponse.Body.Close()
+		}
+		t.Fatalf("connect authorized organization live stream: response=%v error=%v", liveResponse, err)
+	}
+	defer liveConnection.Close()
+
 	collectedAt := time.Now().UTC().UnixNano()
 	observedAt := collectedAt
 	batchID := "0123456789abcdef0123456789abcdef"
@@ -372,11 +413,23 @@ func TestPhase2AuthenticationAndAgentLifecycle(t *testing.T) {
 			Payload: &monitorv1.AgentToServerMessage_TelemetryBatch{
 				TelemetryBatch: &monitorv1.TelemetryBatch{
 					BatchId: batchID, CollectedAtUnixNanos: collectedAt, SchemaVersion: 1,
-					Samples: []*monitorv1.MetricSample{{
-						MetricName: "host.memory.used", Value: value, Unit: "bytes",
-						Labels:              map[string]string{"source": "phase3-integration"},
-						ObservedAtUnixNanos: observedAt,
-					}},
+					Samples: []*monitorv1.MetricSample{
+						{
+							MetricName: "host.memory.used", Value: value, Unit: "bytes",
+							Labels: map[string]string{"source": "phase3-integration"},
+							ObservedAtUnixNanos: observedAt,
+						},
+						{
+							MetricName: "process.memory.rss", Value: 2048, Unit: "bytes",
+							Labels: map[string]string{
+								"pid": "123", "process": "fixture-worker",
+								"workload_type": "systemd",
+								"workload_selector": "/system.slice/example.service",
+								"attribution_method": "systemd",
+							},
+							ObservedAtUnixNanos: observedAt,
+						},
+					},
 				},
 			},
 		}
@@ -388,6 +441,55 @@ func TestPhase2AuthenticationAndAgentLifecycle(t *testing.T) {
 	if err != nil || firstAck.GetAcknowledgement() == nil || !firstAck.GetAcknowledgement().GetAccepted() {
 		t.Fatalf("committed telemetry batch was not acknowledged: response=%v error=%v", firstAck, err)
 	}
+	if err := liveConnection.SetReadDeadline(time.Now().Add(5 * time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	var liveEvent struct {
+		Type           string `json:"type"`
+		OrganizationID string `json:"organization_id"`
+		ServerID       string `json:"server_id"`
+		BatchID        string `json:"batch_id"`
+	}
+	if err := liveConnection.ReadJSON(&liveEvent); err != nil {
+		t.Fatalf("read post-commit live event: %v", err)
+	}
+	if liveEvent.Type != "telemetry.batch" || liveEvent.OrganizationID != registered.User.OrganizationID ||
+		liveEvent.ServerID != serverID || liveEvent.BatchID != batchID {
+		t.Fatalf("live event has incorrect tenant or batch scope: %+v", liveEvent)
+	}
+	_ = liveConnection.Close()
+
+	// A ticket is single-use. Replaying it cannot reopen a stream.
+	replayConnection, replayResponse, replayErr := websocket.DefaultDialer.DialContext(ctx, liveURL, liveHeaders)
+	if replayErr == nil {
+		_ = replayConnection.Close()
+		t.Fatal("a consumed live ticket must not be reusable")
+	}
+	if replayResponse == nil || replayResponse.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("replayed live ticket should return 401, got response=%v error=%v", replayResponse, replayErr)
+	}
+	if replayResponse.Body != nil {
+		replayResponse.Body.Close()
+	}
+
+	// A fresh ticket restores the live stream after a normal reconnect.
+	reconnectTicketResponse := requestJSON(t, ctx, http.MethodPost, baseURL+"/v1/live/ticket", bearer, map[string]any{})
+	if reconnectTicketResponse.StatusCode != http.StatusCreated {
+		t.Fatalf("issue reconnect ticket: expected 201, got %d: %s", reconnectTicketResponse.StatusCode, reconnectTicketResponse.Body)
+	}
+	var reconnectTicket struct {
+		Ticket string `json:"ticket"`
+	}
+	decodeResponse(t, reconnectTicketResponse.Body, &reconnectTicket)
+	reconnectURL := "ws" + strings.TrimPrefix(baseURL, "http") + "/v1/live/ws?ticket=" + url.QueryEscape(reconnectTicket.Ticket)
+	reconnectedLive, reconnectResponse, err := websocket.DefaultDialer.DialContext(ctx, reconnectURL, liveHeaders)
+	if err != nil {
+		if reconnectResponse != nil && reconnectResponse.Body != nil {
+			reconnectResponse.Body.Close()
+		}
+		t.Fatalf("reconnect to organization live stream: response=%v error=%v", reconnectResponse, err)
+	}
+	defer reconnectedLive.Close()
 	if err := stream.Send(telemetryMessage(1048576)); err != nil {
 		t.Fatalf("send retry of telemetry batch: %v", err)
 	}
@@ -404,6 +506,85 @@ func TestPhase2AuthenticationAndAgentLifecycle(t *testing.T) {
 		conflictAck.GetAcknowledgement().GetRejectionCode() != "idempotency_conflict" {
 		t.Fatalf("reused idempotency key with changed data must be rejected: response=%v error=%v", conflictAck, err)
 	}
+	secondBatchID := "fedcba9876543210fedcba9876543210"
+	secondMessage := &monitorv1.AgentToServerMessage{
+		AgentId: enrolled.GetAgentId(), SessionToken: enrolled.GetSessionToken(),
+		Payload: &monitorv1.AgentToServerMessage_TelemetryBatch{
+			TelemetryBatch: &monitorv1.TelemetryBatch{
+				BatchId: secondBatchID, CollectedAtUnixNanos: time.Now().UTC().UnixNano(), SchemaVersion: 1,
+				Samples: []*monitorv1.MetricSample{{
+					MetricName: "host.memory.used", Value: 2097152, Unit: "bytes",
+					Labels: map[string]string{"source": "phase3-reconnect"},
+					ObservedAtUnixNanos: time.Now().UTC().UnixNano(),
+				}},
+			},
+		},
+	}
+	if err := stream.Send(secondMessage); err != nil {
+		t.Fatalf("send telemetry after websocket reconnect: %v", err)
+	}
+	secondAck, err := stream.Recv()
+	if err != nil || secondAck.GetAcknowledgement() == nil || !secondAck.GetAcknowledgement().GetAccepted() {
+		t.Fatalf("telemetry after websocket reconnect was not stored: response=%v error=%v", secondAck, err)
+	}
+	if err := reconnectedLive.SetReadDeadline(time.Now().Add(5 * time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	var reconnectedEvent struct {
+		Type    string `json:"type"`
+		BatchID string `json:"batch_id"`
+	}
+	if err := reconnectedLive.ReadJSON(&reconnectedEvent); err != nil {
+		t.Fatalf("read live event after reconnect: %v", err)
+	}
+	if reconnectedEvent.Type != "telemetry.batch" || reconnectedEvent.BatchID != secondBatchID {
+		t.Fatalf("unexpected event after reconnect: %+v", reconnectedEvent)
+	}
+
+	// The history endpoint is organization-scoped and uses bounded aggregation.
+	seriesValues := url.Values{
+		"metric": []string{"host.memory.used"},
+		"from": []string{time.Now().Add(-30 * time.Second).Format(time.RFC3339Nano)},
+		"to": []string{time.Now().Add(time.Second).Format(time.RFC3339Nano)},
+		"step": []string{"10s"},
+		"limit": []string{"10"},
+	}
+	seriesURL := baseURL + "/v1/servers/" + serverID + "/metrics?" + seriesValues.Encode()
+	seriesResponse := requestJSON(t, ctx, http.MethodGet, seriesURL, bearer, nil)
+	if seriesResponse.StatusCode != http.StatusOK {
+		t.Fatalf("server metrics history: expected 200, got %d: %s", seriesResponse.StatusCode, seriesResponse.Body)
+	}
+	var seriesResult struct {
+		Points []json.RawMessage `json:"points"`
+	}
+	decodeResponse(t, seriesResponse.Body, &seriesResult)
+	if len(seriesResult.Points) == 0 {
+		t.Fatal("expected the persisted telemetry to be queryable from PostgreSQL history")
+	}
+	foreignSeries := requestJSON(t, ctx, http.MethodGet, seriesURL, otherSession.AccessToken, nil)
+	if foreignSeries.StatusCode != http.StatusOK {
+		t.Fatalf("foreign organization metrics query: expected 200, got %d", foreignSeries.StatusCode)
+	}
+	var foreignSeriesResult struct {
+		Points []json.RawMessage `json:"points"`
+	}
+	decodeResponse(t, foreignSeries.Body, &foreignSeriesResult)
+	if len(foreignSeriesResult.Points) != 0 {
+		t.Fatalf("cross-organization telemetry leak: received %d metric points", len(foreignSeriesResult.Points))
+	}
+
+	var mappedProject, attributionMethod string
+	if err := database.QueryRowContext(ctx, `
+		SELECT project_id::text, attribution_method
+		FROM telemetry_samples
+		WHERE agent_id = $1 AND batch_id = $2 AND metric_name = 'process.memory.rss'
+	`, enrolled.GetAgentId(), batchID).Scan(&mappedProject, &attributionMethod); err != nil {
+		t.Fatalf("query workload-attributed telemetry: %v", err)
+	}
+	if mappedProject != projectID || attributionMethod != "systemd" {
+		t.Fatalf("unexpected workload attribution: project=%s method=%s", mappedProject, attributionMethod)
+	}
+
 	if err := stream.CloseSend(); err != nil {
 		t.Fatalf("close telemetry stream: %v", err)
 	}
@@ -414,8 +595,8 @@ func TestPhase2AuthenticationAndAgentLifecycle(t *testing.T) {
 	`, enrolled.GetAgentId(), batchID).Scan(&storedSamples); err != nil {
 		t.Fatalf("query persisted telemetry samples: %v", err)
 	}
-	if storedSamples != 1 {
-		t.Fatalf("idempotent retries must persist one sample, got %d", storedSamples)
+	if storedSamples != 3 {
+		t.Fatalf("the first idempotent batch and second unique batch must persist three samples, got %d", storedSamples)
 	}
 
 	revokeAgent := requestJSON(t, ctx, http.MethodPost,

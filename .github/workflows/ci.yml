@@ -188,6 +188,8 @@ jobs:
           API_BASE_URL: http://127.0.0.1:8080
           AGENT_GRPC_ADDRESS: localhost:8443
           AGENT_GRPC_ROOT_CA: ${{ github.workspace }}/.data/certs/server.crt
+          TEST_REDIS_ADDRESS: localhost:6379
+          TEST_REDIS_PASSWORD: local_only_change_me
         run: go test -tags=integration -v ./integration
       - name: Verify database migration
         run: |
