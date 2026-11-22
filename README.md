@@ -298,6 +298,7 @@ Phases 1–3 are complete and their phase gates pass CI. This does **not** mean 
 | [Feature Acceptance Matrix](docs/FEATURE_ACCEPTANCE_MATRIX.md) | Feature-by-feature verification criteria and evidence status |
 | [Architecture Overview](docs/ARCHITECTURE_OVERVIEW.md) | Components, data flow, storage, Docker boundaries, and security boundaries |
 | [Production Firewall Requirements](docs/PRODUCTION_FIREWALL.md) | Least-privilege firewall profiles for the control plane, agent hosts, Docker, and local/LAN deployments |
+| [Phase 4 Execution Plan](docs/PHASE_4_EXECUTION_PLAN.md) | Dashboard implementation order, verified API baseline, acceptance gates, and agreed release/test sequence |
 | [Zero-to-Production Roadmap](docs/ROADMAP.md) | Five delivery phases and completion gates |
 | [Project State](docs/PROJECT_STATE.md) | Exact current phase, completed work, commit references, and next action |
 | [Repository Instructions](AGENTS.md) | Continuation, code quality, testing, security, and commit rules |
