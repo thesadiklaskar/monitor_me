@@ -64,19 +64,24 @@ No item may be marked Verified based only on a code stub, mock UI, or documentat
 
 ### Phase 2 — Platform Foundation and Secure Connectivity
 
-- [x] Go API bootstrap, health endpoint tests, formatting, race-enabled unit tests, vet, and builds pass in GitHub Actions.
-- [x] Next.js application shell passes ESLint, TypeScript checks, and production build in GitHub Actions.
-- [x] Docker Compose starts the full local stack successfully in CI.
-- [x] Initial PostgreSQL identity/inventory migration applies on a clean database; CI verifies the resulting `organizations` table.
-- [x] PostgreSQL application client and bounded connection pool pass build and startup integration checks.
-- [x] Redis application client and connectivity checks pass in the full Compose integration job.
-- [x] Dependency-aware readiness reports PostgreSQL and Redis status; liveness remains independent.
-- [x] Versioned agent Protocol Buffer contract is drafted and documented.
-- [ ] Application repositories and explicit cache-outage behavior tests are implemented.
-- [ ] Authentication, authorization, expiring enrollment tokens, heartbeat, reconnect, and revocation pass integration tests.
-- [ ] Generated Protocol Buffer code and a running authenticated gRPC service pass integration tests.
+- [x] Go API bootstrap, structured logging, health/readiness behavior, graceful shutdown, formatting, race-enabled unit tests, vet, and builds pass in CI.
+- [x] Next.js application shell passes ESLint, TypeScript checks, and production build in CI.
+- [x] Docker Compose starts the full local stack successfully.
+- [x] PostgreSQL migrations apply to a clean database and the expected identity schema is present.
+- [x] PostgreSQL connection pooling and Redis client configuration pass build and runtime checks.
+- [x] Redis is non-authoritative: API readiness fails during Redis outage, PostgreSQL identity data remains durable, and readiness recovers when Redis returns.
+- [x] Versioned Protobuf sources generate reproducibly in CI; TLS gRPC server enforces 1 MiB message bounds and 128 concurrent streams per connection.
+- [x] First-owner registration, Argon2id password validation, bearer login/logout, and authenticated profile checks pass integration tests.
+- [x] Role authorization rejects viewer server creation and enrollment-token revocation.
+- [x] Organization isolation prevents one organization's owner from seeing another organization's server inventory.
+- [x] Server creation issues a random 15-minute, single-use enrollment token; invalid, expired, consumed, and revoked tokens are rejected.
+- [x] TLS gRPC enrollment creates a stable agent identity and a 30-day session with hash-only persistence.
+- [x] Heartbeats update server/agent liveness and capability metadata.
+- [x] A new gRPC connection can reconnect with the existing session; re-enrollment preserves agent identity and invalidates previous sessions.
+- [x] Agent revocation rejects future heartbeat requests.
+- [x] The telemetry stream remains explicitly deferred until Phase 3 durable ingestion is implemented; no unpersisted telemetry is acknowledged.
 
-**CI evidence:** [GitHub Actions run #45023682627](https://github.com/WorkRCS/monitor_me/actions/runs/45023682627) — Go backend checks, frontend checks, and full Docker Compose integration all passed.
+**CI evidence:** [GitHub Actions run #45030320358](https://github.com/WorkRCS/monitor_me/actions/runs/45030320358) — all three jobs passed: Go backend, Next.js frontend, and full Docker Compose integration.
 
 ### Phase 3 — Monitoring Agent and Telemetry Data Engine
 
