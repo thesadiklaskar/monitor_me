@@ -15,10 +15,23 @@ This file is the authoritative resume point for Monitor Me. Read it before makin
 | Completed phases | Phase 1 — Product Specification and Technical Blueprint; Phase 2 — Platform Foundation and Secure Connectivity; Phase 3 — Monitoring Agent and Telemetry Data Engine |
 | Current phase | Phase 4 — Dashboard and Operational Features |
 | Current phase status | Not Started |
-| Implementation status | Phases 1–3 are complete. The Linux agent, durable WAL, TLS gRPC ingestion, PostgreSQL history/retention, authorized live delivery, workload attribution, and benchmark gates are verified. The frontend remains a foundation shell; Phase 4 UI/alert/operations work has not started. |
-| Latest implementation commit | 8435b5feca943e051c16a70a44479e5a4763f238 |
-| Latest verified CI run | [#45039191041 — success](https://github.com/WorkRCS/monitor_me/actions/runs/45039191041) |
+| MVP status | Not complete — authenticated dashboard, server overview, Add Server UI, and live metric views remain Phase 4 requirements |
+| Implementation status | Phases 1–3 phase gates are complete and CI-verified. The Linux agent, durable WAL, TLS gRPC ingestion, PostgreSQL history/retention, authorized live delivery, workload attribution, and benchmarks are verified. The overall MVP is not complete because dashboard/login/Add Server and browser-facing views remain Phase 4 work. Several non-UI feature requirements remain In Progress/Planned in the acceptance matrix. |
+| Latest implementation commit | 1469206e4a98dfe0c2305e0523cc40a1464a18fc |
+| Latest verified CI run | [#45039870651 — success](https://github.com/WorkRCS/monitor_me/actions/runs/45039870651); final audit hardening and PostgreSQL restart checks await their own CI run |
 | Next action | Implement the authenticated Next.js login/session flow and server inventory page using the verified auth and server APIs; include logout, empty/loading/error states, and the Add Server one-time enrollment-token flow. |
+
+## Phase 1–3 Audit
+
+The latest completed full four-job baseline is [GitHub Actions run #45039870651 — success](https://github.com/WorkRCS/monitor_me/actions/runs/45039870651). The audit found and documented several individual product requirements that remain In Progress or Planned even though the Phase 1–3 exit gates are complete. A separate report is maintained at docs/PHASE_1_TO_3_AUDIT.md. The final hardening run adds strict canonical batch IDs and a PostgreSQL outage/recovery canary.
+
+### Explicit unfinished product requirements
+
+- Authenticated dashboard, server inventory UI, Add Server wizard and live metric views: Phase 4.
+- OS service registration and remaining AgentHealth telemetry samples: In Progress.
+- Workload mapping administration, full Docker Engine API discovery, process lifecycle/per-process CPU and persistent downsampled rollups: In Progress/Planned.
+- Windows/macOS agents, signed installers, staged fleet-scale testing and production operations: Phase 5.
+- Protobuf event/health/command messages are reserved; only authenticated telemetry batches are accepted by the current stream.
 
 ## Completed Phase 1 — Product Specification and Technical Blueprint
 
@@ -94,9 +107,9 @@ At the moment Phase 2 was closed, the frontend was a foundation shell and the na
 
 ## Completed Phase 3 — Monitoring Agent and Telemetry Data Engine
 
-**Status: Completed**
+**Status: Completed — Phase 3 acceptance gate verified. The overall P0 MVP remains incomplete until Phase 4 dashboard workflows are delivered.**
 
-**Verification evidence:** [GitHub Actions run #45039191041 — success](https://github.com/WorkRCS/monitor_me/actions/runs/45039191041). All four CI jobs passed.
+**Verification evidence:** [GitHub Actions run #45039870651 — success](https://github.com/WorkRCS/monitor_me/actions/runs/45039870651). All four CI jobs passed on the audited baseline. The current audit adds canonical batch-ID validation and PostgreSQL service restart durability checks; their CI run must pass before this audit closeout is final.
 
 ### Delivered implementation
 
@@ -113,6 +126,7 @@ At the moment Phase 2 was closed, the frontend was a foundation shell and the na
 - [x] 30-second single-use live tickets bound to user sessions, logout invalidation, cross-organization isolation, 32-message bounded subscriber queue, slow-client disconnect, and reconnect.
 - [x] Database attribution verifies mapped Systemd workload samples and keeps host-total, unclassified, and shared resource categories separate.
 - [x] CI benchmarks execute Linux collection, counter-rate calculation, WAL append, live event preparation, and real TLS gRPC-to-PostgreSQL ingestion.
+- [x] Redis and PostgreSQL dependency outage/readiness recovery are exercised in Compose CI. Persistent AgentHealth samples for CPU, collector errors, spool size and last successful send, and persistent downsampled rollups remain explicitly deferred.
 
 ### Benchmark snapshot (GitHub-hosted Ubuntu runner)
 
@@ -179,4 +193,4 @@ Do not start charts, alerts, project switching or remote actions until the authe
 
 ## Session History
 
-Phase 1 and Phase 2 implementation/verification history is recorded above. Phase 3 closed after all four jobs in [GitHub Actions run #45039191041](https://github.com/WorkRCS/monitor_me/actions/runs/45039191041) succeeded.
+Phase 1 and Phase 2 implementation/verification history is recorded above. Phase 3's baseline completion gate passed all four jobs in [GitHub Actions run #45039870651](https://github.com/WorkRCS/monitor_me/actions/runs/45039870651). The audit hardening follow-up is tracked by the latest CI run linked in the Current Snapshot.
