@@ -72,3 +72,39 @@ func TestSpoolEnforcesQuotaAndPrivateFileMode(t *testing.T) {
 		t.Fatalf("spool file permissions = %o, want 600", info.Mode().Perm())
 	}
 }
+
+func TestSpoolRecoveryKeepsCommittedRecordsAndDropsOnlyTruncatedTail(t *testing.T) {
+	directory := t.TempDir()
+	store, err := Open(directory, 1<<20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	first := fixtureBatch(t, 100)
+	if err := store.Append(first); err != nil {
+		t.Fatal(err)
+	}
+	file, err := os.OpenFile(filepath.Join(directory, "queue.jsonl"), os.O_WRONLY|os.O_APPEND, 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := file.WriteString("{\"id\":\"partially-written"); err != nil {
+		file.Close()
+		t.Fatal(err)
+	}
+	if err := file.Sync(); err != nil {
+		file.Close()
+		t.Fatal(err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	recovered, err := Open(directory, 1<<20)
+	if err != nil {
+		t.Fatalf("Open() should recover an incomplete trailing WAL record: %v", err)
+	}
+	pending, err := recovered.Peek(10)
+	if err != nil || len(pending) != 1 || pending[0].ID != first.ID {
+		t.Fatalf("recovery did not preserve the committed batch: %#v, %v", pending, err)
+	}
+}

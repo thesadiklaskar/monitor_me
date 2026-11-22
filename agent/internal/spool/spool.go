@@ -2,6 +2,7 @@ package spool
 
 import (
 	"bufio"
+	"bytes"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -59,7 +60,11 @@ func Open(directory string, maxBytes int64) (*Store, error) {
 	if err := os.Chmod(path, 0o600); err != nil {
 		return nil, fmt.Errorf("secure spool queue permissions: %w", err)
 	}
-	return &Store{path: path, maxBytes: maxBytes}, nil
+	store := &Store{path: path, maxBytes: maxBytes}
+	if err := store.recoverTrailingRecord(); err != nil {
+		return nil, err
+	}
+	return store, nil
 }
 
 func NewBatch(samples []collector.Sample, collectedAtUnixNanos int64) (Batch, error) {
@@ -180,6 +185,50 @@ func (s *Store) Ack(batchIDs []string) error {
 	if err == nil {
 		_ = directory.Sync()
 		_ = directory.Close()
+	}
+	return nil
+}
+
+
+func (s *Store) recoverTrailingRecord() error {
+	data, err := os.ReadFile(s.path)
+	if err != nil {
+		return fmt.Errorf("read spool queue during recovery: %w", err)
+	}
+	if len(data) == 0 {
+		return nil
+	}
+	if data[len(data)-1] != '\n' {
+		lastNewline := bytes.LastIndexByte(data, '\n')
+		validPrefixLength := lastNewline + 1
+		tail := bytes.TrimSpace(data[validPrefixLength:])
+		var batch Batch
+		completeRecord := len(tail) > 0 &&
+			json.Unmarshal(tail, &batch) == nil &&
+			validateBatch(batch) == nil
+		file, err := os.OpenFile(s.path, os.O_WRONLY, 0o600)
+		if err != nil {
+			return fmt.Errorf("open spool queue for tail recovery: %w", err)
+		}
+		if completeRecord {
+			if _, err := file.WriteAt([]byte("\n"), int64(len(data))); err != nil {
+				file.Close()
+				return fmt.Errorf("finish complete trailing spool record: %w", err)
+			}
+		} else if err := file.Truncate(int64(validPrefixLength)); err != nil {
+			file.Close()
+			return fmt.Errorf("truncate incomplete trailing spool record: %w", err)
+		}
+		if err := file.Sync(); err != nil {
+			file.Close()
+			return fmt.Errorf("sync recovered spool queue: %w", err)
+		}
+		if err := file.Close(); err != nil {
+			return fmt.Errorf("close recovered spool queue: %w", err)
+		}
+	}
+	if _, err := s.readLocked(0); err != nil {
+		return fmt.Errorf("validate recovered spool queue: %w", err)
 	}
 	return nil
 }

@@ -29,4 +29,10 @@ func TestValidateRangeQueryBounds(t *testing.T) {
 	if err := ValidateRangeQuery(invalid, now); err == nil {
 		t.Fatal("range beyond raw retention must be rejected")
 	}
+	invalid = base
+	invalid.Step = 100 * time.Millisecond
+	invalid.Limit = 10
+	if err := ValidateRangeQuery(invalid, now); err == nil {
+		t.Fatal("bucket grids larger than the output limit must be rejected rather than silently truncated")
+	}
 }

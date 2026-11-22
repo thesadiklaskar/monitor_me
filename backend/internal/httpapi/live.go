@@ -89,9 +89,7 @@ func (api *API) liveStream(writer http.ResponseWriter, request *http.Request) {
 				return
 			}
 			payload := []byte(message.Payload)
-			select {
-			case outbound <- payload:
-			default:
+			if !enqueueLivePayload(outbound, payload) {
 				select {
 				case receiveErrors <- errSlowLiveClient:
 				default:
@@ -138,6 +136,15 @@ func (api *API) liveStream(writer http.ResponseWriter, request *http.Request) {
 				return
 			}
 		}
+	}
+}
+
+func enqueueLivePayload(queue chan<- []byte, payload []byte) bool {
+	select {
+	case queue <- payload:
+		return true
+	default:
+		return false
 	}
 }
 

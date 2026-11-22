@@ -17,6 +17,7 @@ type RetentionPolicy struct {
 type RetentionResult struct {
 	SamplesDeleted int64
 	BatchesDeleted int64
+	LiveTicketsDeleted int64
 }
 
 func DefaultRetentionPolicy() RetentionPolicy {
@@ -98,10 +99,35 @@ func PruneBatch(ctx context.Context, db *sql.DB, now time.Time, policy Retention
 	if err != nil {
 		return RetentionResult{}, fmt.Errorf("count expired telemetry idempotency records: %w", err)
 	}
+	liveTicketResult, err := tx.ExecContext(ctx, `
+		WITH expired AS (
+			SELECT id
+			FROM live_stream_tickets
+			WHERE expires_at < $1
+			ORDER BY expires_at
+			LIMIT $2
+			FOR UPDATE SKIP LOCKED
+		)
+		DELETE FROM live_stream_tickets ticket
+		USING expired
+		WHERE ticket.id = expired.id
+	`, now, policy.BatchSize)
+	if err != nil {
+		return RetentionResult{}, fmt.Errorf("delete expired live stream tickets: %w", err)
+	}
+	liveTicketsDeleted, err := liveTicketResult.RowsAffected()
+	if err != nil {
+		return RetentionResult{}, fmt.Errorf("count expired live stream tickets: %w", err)
+	}
+
 	if err := tx.Commit(); err != nil {
 		return RetentionResult{}, fmt.Errorf("commit telemetry retention transaction: %w", err)
 	}
-	return RetentionResult{SamplesDeleted: samplesDeleted, BatchesDeleted: batchesDeleted}, nil
+	return RetentionResult{
+		SamplesDeleted: samplesDeleted,
+		BatchesDeleted: batchesDeleted,
+		LiveTicketsDeleted: liveTicketsDeleted,
+	}, nil
 }
 
 // RunRetention performs a bounded startup sweep and then runs hourly. It uses
@@ -119,14 +145,16 @@ func RunRetention(ctx context.Context, db *sql.DB, policy RetentionPolicy, logge
 				}
 				return
 			}
-			if result.SamplesDeleted > 0 || result.BatchesDeleted > 0 {
+			if result.SamplesDeleted > 0 || result.BatchesDeleted > 0 || result.LiveTicketsDeleted > 0 {
 				logger.Info("telemetry retention sweep completed",
 					"samples_deleted", result.SamplesDeleted,
 					"batch_records_deleted", result.BatchesDeleted,
+					"live_tickets_deleted", result.LiveTicketsDeleted,
 				)
 			}
 			if result.SamplesDeleted < int64(policy.BatchSize) &&
-				result.BatchesDeleted < int64(policy.BatchSize) {
+				result.BatchesDeleted < int64(policy.BatchSize) &&
+				result.LiveTicketsDeleted < int64(policy.BatchSize) {
 				return
 			}
 		}
