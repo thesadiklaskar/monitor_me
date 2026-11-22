@@ -1,0 +1,19 @@
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+/backend/bin/
+/backend/dist/
+*.test
+coverage.out
+/web/node_modules/
+/web/.next/
+/web/out/
+/web/build/
+/web/coverage/
+/web/npm-debug.log*
+.DS_Store
+.idea/
+.vscode/
+/.data/
+*.log
