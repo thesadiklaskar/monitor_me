@@ -1,6 +1,6 @@
 # Local Development
 
-This guide describes the initial Phase 2 development environment. It is intended for local development only, not as a production hardening guide.
+This guide describes the Phase 2 local development environment. It is intended for local development only, not as a production hardening guide.
 
 ## Toolchain Baseline
 
@@ -35,13 +35,17 @@ cp .env.example .env
 
 Change \`POSTGRES_PASSWORD\` and \`REDIS_PASSWORD\` in \`.env\` before starting the stack. The sample values are for isolated local development only and must never be reused in shared or production environments.
 
+Database URLs must be valid PostgreSQL URLs. If a password contains reserved URL characters, percent-encode it before including it in \`DATABASE_URL\`.
+
 ## Start the Control Plane
 
 \`\`\`sh
 docker compose up --build -d
-docker compose ps
+docker compose ps --all
 docker compose logs -f --tail=100
 \`\`\`
+
+Compose starts PostgreSQL and Redis, runs the one-shot migration service, and starts the API only after the migration service exits successfully. The API checks PostgreSQL and Redis during startup.
 
 The local endpoints are bound to loopback by default:
 
@@ -53,37 +57,37 @@ The local endpoints are bound to loopback by default:
 
 PostgreSQL and Redis ports are exposed only on loopback for local tooling. Do not expose these ports publicly.
 
-The API health endpoint currently reports process-level readiness only. Dependency-aware readiness will be added when the database and cache clients are wired into the service.
+\`/health/live\` reports whether the API process can answer requests. \`/health/ready\` checks PostgreSQL and Redis and returns HTTP 503 when either dependency is unavailable. It reports only dependency state and never returns connection strings or driver errors.
 
-## Apply the Initial Schema
+## Database Migrations
 
-The initial migration is checked into \`backend/migrations\`. Until a migration runner is selected and integrated, apply it explicitly:
+Migrations are embedded in the migration runner binary and applied by the one-shot \`migrate\` Compose service before the API starts.
 
-\`\`\`sh
-set -a
-. ./.env
-set +a
-docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" < backend/migrations/000001_initial_schema.up.sql
-\`\`\`
-
-To reverse this initial schema in a disposable local database:
+To run the migration service manually:
 
 \`\`\`sh
-set -a
-. ./.env
-set +a
-docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" < backend/migrations/000001_initial_schema.down.sql
+docker compose run --rm migrate
 \`\`\`
 
-Do not run the down migration against data that must be retained.
+To inspect the migration version:
+
+\`\`\`sh
+docker compose exec -T postgres psql -U monitor_me -d monitor_me -c "SELECT * FROM schema_migrations;"
+\`\`\`
+
+The down migration exists for disposable development databases. Do not reverse migrations in an environment containing data that must be retained.
 
 ## Run Services Without Docker
+
+PostgreSQL and Redis must be available locally. Set \`DATABASE_URL\`, \`REDIS_ADDR\`, and \`REDIS_PASSWORD\` before starting the API.
 
 Backend:
 
 \`\`\`sh
 cd backend
+go mod tidy
 go test ./...
+go run ./cmd/migrate
 go run ./cmd/api
 \`\`\`
 
@@ -107,13 +111,13 @@ make web-typecheck
 make web-build
 \`\`\`
 
-The CI workflow runs these checks and builds the local Compose services. A green CI run is required before the corresponding foundation slice is marked verified.
+The CI workflow runs backend, frontend, and Compose integration checks. A green CI run is required before the corresponding foundation slice is marked verified.
 
 ## Current Limitations
 
-- The API currently implements only liveness and process-level readiness endpoints.
-- PostgreSQL and Redis containers start with health checks, but application clients are not yet connected to them.
-- The initial schema is a foundation migration; application repositories and migration automation are not implemented yet.
+- The API currently implements health endpoints only; server inventory and monitoring APIs are not implemented yet.
+- PostgreSQL and Redis clients are connected for startup and readiness checks, but application repositories, authentication, and live telemetry are not implemented yet.
+- The initial migration creates identity and inventory foundations; metric tables and time-series retention are planned for Phase 3.
 - The frontend is a static foundation preview. It does not display real telemetry and does not yet implement authentication or enrollment.
-- Protocol Buffer definitions exist, but generated code and a running gRPC server are not implemented yet.
+- Protocol Buffer definitions exist, but generated code, a running gRPC server, and agent enrollment are not implemented yet.
 - The current Compose stack is a local development environment, not a production deployment topology.

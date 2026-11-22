@@ -10,7 +10,10 @@ import (
 	"syscall"
 	"time"
 
+	redisclient "github.com/WorkRCS/monitor_me/backend/internal/cache/redis"
+	"github.com/WorkRCS/monitor_me/backend/internal/config"
 	"github.com/WorkRCS/monitor_me/backend/internal/httpapi"
+	"github.com/WorkRCS/monitor_me/backend/internal/storage/postgres"
 )
 
 func main() {
@@ -22,11 +25,56 @@ func main() {
 }
 
 func run(logger *slog.Logger) error {
-	address := getenv("API_ADDR", ":8080")
+	cfg, err := config.Load()
+	if err != nil {
+		return err
+	}
+
+	startupContext, cancelStartup := context.WithTimeout(context.Background(), cfg.StartupTimeout)
+	defer cancelStartup()
+
+	database, err := postgres.Open(startupContext, postgres.Config{
+		URL:                cfg.DatabaseURL,
+		MaxOpenConnections: cfg.DBMaxOpenConnections,
+		MaxIdleConnections: cfg.DBMaxIdleConnections,
+		ConnectionLifetime: cfg.DBConnectionLifetime,
+		IdleConnectionTime: 5 * time.Minute,
+	})
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if closeErr := database.Close(); closeErr != nil {
+			logger.Warn("close PostgreSQL pool", "error", closeErr)
+		}
+	}()
+
+	cache, err := redisclient.Open(startupContext, redisclient.Config{
+		Address:      cfg.RedisAddress,
+		Password:     cfg.RedisPassword,
+		PoolSize:     16,
+		MinIdleConns: 2,
+		DialTimeout:  3 * time.Second,
+		ReadTimeout:  2 * time.Second,
+		WriteTimeout: 2 * time.Second,
+	})
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if closeErr := cache.Close(); closeErr != nil {
+			logger.Warn("close Redis client", "error", closeErr)
+		}
+	}()
+
+	dependencies := []httpapi.Dependency{
+		{Name: "postgres", Check: database.PingContext},
+		{Name: "redis", Check: func(ctx context.Context) error { return cache.Ping(ctx).Err() }},
+	}
 
 	server := &http.Server{
-		Addr:              address,
-		Handler:           httpapi.NewRouter(getenv("SERVICE_VERSION", "0.1.0-dev")),
+		Addr:              cfg.APIAddress,
+		Handler:           httpapi.NewRouter(cfg.ServiceVersion, dependencies...),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,
 		WriteTimeout:      15 * time.Second,
@@ -41,7 +89,7 @@ func run(logger *slog.Logger) error {
 	serverErrors := make(chan error, 1)
 
 	go func() {
-		logger.Info("API server starting", "address", address)
+		logger.Info("API server starting", "address", cfg.APIAddress)
 		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			serverErrors <- err
 		}
@@ -58,7 +106,6 @@ func run(logger *slog.Logger) error {
 	defer cancel()
 
 	if err := server.Shutdown(shutdownContext); err != nil {
-		// Close is the fallback when graceful shutdown exceeds its deadline.
 		if closeErr := server.Close(); closeErr != nil {
 			return errors.Join(err, closeErr)
 		}
@@ -67,12 +114,4 @@ func run(logger *slog.Logger) error {
 
 	logger.Info("API server stopped gracefully")
 	return nil
-}
-
-func getenv(key, fallback string) string {
-	value := os.Getenv(key)
-	if value == "" {
-		return fallback
-	}
-	return value
 }

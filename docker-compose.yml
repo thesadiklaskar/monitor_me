@@ -37,6 +37,18 @@ services:
       retries: 12
       start_period: 5s
 
+  migrate:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    entrypoint: ["/usr/local/bin/monitor-me-migrate"]
+    restart: "no"
+    environment:
+      DATABASE_URL: "postgres://${POSTGRES_USER:-monitor_me}:${POSTGRES_PASSWORD:-local_only_change_me}@postgres:5432/${POSTGRES_DB:-monitor_me}?sslmode=disable"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   api:
     build:
       context: .
@@ -45,6 +57,9 @@ services:
     environment:
       API_ADDR: ":8080"
       SERVICE_VERSION: "0.1.0-dev"
+      DATABASE_URL: "postgres://${POSTGRES_USER:-monitor_me}:${POSTGRES_PASSWORD:-local_only_change_me}@postgres:5432/${POSTGRES_DB:-monitor_me}?sslmode=disable"
+      REDIS_ADDR: "redis:6379"
+      REDIS_PASSWORD: "${REDIS_PASSWORD:-local_only_change_me}"
     ports:
       - "127.0.0.1:${API_PORT:-8080}:8080"
     depends_on:
@@ -52,6 +67,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/health/ready || exit 1"]
       interval: 10s

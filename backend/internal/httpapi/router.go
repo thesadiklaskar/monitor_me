@@ -1,15 +1,24 @@
 package httpapi
 
-import "net/http"
+import (
+	"context"
+	"net/http"
+)
 
-// NewRouter registers the initial public health endpoints for the control plane.
-// Business APIs are added only after their contracts and authorization rules
-// have been defined.
-func NewRouter(version string) http.Handler {
+// Dependency represents a backend service that must be reachable before the
+// API is considered ready to receive application traffic.
+type Dependency struct {
+	Name  string
+	Check func(context.Context) error
+}
+
+// NewRouter registers public health endpoints.
+// Business APIs are added only after their authorization contracts are defined.
+func NewRouter(version string, dependencies ...Dependency) http.Handler {
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("/health/live", healthHandler("ok", version))
-	mux.HandleFunc("/health/ready", healthHandler("ready", version))
+	mux.HandleFunc("/health/live", healthHandler("ok", version, nil))
+	mux.HandleFunc("/health/ready", healthHandler("ready", version, dependencies))
 
 	return mux
 }

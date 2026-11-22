@@ -64,11 +64,19 @@ No item may be marked Verified based only on a code stub, mock UI, or documentat
 
 ### Phase 2 — Platform Foundation and Secure Connectivity
 
-- [ ] Go backend builds and passes baseline tests.
-- [ ] Next.js frontend builds and passes baseline checks.
-- [ ] PostgreSQL migrations and Redis integration are tested.
-- [ ] Docker Compose starts a healthy local stack.
-- [ ] Authenticated, versioned agent enrollment and gRPC protocol pass integration tests.
+- [x] Go API bootstrap, health endpoint tests, formatting, race-enabled unit tests, vet, and builds pass in GitHub Actions.
+- [x] Next.js application shell passes ESLint, TypeScript checks, and production build in GitHub Actions.
+- [x] Docker Compose starts the full local stack successfully in CI.
+- [x] Initial PostgreSQL identity/inventory migration applies on a clean database; CI verifies the resulting `organizations` table.
+- [x] PostgreSQL application client and bounded connection pool pass build and startup integration checks.
+- [x] Redis application client and connectivity checks pass in the full Compose integration job.
+- [x] Dependency-aware readiness reports PostgreSQL and Redis status; liveness remains independent.
+- [x] Versioned agent Protocol Buffer contract is drafted and documented.
+- [ ] Application repositories and explicit cache-outage behavior tests are implemented.
+- [ ] Authentication, authorization, expiring enrollment tokens, heartbeat, reconnect, and revocation pass integration tests.
+- [ ] Generated Protocol Buffer code and a running authenticated gRPC service pass integration tests.
+
+**CI evidence:** [GitHub Actions run #45023682627](https://github.com/WorkRCS/monitor_me/actions/runs/45023682627) — Go backend checks, frontend checks, and full Docker Compose integration all passed.
 
 ### Phase 3 — Monitoring Agent and Telemetry Data Engine
 

@@ -1,13 +1,21 @@
 package httpapi
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
 func TestHealthEndpoints(t *testing.T) {
+	dependencies := []Dependency{
+		{Name: "postgres", Check: func(context.Context) error { return nil }},
+		{Name: "redis", Check: func(context.Context) error { return nil }},
+	}
+
 	tests := []struct {
 		name           string
 		path           string
@@ -17,7 +25,7 @@ func TestHealthEndpoints(t *testing.T) {
 		{name: "readiness", path: "/health/ready", expectedStatus: "ready"},
 	}
 
-	handler := NewRouter("test-version")
+	handler := NewRouter("test-version", dependencies...)
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -48,6 +56,37 @@ func TestHealthEndpoints(t *testing.T) {
 				t.Fatal("expected checked_at to be populated")
 			}
 		})
+	}
+}
+
+func TestReadinessFailsWhenDependencyIsUnavailable(t *testing.T) {
+	handler := NewRouter("test-version", Dependency{
+		Name: "postgres",
+		Check: func(context.Context) error {
+			return errors.New("connection details must not be exposed")
+		},
+	})
+
+	request := httptest.NewRequest(http.MethodGet, "/health/ready", nil)
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusServiceUnavailable {
+		t.Fatalf("expected HTTP %d, got %d", http.StatusServiceUnavailable, recorder.Code)
+	}
+
+	var response healthResponse
+	if err := json.NewDecoder(recorder.Body).Decode(&response); err != nil {
+		t.Fatalf("decode readiness response: %v", err)
+	}
+	if response.Status != "not_ready" {
+		t.Fatalf("expected not_ready status, got %q", response.Status)
+	}
+	if response.Dependencies["postgres"] != "unavailable" {
+		t.Fatalf("expected postgres unavailable, got %q", response.Dependencies["postgres"])
+	}
+	if strings.Contains(recorder.Body.String(), "connection details") {
+		t.Fatal("readiness response exposed an internal connection error")
 	}
 }
 

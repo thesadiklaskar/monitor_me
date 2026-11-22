@@ -1,11 +1,12 @@
 GO_DIR := backend
 WEB_DIR := web
 
-.PHONY: help test vet fmt web-install web-lint web-typecheck web-build compose-up compose-down compose-logs
+.PHONY: help tidy test vet fmt web-install web-lint web-typecheck web-build compose-up compose-down compose-logs db-migrate
 
 help:
 	@printf '%s\n' \
 		'Available targets:' \
+		'  make tidy          Resolve and tidy Go modules' \
 		'  make test          Run Go unit tests' \
 		'  make vet           Run go vet' \
 		'  make fmt           Format Go source files' \
@@ -15,7 +16,11 @@ help:
 		'  make web-build     Build the Next.js application' \
 		'  make compose-up    Build and start the local platform stack' \
 		'  make compose-down  Stop the local platform stack' \
-		'  make compose-logs  Follow local platform logs'
+		'  make compose-logs  Follow local platform logs' \
+		'  make db-migrate    Run the one-shot database migration service'
+
+tidy:
+	cd $(GO_DIR) && go mod tidy
 
 test:
 	cd $(GO_DIR) && go test ./...
@@ -46,3 +51,6 @@ compose-down:
 
 compose-logs:
 	docker compose logs -f --tail=100
+
+db-migrate:
+	docker compose run --rm migrate

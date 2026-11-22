@@ -1,5 +1,8 @@
 -- Establish the minimum identity and inventory schema for the control plane.
 -- Telemetry partitions and high-volume metric tables are introduced in Phase 3.
+-- The migration runner applies this file as one transaction.
+
+BEGIN;
 
 CREATE TABLE organizations (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -99,3 +102,5 @@ CREATE TABLE server_project_mappings (
 CREATE INDEX servers_organization_status_idx ON servers (organization_id, status);
 CREATE INDEX agents_status_last_seen_idx ON agents (status, last_seen_at);
 CREATE INDEX projects_organization_idx ON projects (organization_id);
+
+COMMIT;

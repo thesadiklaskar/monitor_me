@@ -3,12 +3,14 @@ FROM golang:1.27.4-alpine3.23 AS build
 WORKDIR /src
 
 COPY backend/go.mod ./
-RUN go mod download
-
 COPY backend/ ./
 
+# Resolve and checksum dependencies after package sources are available to go mod tidy.
+RUN go mod tidy
+
 RUN CGO_ENABLED=0 GOOS=linux \
-    go build -trimpath -ldflags="-s -w" -o /out/monitor-me-api ./cmd/api
+    go build -trimpath -ldflags="-s -w" -o /out/monitor-me-api ./cmd/api && \
+    go build -trimpath -ldflags="-s -w" -o /out/monitor-me-migrate ./cmd/migrate
 
 FROM alpine:3.23 AS runtime
 
@@ -17,6 +19,7 @@ RUN addgroup -S -g 10001 monitor && \
     apk add --no-cache ca-certificates
 
 COPY --from=build /out/monitor-me-api /usr/local/bin/monitor-me-api
+COPY --from=build /out/monitor-me-migrate /usr/local/bin/monitor-me-migrate
 
 USER 10001:10001
 

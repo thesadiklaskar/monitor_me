@@ -53,7 +53,7 @@ A feature can be implemented before its phase is complete, but its status must r
 
 ## Phase 2 — Platform Foundation and Secure Connectivity
 
-**Status: Not Started**
+**Status: In Progress**
 
 ### Scope
 
@@ -68,17 +68,48 @@ A feature can be implemented before its phase is complete, but its status must r
 9. Implement user authentication and server-side authorization foundations.
 10. Implement secure agent enrollment, identity binding, heartbeat, revocation, and capability reporting.
 
+### Verified progress — initial foundation slice
+
+The following implementation slice is committed in `2b88d17fe66715d766d093eddc6348e339552392` and passed GitHub Actions run [#45022243672](https://github.com/WorkRCS/monitor_me/actions/runs/45022243672):
+
+- [x] Go API bootstrap with JSON logging, health endpoints, HTTP timeouts, graceful shutdown, and unit tests.
+- [x] Go formatting check, unit tests with race detection, `go vet`, and API build.
+- [x] Next.js/TypeScript/Tailwind application shell with ESLint, TypeScript checks, and production build.
+- [x] Docker Compose syntax validation and backend/frontend image builds.
+- [x] Initial PostgreSQL identity/inventory migration draft.
+- [x] Versioned Protocol Buffer agent contract draft.
+- [x] Local development guide and repository tooling baseline.
+
+**Not yet verified or implemented:** Compose runtime startup and service smoke tests, applying the PostgreSQL migration, backend PostgreSQL/Redis clients, dependency-aware readiness, migration automation, generated Protobuf code, a running gRPC service, authentication, enrollment-token lifecycle, and agent heartbeat integration.
+
+### Verified progress — database, cache, and runtime integration
+
+The database/cache integration slice is committed on `phase-2/platform-foundation` and passed GitHub Actions run [#45023682627](https://github.com/WorkRCS/monitor_me/actions/runs/45023682627):
+
+- [x] Added a bounded PostgreSQL connection pool using pgx through `database/sql`.
+- [x] Added a Redis client with bounded pool settings and explicit timeouts.
+- [x] API startup verifies PostgreSQL and Redis connectivity without logging credentials.
+- [x] `/health/live` remains independent of dependency health.
+- [x] `/health/ready` reports PostgreSQL and Redis state and returns HTTP 503 when a required dependency is unavailable.
+- [x] Added an embedded, versioned migration runner as a separate one-shot executable.
+- [x] Docker Compose runs migrations after PostgreSQL becomes healthy and starts the API only after migration success and Redis health.
+- [x] Added CI runtime checks that start the complete stack, wait for API readiness, verify the migrated `organizations` table, verify Redis PONG, and inspect dependency-aware readiness.
+- [x] Go module resolution, formatting, race-enabled unit tests, vet, API/migration builds, frontend lint/typecheck/build, Compose startup, migrations, and database/cache health checks passed.
+
+**Still pending:** authentication and authorization, generated Protobuf code, a running authenticated gRPC service, secure expiring enrollment tokens, agent identity/heartbeat/reconnect/revocation, application data repositories, and explicit Redis-outage behavior tests.
+
 ### Completion gate
 
-- [ ] Backend and frontend build from a clean checkout.
-- [ ] Docker Compose starts the full local control-plane stack with health checks.
-- [ ] PostgreSQL migrations work on a clean database and are version-controlled.
-- [ ] Redis is optional to durable storage; a cache outage does not corrupt persisted records.
+- [x] Backend and frontend build from a clean checkout in CI.
+- [x] Docker Compose starts the full local control-plane stack with health checks.
+- [x] The migration runner applies the initial PostgreSQL schema on a clean database; CI verifies the resulting table.
+- [ ] Redis remains non-authoritative for durable data and explicit cache-outage behavior is tested when application repositories are introduced.
+- [x] API readiness checks PostgreSQL and Redis, while liveness remains independent.
 - [ ] Authentication and authorization tests pass.
 - [ ] Valid enrollment succeeds; expired, revoked, and invalid credentials fail.
 - [ ] An agent can authenticate, report heartbeat/capabilities, reconnect, and be revoked in integration tests.
-- [ ] Protocol compatibility and configuration are documented.
-- [ ] README explains the implemented setup and features; state points to Phase 3.
+- [x] The versioned Protocol Buffer contract and configuration responsibilities are documented.
+- [x] README and project state record verified implementation and the exact next action.
 
 ## Phase 3 — Monitoring Agent and Telemetry Data Engine
 

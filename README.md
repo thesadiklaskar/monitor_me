@@ -4,7 +4,7 @@
 
 The product is being built around its own native host agent, telemetry ingestion pipeline, metric model, project attribution, alert engine, and operator dashboard. It is intended for infrastructure engineers, platform teams, and organizations that need clear visibility into servers, workloads, and applications.
 
-> **Current status:** Phase 1 — Product Specification and Technical Blueprint is complete. Implementation has not started yet. The next delivery stage is Phase 2 — Platform Foundation and Secure Connectivity.
+> **Current status:** Phase 1 is complete. Phase 2 — Platform Foundation and Secure Connectivity is in progress. The initial foundation slice is committed and its GitHub Actions CI checks have passed: Go API health endpoints/tests, Next.js lint/typecheck/production build, Docker Compose configuration validation, and service image builds. Database/cache application clients, runtime Compose smoke tests, authentication, generated gRPC code, and agent enrollment are not complete yet.
 
 ---
 
@@ -48,8 +48,11 @@ The long-term objective is an enterprise-oriented product with a straightforward
 | Metric definitions | **Completed** | Names, units, calculations, timestamps, and limitations documented |
 | High-level architecture | **Completed** | Component boundaries, data flow, storage responsibilities, and security boundaries documented |
 | Feature acceptance matrix | **Completed** | Planned features mapped to test evidence |
-| Backend implementation | Not started | Planned for Phase 2 |
-| Frontend implementation | Not started | Planned for Phase 2 |
+| Backend implementation | **Foundation verified** | Go API, PostgreSQL and Redis clients, dependency-aware readiness, and migration runner pass CI; authentication and business APIs remain pending |
+| Frontend implementation | **Foundation verified** | Next.js app shell passes ESLint, TypeScript, and production build in CI; authentication and monitoring views remain pending |
+| Local platform stack | **Runtime verified** | Full Docker Compose startup, migration execution, API readiness, PostgreSQL schema, and Redis connectivity pass CI |
+| Database and cache integration | **Startup integration verified** | PostgreSQL pool, embedded migration runner, Redis client, and dependency health checks are verified; application repositories and cache-outage semantics remain pending |
+| Agent protocol runtime | **Contract drafted** | Versioned Protobuf contract exists; generated code, gRPC server, authentication, and enrollment are pending |
 | Host agent implementation | Not started | Planned for Phase 3 |
 | Monitoring dashboard | Not started | Planned for Phase 4 |
 | Production release | Not started | Planned for Phase 5 |
@@ -109,6 +112,21 @@ The following are target capabilities. They are not represented as implemented u
 | System design | Excalidraw | Final as-built architecture diagrams |
 
 The monitoring product itself is custom-built. The project will not embed or depend on ready-made monitoring platforms such as Grafana, Prometheus, Zabbix, or Netdata. General-purpose development and infrastructure technologies listed above are allowed.
+
+## Local Development
+
+See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for prerequisites and current limitations.
+
+For the initial local control-plane environment:
+
+```sh
+cp .env.example .env
+# Replace the local PostgreSQL and Redis passwords in .env.
+docker compose up --build -d
+docker compose ps
+```
+
+The API exposes `/health/live` and `/health/ready`. Liveness reports process health independently; readiness checks PostgreSQL and Redis and returns HTTP 503 when either dependency is unavailable. Docker Compose runs a one-shot migration service before the API starts. The frontend is a foundation preview and does not display live monitoring data.
 
 ## Architecture at a Glance
 
@@ -189,7 +207,7 @@ The initial collection target is configurable in the 100ms–500ms range where h
 | Phase | Name | Status | Main outcome |
 | --- | --- | --- | --- |
 | 1 | Product Specification and Technical Blueprint | **Completed** | Requirements, metric catalog, acceptance matrix, and architecture baseline |
-| 2 | Platform Foundation and Secure Connectivity | Not started | Go/Next.js foundations, PostgreSQL, Redis, Docker Compose, authentication, and agent enrollment protocol |
+| 2 | Platform Foundation and Secure Connectivity | **In progress** | Go/Next.js foundation, PostgreSQL/Redis connectivity, automatic migrations, and full local Compose runtime checks pass CI; authentication and running gRPC enrollment remain in progress |
 | 3 | Monitoring Agent and Telemetry Data Engine | Not started | Native Linux agent, core host metrics, durable spool, ingestion, historical storage, live distribution, and workload attribution |
 | 4 | Dashboard and Operational Features | Not started | Server/project dashboards, custom charts, application visibility, alerts, notifications, one-click installation workflow, and secure remote actions |
 | 5 | Cross-Platform Production and Scale | Not started | Windows/macOS agents, signed lifecycle tooling, security hardening, benchmarks, production operations, and final as-built design |
@@ -241,4 +259,4 @@ The final diagram must describe the system that was actually built, not an aspir
 
 ---
 
-**Current resume point:** Phase 1 is complete. Read [docs/PROJECT_STATE.md](docs/PROJECT_STATE.md) before starting Phase 2.
+**Current resume point:** Phase 2 is in progress on `phase-2/platform-foundation`. The initial platform foundation, PostgreSQL/Redis startup integration, automatic migrations, and full local Compose smoke tests are verified in [GitHub Actions run #45023682627](https://github.com/WorkRCS/monitor_me/actions/runs/45023682627). Read [docs/PROJECT_STATE.md](docs/PROJECT_STATE.md) for the exact next action.
