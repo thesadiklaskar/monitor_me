@@ -81,7 +81,21 @@ func TestReadinessFailsWhenDependencyIsUnavailable(t *testing.T) {
 	}
 }
 
-func TestHealthEndpointRejectsNonGetMethods(t *testing.T) {
+func TestHealthEndpointSupportsHead(t *testing.T) {
+	handler := NewRouter("test-version", nil, nil)
+	request := httptest.NewRequest(http.MethodHead, "/health/live", nil)
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected HTTP %d, got %d", http.StatusOK, recorder.Code)
+	}
+	if recorder.Body.Len() != 0 {
+		t.Fatal("HEAD health response must not contain a body")
+	}
+}
+
+func TestHealthEndpointRejectsUnsupportedMethods(t *testing.T) {
 	handler := NewRouter("test-version", nil, nil)
 	request := httptest.NewRequest(http.MethodPost, "/health/live", nil)
 	recorder := httptest.NewRecorder()
@@ -90,7 +104,7 @@ func TestHealthEndpointRejectsNonGetMethods(t *testing.T) {
 	if recorder.Code != http.StatusMethodNotAllowed {
 		t.Fatalf("expected HTTP %d, got %d", http.StatusMethodNotAllowed, recorder.Code)
 	}
-	if allow := recorder.Header().Get("Allow"); allow != http.MethodGet {
-		t.Fatalf("expected Allow header %q, got %q", http.MethodGet, allow)
+	if allow := recorder.Header().Get("Allow"); allow != "GET, HEAD" {
+		t.Fatalf("expected Allow header %q, got %q", "GET, HEAD", allow)
 	}
 }

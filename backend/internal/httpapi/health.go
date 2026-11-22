@@ -17,8 +17,8 @@ type healthResponse struct {
 
 func healthHandler(status, version string, dependencies []Dependency) http.HandlerFunc {
 	return func(writer http.ResponseWriter, request *http.Request) {
-		if request.Method != http.MethodGet {
-			writer.Header().Set("Allow", http.MethodGet)
+		if request.Method != http.MethodGet && request.Method != http.MethodHead {
+			writer.Header().Set("Allow", "GET, HEAD")
 			http.Error(writer, "method not allowed", http.StatusMethodNotAllowed)
 			return
 		}
@@ -51,6 +51,11 @@ func healthHandler(status, version string, dependencies []Dependency) http.Handl
 		writer.Header().Set("Cache-Control", "no-store")
 		writer.Header().Set("Content-Type", "application/json; charset=utf-8")
 		writer.WriteHeader(statusCode)
+
+		// HEAD returns the same status and headers without a response body.
+		if request.Method == http.MethodHead {
+			return
+		}
 
 		// Health responses expose dependency state, never connection strings or driver errors.
 		_ = json.NewEncoder(writer).Encode(response)
