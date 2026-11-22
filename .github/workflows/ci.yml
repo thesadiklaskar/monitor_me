@@ -131,8 +131,10 @@ jobs:
             -out .data/certs/server.crt \
             -days 2 -subj "/CN=localhost" \
             -addext "subjectAltName=DNS:localhost,IP:127.0.0.1"
-          chmod 644 .data/certs/server.crt .data/certs/server.key
-
+          sudo chgrp -R 10001 .data/certs
+          chmod 750 .data/certs
+          chmod 644 .data/certs/server.crt
+          chmod 640 .data/certs/server.key
 
       - name: Validate Compose configuration
         run: docker compose config --quiet
