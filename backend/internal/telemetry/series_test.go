@@ -9,7 +9,7 @@ func TestValidateRangeQueryBounds(t *testing.T) {
 	now := time.Now().UTC()
 	base := RangeQuery{
 		OrganizationID: "org", ServerID: "server", MetricName: "host.cpu.total",
-		From: now.Add(-time.Hour), To: now, Step: time.Second, Limit: 1000,
+		From: now.Add(-time.Hour), To: now, Step: time.Second, Limit: 5000,
 	}
 	if err := ValidateRangeQuery(base, now); err != nil {
 		t.Fatalf("valid range should pass: %v", err)

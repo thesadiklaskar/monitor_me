@@ -29,11 +29,11 @@ type RangeQuery struct {
 }
 
 type SeriesPoint struct {
-	Bucket      time.Time
-	Average     float64
-	Minimum     float64
-	Maximum     float64
-	SampleCount int64
+	Bucket      time.Time `json:"bucket"`
+	Average     float64   `json:"average"`
+	Minimum     float64   `json:"minimum"`
+	Maximum     float64   `json:"maximum"`
+	SampleCount int64     `json:"sample_count"`
 }
 
 func ValidateRangeQuery(query RangeQuery, now time.Time) error {

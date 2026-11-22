@@ -672,11 +672,34 @@ func TestPhase2AuthenticationAndAgentLifecycle(t *testing.T) {
 		t.Fatalf("server metrics history: expected 200, got %d: %s", seriesResponse.StatusCode, seriesResponse.Body)
 	}
 	var seriesResult struct {
-		Points []json.RawMessage `json:"points"`
+		Points []struct {
+			Average     float64 `json:"average"`
+			Minimum     float64 `json:"minimum"`
+			Maximum     float64 `json:"maximum"`
+			SampleCount int64   `json:"sample_count"`
+		} `json:"points"`
 	}
 	decodeResponse(t, seriesResponse.Body, &seriesResult)
 	if len(seriesResult.Points) == 0 {
 		t.Fatal("expected the persisted telemetry to be queryable from PostgreSQL history")
+	}
+	var aggregateCount int64
+	var weightedSum float64
+	minimum, maximum := seriesResult.Points[0].Minimum, seriesResult.Points[0].Maximum
+	for _, point := range seriesResult.Points {
+		aggregateCount += point.SampleCount
+		weightedSum += point.Average * float64(point.SampleCount)
+		if point.Minimum < minimum {
+			minimum = point.Minimum
+		}
+		if point.Maximum > maximum {
+			maximum = point.Maximum
+		}
+	}
+	if aggregateCount != 2 || minimum != 1048576 || maximum != 2097152 ||
+		weightedSum/float64(aggregateCount) != 1572864 {
+		t.Fatalf("historical buckets did not preserve expected aggregation: count=%d min=%v max=%v average=%v",
+			aggregateCount, minimum, maximum, weightedSum/float64(aggregateCount))
 	}
 	foreignSeries := requestJSON(t, ctx, http.MethodGet, seriesURL, otherSession.AccessToken, nil)
 	if foreignSeries.StatusCode != http.StatusOK {
