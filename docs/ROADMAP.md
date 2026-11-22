@@ -7,7 +7,7 @@ Monitor Me is delivered in **five major phases**. Each phase contains smaller in
 | Phase | Name | Status |
 | --- | --- | --- |
 | 1 | Product Specification and Technical Blueprint | **Completed** |
-| 2 | Platform Foundation and Secure Connectivity | Not Started |
+| 2 | Platform Foundation and Secure Connectivity | **Completed** |
 | 3 | Monitoring Agent and Telemetry Data Engine | Not Started |
 | 4 | Dashboard and Operational Features | Not Started |
 | 5 | Cross-Platform Production and Scale | Not Started |
@@ -53,63 +53,53 @@ A feature can be implemented before its phase is complete, but its status must r
 
 ## Phase 2 — Platform Foundation and Secure Connectivity
 
-**Status: In Progress**
+**Status: Completed**
 
-### Scope
+### Scope delivered
 
-1. Establish repository layout for the Go backend, native Go agent, and Next.js application.
-2. Add baseline formatting, linting, unit-test, static-check, and CI workflows.
-3. Initialize the Go backend with configuration, structured logging, health/readiness endpoints, and graceful shutdown.
-4. Initialize the Next.js/TypeScript frontend with an accessible application shell.
-5. Add local Docker Compose orchestration for the backend, frontend, PostgreSQL, and Redis.
-6. Add versioned PostgreSQL migrations and tested connection management.
-7. Integrate Redis for documented ephemeral cache/coordination use cases.
-8. Define the versioned Protocol Buffer schema and gRPC service contract.
-9. Implement user authentication and server-side authorization foundations.
-10. Implement secure agent enrollment, identity binding, heartbeat, revocation, and capability reporting.
+1. Established repository boundaries for the Go control plane, versioned protocol, Next.js frontend, and native Go agent workspace.
+2. Added formatting, linting, unit-test, race-test, static-analysis, build, and full-stack CI workflows.
+3. Implemented the Go API with environment configuration, JSON structured logging, health/readiness checks, HTTP timeouts, and graceful shutdown.
+4. Implemented the Next.js/TypeScript/Tailwind application shell.
+5. Added Docker Compose orchestration for PostgreSQL, Redis, the API, migration runner, and frontend.
+6. Added versioned PostgreSQL migrations, bounded connection pooling, and an embedded migration runner.
+7. Added Redis connectivity with bounded pool/timeouts; PostgreSQL remains authoritative for durable data.
+8. Generated the versioned Protocol Buffer contract and implemented a TLS-protected gRPC agent-control server with bounded message sizes and concurrent streams.
+9. Implemented one-time first-owner bootstrap, Argon2id password hashing, opaque bearer sessions, logout, membership lookup, and role-based authorization.
+10. Implemented organization-scoped server inventory, enrollment-token issuance/reissue/revocation, agent identity binding, heartbeat/capability updates, re-enrollment, reconnect, and agent revocation.
 
-### Verified progress — initial foundation slice
+### Implementation and security evidence
 
-The following implementation slice is committed in `2b88d17fe66715d766d093eddc6348e339552392` and passed GitHub Actions run [#45022243672](https://github.com/WorkRCS/monitor_me/actions/runs/45022243672):
-
-- [x] Go API bootstrap with JSON logging, health endpoints, HTTP timeouts, graceful shutdown, and unit tests.
-- [x] Go formatting check, unit tests with race detection, `go vet`, and API build.
-- [x] Next.js/TypeScript/Tailwind application shell with ESLint, TypeScript checks, and production build.
-- [x] Docker Compose syntax validation and backend/frontend image builds.
-- [x] Initial PostgreSQL identity/inventory migration draft.
-- [x] Versioned Protocol Buffer agent contract draft.
-- [x] Local development guide and repository tooling baseline.
-
-**Not yet verified or implemented:** Compose runtime startup and service smoke tests, applying the PostgreSQL migration, backend PostgreSQL/Redis clients, dependency-aware readiness, migration automation, generated Protobuf code, a running gRPC service, authentication, enrollment-token lifecycle, and agent heartbeat integration.
-
-### Verified progress — database, cache, and runtime integration
-
-The database/cache integration slice is committed on `phase-2/platform-foundation` and passed GitHub Actions run [#45023682627](https://github.com/WorkRCS/monitor_me/actions/runs/45023682627):
-
-- [x] Added a bounded PostgreSQL connection pool using pgx through `database/sql`.
-- [x] Added a Redis client with bounded pool settings and explicit timeouts.
-- [x] API startup verifies PostgreSQL and Redis connectivity without logging credentials.
-- [x] `/health/live` remains independent of dependency health.
-- [x] `/health/ready` reports PostgreSQL and Redis state and returns HTTP 503 when a required dependency is unavailable.
-- [x] Added an embedded, versioned migration runner as a separate one-shot executable.
-- [x] Docker Compose runs migrations after PostgreSQL becomes healthy and starts the API only after migration success and Redis health.
-- [x] Added CI runtime checks that start the complete stack, wait for API readiness, verify the migrated `organizations` table, verify Redis PONG, and inspect dependency-aware readiness.
-- [x] Go module resolution, formatting, race-enabled unit tests, vet, API/migration builds, frontend lint/typecheck/build, Compose startup, migrations, and database/cache health checks passed.
-
-**Still pending:** authentication and authorization, generated Protobuf code, a running authenticated gRPC service, secure expiring enrollment tokens, agent identity/heartbeat/reconnect/revocation, application data repositories, and explicit Redis-outage behavior tests.
+- [x] First-owner bootstrap is serialized and can only succeed once per database.
+- [x] Passwords are hashed with Argon2id; bearer session and agent credentials are stored as SHA-256 digests, not raw secrets.
+- [x] Organization membership and role are resolved from the authenticated session for protected requests.
+- [x] Viewer permissions are read-only; unauthorized server creation and token revocation are rejected.
+- [x] Server inventory is scoped to the caller's organization; a second organization cannot see the first organization's server.
+- [x] Enrollment tokens are random, hash-only at rest, expire after 15 minutes, and can be consumed once.
+- [x] Invalid, expired, consumed, and revoked enrollment credentials are rejected.
+- [x] TLS gRPC enrollment returns an opaque 30-day agent session; agent identity is stable across re-enrollment and previous sessions are invalidated.
+- [x] Heartbeat updates liveness and bounded capability metadata; a new gRPC connection can resume with the persisted session credential.
+- [x] Agent revocation invalidates existing sessions.
+- [x] PostgreSQL migrations apply on a clean database; Redis availability, dependency-aware readiness, PostgreSQL durability during Redis outage, and readiness recovery are tested.
+- [x] The gRPC telemetry stream is deliberately left UNIMPLEMENTED until Phase 3 provides durable, idempotent telemetry persistence. The server does not acknowledge data it has not stored.
+- [x] A native agent workspace boundary is documented at agent/README.md; the working agent executable and collectors are Phase 3 deliverables.
 
 ### Completion gate
 
 - [x] Backend and frontend build from a clean checkout in CI.
-- [x] Docker Compose starts the full local control-plane stack with health checks.
-- [x] The migration runner applies the initial PostgreSQL schema on a clean database; CI verifies the resulting table.
-- [ ] Redis remains non-authoritative for durable data and explicit cache-outage behavior is tested when application repositories are introduced.
-- [x] API readiness checks PostgreSQL and Redis, while liveness remains independent.
-- [ ] Authentication and authorization tests pass.
-- [ ] Valid enrollment succeeds; expired, revoked, and invalid credentials fail.
-- [ ] An agent can authenticate, report heartbeat/capabilities, reconnect, and be revoked in integration tests.
-- [x] The versioned Protocol Buffer contract and configuration responsibilities are documented.
-- [x] README and project state record verified implementation and the exact next action.
+- [x] Go formatting, race-enabled unit tests, go vet, and binary builds pass.
+- [x] Frontend ESLint, TypeScript typecheck, and production build pass.
+- [x] Docker Compose starts the full local control-plane stack and the API becomes ready.
+- [x] PostgreSQL schema migrations and Redis connectivity pass runtime checks.
+- [x] Redis outage causes readiness to fail without making Redis the durable data store; PostgreSQL state remains intact and readiness recovers.
+- [x] User authentication, session lifecycle, organization authorization, and tenant isolation pass integration tests.
+- [x] TLS gRPC enrollment, heartbeat/capability reporting, reconnect, re-enrollment, and revocation pass integration tests.
+- [x] Invalid, expired, consumed, and revoked enrollment credentials are rejected.
+- [x] README, development guide, ADR, feature acceptance matrix, and project state record implemented behavior and Phase 3 as the next phase.
+
+**CI evidence:** [GitHub Actions run #45030320358](https://github.com/WorkRCS/monitor_me/actions/runs/45030320358) — all three jobs succeeded: Go backend checks, Next.js frontend checks, and Docker Compose integration. The run generated Protobuf sources, built the Go services, started the full stack, exercised user authentication and TLS agent enrollment, verified migrations and Redis connectivity, and tested Redis outage/recovery with durable PostgreSQL state.
+
+**Decision record:** ADR 0002 — User Authentication and Secure Agent Enrollment.
 
 ## Phase 3 — Monitoring Agent and Telemetry Data Engine
 
