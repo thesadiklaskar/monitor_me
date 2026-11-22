@@ -4,16 +4,16 @@ package monitor.v1;
 
 option go_package = "github.com/WorkRCS/monitor_me/backend/gen/monitor/v1;monitorv1";
 
-// AgentControl defines the versioned control and telemetry contract between
+// AgentControl defines the versioned, TLS-protected control contract between
 // a native host agent and the Monitor Me control plane.
 service AgentControl {
-  // Enroll exchanges a short-lived enrollment token for an agent identity.
+  // Enroll atomically consumes a scoped, short-lived enrollment token.
   rpc Enroll(EnrollRequest) returns (EnrollResponse);
 
-  // ReportHeartbeat updates agent liveness and capability information.
+  // ReportHeartbeat validates an opaque agent session credential and refreshes liveness.
   rpc ReportHeartbeat(HeartbeatRequest) returns (HeartbeatResponse);
 
-  // Stream carries telemetry and control messages over a bidirectional stream.
+  // Stream is reserved for Phase 3 durable telemetry ingestion.
   rpc Stream(stream AgentToServerMessage) returns (stream ServerToAgentMessage);
 }
 
@@ -29,14 +29,17 @@ message EnrollRequest {
 message EnrollResponse {
   string agent_id = 1;
   string server_id = 2;
-  string session_id = 3;
+  // session_token is a bearer secret returned only once and stored as a hash.
+  string session_token = 3;
   int32 heartbeat_interval_seconds = 4;
   string protocol_version = 5;
+  int64 session_expires_at_unix_millis = 6;
 }
 
 message HeartbeatRequest {
   string agent_id = 1;
-  string session_id = 2;
+  // session_token is the opaque credential returned by Enroll.
+  string session_token = 2;
   string agent_version = 3;
   repeated string capabilities = 4;
   int64 sent_at_unix_millis = 5;
@@ -49,7 +52,7 @@ message HeartbeatResponse {
 
 message AgentToServerMessage {
   string agent_id = 1;
-  string session_id = 2;
+  string session_token = 2;
 
   oneof payload {
     TelemetryBatch telemetry_batch = 3;

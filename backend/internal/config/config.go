@@ -7,13 +7,16 @@ import (
 	"time"
 )
 
-// Config contains runtime settings for the control-plane API and migration runner.
+// Config contains runtime settings for the control-plane API and agent RPC server.
 type Config struct {
 	APIAddress           string
 	ServiceVersion       string
 	DatabaseURL          string
 	RedisAddress         string
 	RedisPassword        string
+	AgentGRPCAddress     string
+	AgentTLSCertFile     string
+	AgentTLSKeyFile      string
 	DBMaxOpenConnections int
 	DBMaxIdleConnections int
 	DBConnectionLifetime time.Duration
@@ -21,7 +24,7 @@ type Config struct {
 }
 
 // Load reads and validates environment-based configuration.
-// Secrets are kept as values and must never be included in log messages.
+// Secret values are never included in configuration errors or logs.
 func Load() (Config, error) {
 	cfg := Config{
 		APIAddress:           getEnv("API_ADDR", ":8080"),
@@ -29,6 +32,9 @@ func Load() (Config, error) {
 		DatabaseURL:          getEnv("DATABASE_URL", "postgres://monitor_me:local_only_change_me@localhost:5432/monitor_me?sslmode=disable"),
 		RedisAddress:         getEnv("REDIS_ADDR", "localhost:6379"),
 		RedisPassword:        os.Getenv("REDIS_PASSWORD"),
+		AgentGRPCAddress:     getEnv("AGENT_GRPC_ADDR", ":8443"),
+		AgentTLSCertFile:     getEnv("AGENT_TLS_CERT_FILE", ".data/certs/server.crt"),
+		AgentTLSKeyFile:      getEnv("AGENT_TLS_KEY_FILE", ".data/certs/server.key"),
 		DBMaxOpenConnections: 25,
 		DBMaxIdleConnections: 10,
 		DBConnectionLifetime: 30 * time.Minute,
@@ -40,6 +46,12 @@ func Load() (Config, error) {
 	}
 	if cfg.RedisAddress == "" {
 		return Config{}, fmt.Errorf("REDIS_ADDR must not be empty")
+	}
+	if cfg.AgentGRPCAddress == "" || cfg.AgentTLSCertFile == "" || cfg.AgentTLSKeyFile == "" {
+		return Config{}, fmt.Errorf("agent gRPC address and TLS certificate/key files are required")
+	}
+	if cfg.AgentTLSCertFile == cfg.AgentTLSKeyFile {
+		return Config{}, fmt.Errorf("agent TLS certificate and key paths must be different")
 	}
 
 	return cfg, nil

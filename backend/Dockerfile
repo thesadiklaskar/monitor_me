@@ -2,10 +2,22 @@ FROM golang:1.27.4-alpine3.23 AS build
 
 WORKDIR /src
 
+RUN apk add --no-cache protobuf
+
 COPY backend/go.mod ./
 COPY backend/ ./
+COPY proto/ ./proto/
 
-# Resolve and checksum dependencies after package sources are available to go mod tidy.
+RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.12 && \
+    go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.6.2
+
+ENV PATH="/go/bin:${PATH}"
+
+RUN protoc -I proto \
+    --go_out=. --go_opt=module=github.com/WorkRCS/monitor_me/backend \
+    --go-grpc_out=. --go-grpc_opt=module=github.com/WorkRCS/monitor_me/backend \
+    proto/monitor/v1/agent.proto
+
 RUN go mod tidy
 
 RUN CGO_ENABLED=0 GOOS=linux \
@@ -23,7 +35,7 @@ COPY --from=build /out/monitor-me-migrate /usr/local/bin/monitor-me-migrate
 
 USER 10001:10001
 
-EXPOSE 8080
+EXPOSE 8080 8443
 
 HEALTHCHECK --interval=10s --timeout=3s --start-period=5s --retries=5 \
     CMD wget -q -O /dev/null http://127.0.0.1:8080/health/ready || exit 1

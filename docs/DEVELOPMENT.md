@@ -52,12 +52,40 @@ The local endpoints are bound to loopback by default:
 - Web application: http://localhost:3000
 - API liveness: http://localhost:8080/health/live
 - API readiness: http://localhost:8080/health/ready
+- Agent gRPC/TLS: localhost:8443
 - PostgreSQL: localhost:5432
 - Redis: localhost:6379
 
 PostgreSQL and Redis ports are exposed only on loopback for local tooling. Do not expose these ports publicly.
 
 \`/health/live\` reports whether the API process can answer requests. \`/health/ready\` checks PostgreSQL and Redis and returns HTTP 503 when either dependency is unavailable. It reports only dependency state and never returns connection strings or driver errors.
+
+## First-Time Owner and Server Enrollment
+
+The first user account is bootstrapped once per database. Register the owner with the API, then log in to receive a 24-hour opaque bearer token:
+
+```sh
+curl -sS http://localhost:8080/v1/auth/register \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"owner@example.com","display_name":"Workspace Owner","password":"replace-with-a-long-password","organization_name":"Example Team","organization_slug":"example-team"}'
+
+curl -sS http://localhost:8080/v1/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"owner@example.com","password":"replace-with-a-long-password"}'
+```
+
+Use the returned `access_token` as a `Bearer` token. Create a server and receive a one-time enrollment token:
+
+```sh
+curl -sS http://localhost:8080/v1/servers \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"production-node-01","hostname":"production-node-01"}'
+```
+
+Enrollment tokens expire after 15 minutes and can be used once. If installation is delayed, request a replacement with `POST /v1/servers/{serverID}/enrollment-token`. Owners and administrators can revoke unused enrollment tokens and revoke enrolled agents. Agent session tokens expire after 30 days and are stored as SHA-256 digests.
+
+The agent protocol is defined in `proto/monitor/v1/agent.proto`. The TLS-protected gRPC endpoint supports `Enroll` and `ReportHeartbeat`. The telemetry `Stream` remains unimplemented until Phase 3 can durably persist and acknowledge incoming telemetry.
 
 ## Database Migrations
 
@@ -115,9 +143,9 @@ The CI workflow runs backend, frontend, and Compose integration checks. A green 
 
 ## Current Limitations
 
-- The API currently implements health endpoints only; server inventory and monitoring APIs are not implemented yet.
-- PostgreSQL and Redis clients are connected for startup and readiness checks, but application repositories, authentication, and live telemetry are not implemented yet.
+- The API implements first-owner bootstrap, bearer login/logout, session validation, organization-scoped server inventory, and enrollment-token issuance/revocation.
+- PostgreSQL stores durable identity and agent state. Redis is connected for startup/readiness but is not yet used for durable application data.
 - The initial migration creates identity and inventory foundations; metric tables and time-series retention are planned for Phase 3.
 - The frontend is a static foundation preview. It does not display real telemetry and does not yet implement authentication or enrollment.
-- Protocol Buffer definitions exist, but generated code, a running gRPC server, and agent enrollment are not implemented yet.
+- TLS gRPC enrollment and heartbeat are implemented. Telemetry streaming is explicitly deferred to Phase 3 until durable ingestion and acknowledgement are available.
 - The current Compose stack is a local development environment, not a production deployment topology.

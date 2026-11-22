@@ -41,7 +41,9 @@ proto:
 certs:
 	mkdir -p .data/certs
 	openssl req -x509 -newkey rsa:2048 -nodes -keyout .data/certs/server.key -out .data/certs/server.crt -days 365 -subj "/CN=localhost" -addext "subjectAltName=DNS:localhost,IP:127.0.0.1"
-	chmod 644 .data/certs/server.crt .data/certs/server.key
+	chmod 750 .data/certs
+	chmod 644 .data/certs/server.crt
+	chmod 640 .data/certs/server.key
 
 web-install:
 	cd $(WEB_DIR) && npm install
