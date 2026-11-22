@@ -54,3 +54,12 @@ compose-logs:
 
 db-migrate:
 	docker compose run --rm migrate
+
+proto:
+	go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.12
+	go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.6.2
+	sh scripts/generate-proto.sh
+
+certs:
+	mkdir -p .data/certs
+	openssl req -x509 -newkey rsa:2048 -nodes -keyout .data/certs/server.key -out .data/certs/server.crt -days 365 -subj "/CN=localhost" -addext "subjectAltName=DNS:localhost,IP:127.0.0.1"
