@@ -55,9 +55,9 @@ func (state *State) Samples(now time.Time, collectorErrors int, spoolBytes int64
 		lastSuccessfulSend := state.lastSuccessfulSendUnixNanos.Load()
 		if lastSuccessfulSend > 0 {
 			samples = append(samples, collector.Sample{
-				Name: "agent.last_successful_send",
-				Value: float64(lastSuccessfulSend) / float64(time.Second),
-				Unit: "unix_seconds",
+				Name:                "agent.last_successful_send",
+				Value:               float64(lastSuccessfulSend) / float64(time.Second),
+				Unit:                "unix_seconds",
 				ObservedAtUnixNanos: observedAt,
 			})
 		}

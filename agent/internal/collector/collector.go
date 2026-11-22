@@ -43,9 +43,9 @@ type networkCounters struct {
 // ProcCollector reads Linux kernel counters and retains only the previous
 // snapshot required to calculate rates over monotonic elapsed time.
 type ProcCollector struct {
-	root            string
-	startedAt       time.Time
-	previousAt      time.Time
+	root                    string
+	startedAt               time.Time
+	previousAt              time.Time
 	previousCPU             map[string]cpuCounters
 	previousDisk            map[string]diskCounters
 	previousNetwork         map[string]networkCounters
@@ -530,7 +530,6 @@ func CounterRate(previous, current float64, elapsed time.Duration) (float64, boo
 	}
 	return (current - previous) / elapsed.Seconds(), true
 }
-
 
 // AgentCPUUtilization reports process CPU as a percentage of one logical CPU.
 // Multi-threaded workloads may legitimately exceed 100 percent.
