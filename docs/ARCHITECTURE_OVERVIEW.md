@@ -161,3 +161,5 @@ The Phase 3 data path now has an initial implementation: native Linux procfs age
 The browser live endpoint uses a 30-second single-use ticket derived from a valid user bearer session. The ticket is stored by hash and consumed once; WebSocket subscribers are isolated by organization and have a fixed-size outbound queue. Historical queries are authenticated and scoped to the user's organization and requested server. Slow clients reconnect with a fresh ticket and use the durable history endpoint to fill gaps.
 
 This implementation is Linux-first. Windows/macOS collectors, full Docker Engine discovery, process CPU metrics, app request instrumentation, persistent rollup tables, dashboard UI, and production installers are not claimed as implemented.
+
+**Verification:** the full Phase 3 control-plane, native agent, frontend foundation, and Docker Compose integration pipeline passed in [GitHub Actions run #45039191041](https://github.com/WorkRCS/monitor_me/actions/runs/45039191041).

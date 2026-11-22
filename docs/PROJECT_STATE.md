@@ -12,13 +12,13 @@ This file is the authoritative resume point for Monitor Me. Read it before makin
 | Working branch | main |
 | Branch policy | All work and commits are made directly on main; do not create another branch |
 | Repository visibility | Private |
-| Completed phases | Phase 1 — Product Specification and Technical Blueprint; Phase 2 — Platform Foundation and Secure Connectivity |
-| Current phase | Phase 3 — Monitoring Agent and Telemetry Data Engine |
+| Completed phases | Phase 1 — Product Specification and Technical Blueprint; Phase 2 — Platform Foundation and Secure Connectivity; Phase 3 — Monitoring Agent and Telemetry Data Engine |
+| Current phase | Phase 4 — Dashboard and Operational Features |
 | Current phase status | Not Started |
-| Implementation status | Phase 2 control-plane foundation, authentication/authorization, TLS gRPC enrollment/heartbeat, Docker Compose runtime, PostgreSQL migrations, Redis outage/recovery checks, and frontend shell are CI-verified. Native agent executable, host collectors, telemetry spool/ingestion, and live delivery are not implemented yet. |
-| Latest implementation commit | 694ffccdf8676b03fe9212366c3abaa17b2de985 |
-| Latest verified CI run | [#45030320358 — success](https://github.com/WorkRCS/monitor_me/actions/runs/45030320358) |
-| Next action | Initialize the native Go agent module in agent/: add go.mod, a cmd/monitor-agent entry point, validated configuration, structured logging, graceful shutdown, and focused unit tests; wire its build/test checks into CI. |
+| Implementation status | Phases 1–3 are complete. The Linux agent, durable WAL, TLS gRPC ingestion, PostgreSQL history/retention, authorized live delivery, workload attribution, and benchmark gates are verified. The frontend remains a foundation shell; Phase 4 UI/alert/operations work has not started. |
+| Latest implementation commit | 8435b5feca943e051c16a70a44479e5a4763f238 |
+| Latest verified CI run | [#45039191041 — success](https://github.com/WorkRCS/monitor_me/actions/runs/45039191041) |
+| Next action | Implement the authenticated Next.js login/session flow and server inventory page using the verified auth and server APIs; include logout, empty/loading/error states, and the Add Server one-time enrollment-token flow. |
 
 ## Completed Phase 1 — Product Specification and Technical Blueprint
 
@@ -73,12 +73,9 @@ GitHub Actions run [#45030320358](https://github.com/WorkRCS/monitor_me/actions/
 - [x] PostgreSQL durability and readiness recovery during Redis outage.
 - [x] Full stack cleanup after CI.
 
-### Phase 2 boundaries
+### Phase 2 boundaries at phase close (historical)
 
-- The frontend is still a foundation shell. Authentication screens, project switching, dashboards, graphs, alerts, and operational workflows are later-phase work.
-- No native agent executable or collectors are shipped yet. The agent workspace boundary is reserved for Phase 3.
-- The gRPC telemetry stream intentionally returns UNIMPLEMENTED until Phase 3 can validate, durably persist, and idempotently acknowledge telemetry.
-- The Compose deployment is a local development topology, not a production deployment design.
+At the moment Phase 2 was closed, the frontend was a foundation shell and the native agent/telemetry stream had not yet been implemented. Phase 3 has since added the Linux agent, durable telemetry path, history, retention, and live delivery. The Compose deployment remains a local development topology, not a production deployment design.
 
 ### Key Phase 2 commits
 
@@ -95,41 +92,78 @@ GitHub Actions run [#45030320358](https://github.com/WorkRCS/monitor_me/actions/
 - 694ffccdf8676b03fe9212366c3abaa17b2de985 — Format reconnect heartbeat request; full three-job CI passed.
 - 694ffccdf8676b03fe9212366c3abaa17b2de985 — Format the reconnect heartbeat request.
 
-## Current Phase 3 — Monitoring Agent and Telemetry Data Engine
+## Completed Phase 3 — Monitoring Agent and Telemetry Data Engine
+
+**Status: Completed**
+
+**Verification evidence:** [GitHub Actions run #45039191041 — success](https://github.com/WorkRCS/monitor_me/actions/runs/45039191041). All four CI jobs passed.
+
+### Delivered implementation
+
+- [x] Native Linux Go agent with validated configuration, JSON logging, graceful shutdown, and explicit capability reporting.
+- [x] Linux procfs aggregate/per-core CPU, memory/cache/swap, disk throughput/IOPS, network throughput/packets/errors, host/agent uptime, process count and top-128 process RSS.
+- [x] TCP connection-state counts, listening-port inventory, cgroup selectors, Systemd unit and container cgroup-ID recognition.
+- [x] Counter rates based on monotonic elapsed time; initial samples, resets, and invalid counter intervals never generate fabricated negative rates.
+- [x] Private append-only JSONL WAL with fsync, bounded disk quota, truncated-tail recovery, and atomic acknowledgement compaction.
+- [x] TLS gRPC enrollment, private persisted agent session, heartbeat, reconnect/backoff, and streaming telemetry batches.
+- [x] Bounded authenticated ingestion, batch schema/label validation, idempotency hash, post-commit ACK, and negative/mismatched ACK retention tests.
+- [x] PostgreSQL transactionally stores batches and samples; Redis is used for organization-scoped ephemeral live notifications only.
+- [x] Authenticated historical range API with exact epoch-aligned `date_bin` buckets, 100ms minimum step, 30-day raw range, and maximum 5,000 points.
+- [x] 30-day raw sample and 90-day idempotency retention; expired WebSocket tickets cleaned in bounded batches.
+- [x] 30-second single-use live tickets bound to user sessions, logout invalidation, cross-organization isolation, 32-message bounded subscriber queue, slow-client disconnect, and reconnect.
+- [x] Database attribution verifies mapped Systemd workload samples and keeps host-total, unclassified, and shared resource categories separate.
+- [x] CI benchmarks execute Linux collection, counter-rate calculation, WAL append, live event preparation, and real TLS gRPC-to-PostgreSQL ingestion.
+
+### Benchmark snapshot (GitHub-hosted Ubuntu runner)
+
+| Benchmark | Result |
+| --- | ---: |
+| Linux proc collector | 5.33 ms/op; 1.03 MB/op; 5,163 allocs/op |
+| Counter rate calculation | 3.68 ns/op; 0 allocs/op |
+| One-sample WAL append/fsync | 256 μs/op; 952 B/op; 12 allocs/op |
+| Live event preparation (96 input samples) | 128 μs/op; 165.7 KB/op; 897 allocs/op |
+| TLS gRPC to PostgreSQL (64 samples/batch) | 4.40 ms/batch; 14,533 samples/sec; 9.2 KB/op; 535 allocs/op |
+
+These measurements are a single CI-runner snapshot, not production capacity guarantees or evidence of million-host scale.
+
+### Phase 3 boundaries
+
+- Implemented host collector platform: Linux. Windows and macOS are Phase 5 work.
+- Full Docker Engine API discovery is not implemented; container identification uses cgroup metadata exposed by the host.
+- Per-process CPU and eBPF are not implemented.
+- Listening ports and TCP state are not HTTP request latency or HTTP error telemetry. Those require application instrumentation, proxy integration, or tracing.
+- Historical aggregation is performed on query with PostgreSQL `date_bin`; persistent materialized rollups and table partitioning remain later scale optimizations.
+- Dashboard, project selector, alerting, notifications, installer UX, and remote operations remain Phase 4 work.
+
+## Current Phase 4 — Dashboard and Operational Features
 
 **Status: Not Started**
 
-### Phase 3 scope
+### Phase 4 scope
 
-- [ ] Native Go agent module, command lifecycle, configuration, structured logs, and capabilities.
-- [ ] Secure enrollment client using the Phase 2 TLS gRPC contract; persist/reload session credentials safely.
-- [ ] Linux CPU and per-core collection.
-- [ ] Linux memory, cache, swap, and process RSS collection with documented semantics.
-- [ ] Disk read/write throughput and IOPS; network throughput and packet counters.
-- [ ] Agent health, uptime, collector errors, and process inventory.
-- [ ] Counter-delta calculations with monotonic elapsed time and reset handling.
-- [ ] Bounded queue and persistent local spool/WAL.
-- [ ] Authenticated, versioned, idempotent telemetry ingestion with validation, batching, and backpressure.
-- [ ] Durable PostgreSQL telemetry storage and retention/partition strategy.
-- [ ] Authorized WebSocket live fan-out and reconnect behavior.
-- [ ] Docker/Systemd discovery, cgroups attribution, port/connection metadata, and application instrumentation foundations.
-- [ ] Aggregation/downsampling and reproducible collection/ingestion benchmarks.
+- [ ] Implement authenticated Next.js login/logout and server session handling.
+- [ ] Build server inventory, empty/loading/error states, Add Server and one-time enrollment-token display.
+- [ ] Build server detail and overall host dashboard using the verified history/live APIs.
+- [ ] Add All Projects / project selector with no-full-reload data scope changes.
+- [ ] Add Canvas/WebGL charts after rendering benchmarks.
+- [ ] Add process/port/connection/workload views and supported application instrumentation integrations.
+- [ ] Add alert rules, deduplication, recovery events and notifications.
+- [ ] Add allowlisted, authorized and audited remote restart/stop operations through the agent control channel.
 
 ### Exact resume instructions
 
-Continue directly on main. Do not create a new branch.
+Continue directly on `main`. Do not create a new branch.
 
-**Next implementation slice:** initialize the native Go agent module in agent/.
+**Next implementation slice:** build the authenticated server inventory experience in the Next.js frontend.
 
-1. Add a standalone Go module and the cmd/monitor-agent entry point.
-2. Add validated environment/config-file loading without logging secrets.
-3. Add JSON structured logging and graceful shutdown.
-4. Define an explicit agent capability/version structure and unit tests.
-5. Add CI steps for go test -race ./..., go vet ./..., and agent binary build.
-6. Update README, feature acceptance matrix, and this state file when the slice is verified.
-7. Only after this foundation, implement the TLS enrollment client and Linux CPU/memory collector slices.
+1. Add a typed API client for login, current-user, logout and server inventory endpoints.
+2. Implement login and session handling without exposing bearer tokens in logs or URLs.
+3. Build the server inventory list with loading, empty, error and disconnected states.
+4. Add the Add Server flow and show the one-time enrollment token exactly once with copy/install guidance.
+5. Add component/API tests and keep all UI strings, comments and documentation in English.
+6. Update README, feature acceptance matrix and this state file after the slice passes CI.
 
-Do not implement unbounded queues, acknowledge telemetry before durable persistence, or claim metric accuracy/performance without source-based tests and benchmarks.
+Do not start charts, alerts, project switching or remote actions until the authenticated server inventory and Add Server flow are accepted and tested.
 
 ## Repository Rules
 
@@ -145,4 +179,4 @@ Do not implement unbounded queues, acknowledge telemetry before durable persiste
 
 ## Session History
 
-Phase 1 is recorded above. Phase 2 implementation and verification evidence is listed above. Phase 2 closed after all three jobs in [GitHub Actions run #45030320358](https://github.com/WorkRCS/monitor_me/actions/runs/45030320358) succeeded.
+Phase 1 and Phase 2 implementation/verification history is recorded above. Phase 3 closed after all four jobs in [GitHub Actions run #45039191041](https://github.com/WorkRCS/monitor_me/actions/runs/45039191041) succeeded.

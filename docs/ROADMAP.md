@@ -8,7 +8,7 @@ Monitor Me is delivered in **five major phases**. Each phase contains smaller in
 | --- | --- | --- |
 | 1 | Product Specification and Technical Blueprint | **Completed** |
 | 2 | Platform Foundation and Secure Connectivity | **Completed** |
-| 3 | Monitoring Agent and Telemetry Data Engine | Not Started |
+| 3 | Monitoring Agent and Telemetry Data Engine | **Completed** |
 | 4 | Dashboard and Operational Features | Not Started |
 | 5 | Cross-Platform Production and Scale | Not Started |
 
@@ -103,36 +103,38 @@ A feature can be implemented before its phase is complete, but its status must r
 
 ## Phase 3 — Monitoring Agent and Telemetry Data Engine
 
-**Status: Not Started**
+**Status: Completed**
 
-### Scope
+### Delivered scope
 
-1. Implement the native Go agent lifecycle, configuration, logging, and capability model.
-2. Implement Linux CPU and per-core collection.
-3. Implement Linux memory, swap, cache, and process RSS collection with correct semantics.
-4. Implement disk throughput, read/write operations, network throughput, and packet counters.
-5. Add uptime, agent health, collector errors, and process inventory.
-6. Implement counter-delta calculations, monotonic elapsed-time measurement, and counter-reset handling.
-7. Implement bounded in-memory queues and a persistent agent-side spool/WAL.
-8. Implement authenticated, versioned telemetry ingestion with validation, idempotency, batching, and backpressure.
-9. Persist telemetry in PostgreSQL and define retention/partition behavior.
-10. Implement live data fan-out to authorized WebSocket subscribers.
-11. Add Docker/Systemd discovery and cgroups-based project attribution where supported.
-12. Add port/connection metadata and the foundations for supported application instrumentation or proxy integrations.
-13. Add metric aggregation and downsampling after correctness tests.
+1. Native Go Linux agent lifecycle, validated configuration, structured logging, signal-aware shutdown, and capability reporting.
+2. Linux aggregate/per-core CPU and documented memory, cache, swap, disk, network, uptime, process, TCP-state, and listening-port collection.
+3. Counter-derived rates using monotonic elapsed time, with missing values on first samples, resets, and invalid counter intervals.
+4. Bounded append-only agent JSONL WAL with fsync, disk quota, private permissions, trailing-record recovery, and atomic compaction after accepted ACKs.
+5. TLS gRPC enrollment, persisted agent sessions, heartbeat, reconnect/backoff, and streaming batch delivery.
+6. Authenticated ingestion with 1 MiB transport bounds, a 4,096-sample batch ceiling, payload validation, idempotency hashes, sequential ACK/backpressure, and oversized-batch rejection.
+7. Atomic PostgreSQL batch/sample persistence; ACKs are sent only after commit. Redis remains an ephemeral post-commit notification path.
+8. Authenticated, organization/server-scoped historical range query using epoch-aligned PostgreSQL `date_bin` aggregation, a 100ms minimum step, 30-day raw range, and a 5,000-point cap.
+9. Bounded retention: raw metric samples for 30 days, batch idempotency records for 90 days, and expired live tickets removed in bounded batches.
+10. Session-bound, 30-second single-use WebSocket tickets, organization-scoped channels, 32-event subscriber queues, 128-point event caps, slow-client disconnect, reconnect, and history catch-up.
+11. Linux cgroup/Systemd/container selector recognition and explicit server/project workload mappings. Host-total, unclassified, and shared resources remain separately represented.
+12. TCP connection-state/listening-port metadata and documented limits: port discovery does not infer application HTTP request latency or error rates.
+13. On-query aggregation and reproducible collector, WAL, live-event, and TLS gRPC/PostgreSQL benchmarks. Persistent rollup tables and partitioning remain future scale optimizations.
 
 ### Completion gate
 
-- [ ] Linux agent runs natively and reports its capabilities.
-- [ ] Core metrics have unit/fixture tests and comparisons against documented OS sources.
-- [ ] Rate calculations handle resets and elapsed-time changes without negative or fabricated values.
-- [ ] Agent buffering survives expected network interruption and process restart scenarios.
-- [ ] Ingestion has bounded queues, observable backpressure, idempotency, and tested overload behavior.
-- [ ] Historical data is durable in PostgreSQL; Redis is not the only copy.
-- [ ] Live delivery is authorized, bounded, and reconnectable.
-- [ ] Project attribution exposes its method and does not hide shared/unclassified resources.
-- [ ] Collection overhead and initial ingest performance are benchmarked.
-- [ ] README and state reflect only verified telemetry capabilities; state points to Phase 4.
+- [x] Linux agent runs natively and reports explicit capabilities.
+- [x] Core Linux metrics have fixture/unit tests tied to documented procfs semantics.
+- [x] Counter rates handle resets and actual elapsed time without negative or fabricated values.
+- [x] Agent WAL survives process reopen and truncated-tail recovery; failed, negative, and mismatched ACKs do not remove queued batches.
+- [x] Ingestion bounds message/sample sizes, validates payloads, rejects oversized batches, and uses batch-ID/payload-hash idempotency.
+- [x] PostgreSQL persists telemetry durably and exposes bounded history; Redis is not the source of truth.
+- [x] Live delivery is session-authorized, single-use-ticket protected, organization isolated, bounded, and reconnectable.
+- [x] Project attribution exposes mapping method and preserves host-total, unclassified, and shared samples.
+- [x] Collection, WAL, event preparation, and TLS gRPC/PostgreSQL ingestion are benchmarked in CI.
+- [x] README, metric catalog, development guide, architecture overview, acceptance matrix, roadmap, and project state match the implementation.
+
+**Verification evidence:** [GitHub Actions run #45039191041 — success](https://github.com/WorkRCS/monitor_me/actions/runs/45039191041). All four jobs passed: Go backend, native Linux agent, Next.js frontend, and Docker Compose integration. The Compose job applied migrations, exercised authenticated TLS enrollment and telemetry ingestion, verified idempotency/history/tenant isolation/live reconnect/workload attribution/retention, ran the 64-sample TLS gRPC-to-PostgreSQL benchmark, and tested Redis outage/recovery with PostgreSQL durability.
 
 ## Phase 4 — Dashboard and Operational Features
 

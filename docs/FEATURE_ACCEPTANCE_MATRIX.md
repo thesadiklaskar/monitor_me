@@ -13,30 +13,30 @@ No item may be marked Verified based only on a code stub, mock UI, or documentat
 
 ## Feature Matrix
 
-| ID | Feature | Priority | Acceptance evidence | Initial status |
+| ID | Feature | Priority | Acceptance evidence | Current status |
 | --- | --- | --- | --- | --- |
-| F-001 | Add Server and scoped enrollment token | P0 | Valid enrollment succeeds; expired/revoked/invalid token fails | Planned |
-| F-002 | Native Go host agent lifecycle | P0 | Foreground and service modes; health and graceful shutdown tests | Planned |
-| F-003 | Host CPU and per-core metrics | P0 | Counter fixtures, reset tests, comparison with OS tools | Planned |
-| F-004 | Host memory, swap, cache metrics | P0 | Unit and OS-specific semantics tests | Planned |
-| F-005 | Disk throughput and IOPS | P0 | Counter-delta tests and known workload comparison | Planned |
-| F-006 | Network throughput and packets | P0 | Counter-delta, interface lifecycle, and reset tests | Planned |
-| F-007 | Authenticated gRPC ingestion | P0 | Integration tests for authentication, schema validation, and malformed payloads | Planned |
-| F-008 | Durable local telemetry spool | P0 | Disconnect, process restart, recovery, quota, and acknowledgement tests | Planned |
-| F-009 | PostgreSQL historical persistence | P0 | Migration, batch-write, duplicate-delivery, and query tests | Planned |
-| F-010 | Redis live cache/state | P0 | Cache outage does not corrupt durable records; bounded reconnect tests | Planned |
-| F-011 | Server inventory and agent status | P0 | API and UI tests for online, stale, and disconnected states | Planned |
+| F-001 | Add Server and scoped enrollment token | P0 | Valid enrollment succeeds; expired/revoked/invalid token fails | Verified |
+| F-002 | Native Go host agent lifecycle | P0 | Foreground and service modes; health and graceful shutdown tests | In Progress |
+| F-003 | Host CPU and per-core metrics | P0 | Counter fixtures, reset tests, comparison with OS tools | Verified |
+| F-004 | Host memory, swap, cache metrics | P0 | Unit and OS-specific semantics tests | Verified |
+| F-005 | Disk throughput and IOPS | P0 | Counter-delta tests and known workload comparison | Verified |
+| F-006 | Network throughput and packets | P0 | Counter-delta, interface lifecycle, and reset tests | Verified |
+| F-007 | Authenticated gRPC ingestion | P0 | Integration tests for authentication, schema validation, and malformed payloads | Verified |
+| F-008 | Durable local telemetry spool | P0 | Disconnect, process restart, recovery, quota, and acknowledgement tests | Verified |
+| F-009 | PostgreSQL historical persistence | P0 | Migration, batch-write, duplicate-delivery, and query tests | Verified |
+| F-010 | Redis live cache/state | P0 | Cache outage does not corrupt durable records; bounded reconnect tests | Verified |
+| F-011 | Server inventory and agent status | P0 | API and UI tests for online, stale, and disconnected states | In Progress |
 | F-012 | Overall server dashboard | P0 | Metric correctness, timestamp, units, and empty-state UI tests | Planned |
-| F-013 | Authorized live WebSocket updates | P0 | Scope authorization, reconnect, slow-client, and bounded-buffer tests | Planned |
-| F-014 | Docker Compose local stack | P0 | Clean-start, health-check, restart, and documented local setup tests | Planned |
+| F-013 | Authorized live WebSocket updates | P0 | Scope authorization, reconnect, slow-client, and bounded-buffer tests | Verified |
+| F-014 | Docker Compose local stack | P0 | Clean-start, health-check, restart, and documented local setup tests | Verified |
 | F-015 | All Projects / project switcher | P1 | No-reload switch; all panels and subscriptions change scope | Planned |
-| F-016 | Docker and Systemd discovery | P1 | Discovery fixtures and least-privilege integration tests | Planned |
-| F-017 | cgroups-based project attribution | P1 | Known workload resource comparison and attribution labels | Planned |
-| F-018 | Process and port monitoring | P1 | Process lifecycle, listening ports, and permission tests | Planned |
-| F-019 | Connection monitoring | P1 | TCP state/count fixtures and platform capability tests | Planned |
+| F-016 | Docker and Systemd discovery | P1 | Discovery fixtures and least-privilege integration tests | In Progress |
+| F-017 | cgroups-based project attribution | P1 | Known workload resource comparison and attribution labels | Verified |
+| F-018 | Process and port monitoring | P1 | Process lifecycle, listening ports, and permission tests | In Progress |
+| F-019 | Connection monitoring | P1 | TCP state/count fixtures and platform capability tests | Verified |
 | F-020 | Application request latency and HTTP errors | P1 | Controlled application/proxy test with known response distribution | Planned |
-| F-021 | Historical query and retention | P1 | Time-range, partition, retention, and bounded-query tests | Planned |
-| F-022 | Downsampling | P1 | Aggregation correctness and raw-retention preservation tests | Planned |
+| F-021 | Historical query and retention | P1 | Time-range, partition, retention, and bounded-query tests | Verified |
+| F-022 | Downsampling | P1 | Aggregation correctness and raw-retention preservation tests | In Progress |
 | F-023 | Custom live visualization | P1 | Rendering benchmark on reference hardware and representative point counts | Planned |
 | F-024 | Alert evaluation and recovery | P1 | Deterministic rule tests, deduplication, recovery, and delay measurement | Planned |
 | F-025 | Notifications | P1 | Provider success/failure, retry, and delivery-state tests | Planned |
@@ -44,9 +44,9 @@ No item may be marked Verified based only on a code stub, mock UI, or documentat
 | F-027 | Windows agent | P1 | OS-version-specific collector and installer test suite | Planned |
 | F-028 | macOS agent | P1 | OS-version-specific collector and installer test suite | Planned |
 | F-029 | Signed installers and upgrades | P1 | Signature validation, install, upgrade, rollback, and uninstall tests | Planned |
-| F-030 | Role-based access and tenant isolation | P1 | API, WebSocket, and cross-tenant denial tests | Planned |
-| F-031 | Performance benchmark suite | P2 | Reproducible reports with environment and workload metadata | Planned |
-| F-032 | Failure and recovery testing | P2 | Network, database, cache, agent, and backend fault-injection evidence | Planned |
+| F-030 | Role-based access and tenant isolation | P1 | API, WebSocket, and cross-tenant denial tests | Verified |
+| F-031 | Performance benchmark suite | P2 | Reproducible reports with environment and workload metadata | Verified |
+| F-032 | Failure and recovery testing | P2 | Network, database, cache, agent, and backend fault-injection evidence | Verified |
 | F-033 | Horizontal scale validation | P2 | Staged multi-agent load reports and identified capacity limits | Planned |
 | F-034 | Production operations and backup | P1 | Clean deployment, backup, restore, and rollback exercise | Planned |
 | F-035 | Final as-built Excalidraw design | P1 | Diagram reviewed against actual source, data flows, and deployment | Planned |
@@ -85,11 +85,19 @@ No item may be marked Verified based only on a code stub, mock UI, or documentat
 
 ### Phase 3 — Monitoring Agent and Telemetry Data Engine
 
-- [ ] Linux agent collects verified core host metrics.
-- [ ] Persistent spool survives expected network and process interruptions.
-- [ ] Ingestion is bounded, idempotent, and observable.
-- [ ] Metrics are durably persisted and queryable.
-- [ ] Live update path and project/workload attribution pass tests.
+- [x] Native Linux agent builds, passes race-enabled tests/vet, runs natively, and reports host capabilities.
+- [x] Aggregate/per-core CPU, memory/cache/swap, disk throughput/IOPS, network throughput/packets/errors, uptime, process RSS, TCP states, and listening ports pass fixture/source-semantics tests.
+- [x] Monotonic counter calculations handle initial samples, resets, and elapsed-time changes without negative or fabricated rates.
+- [x] Durable WAL survives reopen and partial-tail recovery; disk quota is bounded; unacknowledged, rejected, or mismatched batches remain queued.
+- [x] TLS gRPC ingestion enforces 1 MiB transport and 4,096-sample batch bounds, schema/label validation, idempotency, and post-commit acknowledgements.
+- [x] PostgreSQL history queries preserve sample count/min/max/weighted average, use exact epoch-aligned bucket bounds, and enforce bounded range/point limits.
+- [x] 30-day raw sample retention and 90-day idempotency retention are verified against PostgreSQL.
+- [x] WebSocket tickets are one-use, session-bound, invalidated on logout, isolated by organization, bounded for slow clients, and reconnectable.
+- [x] Workload mappings verify Systemd project attribution while keeping host-total, unclassified, and shared resources separate.
+- [x] Agent collection/WAL, live event preparation, and TLS gRPC/PostgreSQL ingestion benchmarks execute in CI.
+- [x] All Phase 3 gates pass in [GitHub Actions run #45039191041](https://github.com/WorkRCS/monitor_me/actions/runs/45039191041).
+
+**Phase 3 boundaries:** Linux is the only implemented collector platform. Full Windows/macOS support, complete Docker Engine API discovery, per-process CPU, eBPF, HTTP request latency/error instrumentation, persistent materialized rollups, and dashboard UI remain later-phase work.
 
 ### Phase 4 — Dashboard and Operational Features
 
