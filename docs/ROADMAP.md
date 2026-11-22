@@ -134,7 +134,7 @@ A feature can be implemented before its phase is complete, but its status must r
 - [x] Collection, WAL, event preparation, and TLS gRPC/PostgreSQL ingestion are benchmarked in CI.
 - [x] README, metric catalog, development guide, architecture overview, acceptance matrix, roadmap, and project state match the implementation.
 
-**Verification evidence:** [GitHub Actions run #45039870651 — success](https://github.com/WorkRCS/monitor_me/actions/runs/45039870651) verified all four jobs on the audited main commit. The current audit adds strict lowercase batch-ID validation and PostgreSQL outage/recovery tests; those changes are being re-run by CI before the audit is closed.
+**Verification evidence:** [GitHub Actions run #45043161542 — success](https://github.com/WorkRCS/monitor_me/actions/runs/45043161542) verified all four jobs on `main`: Go backend, native Linux agent, Next.js frontend, and Docker Compose integration. The Compose job verified telemetry ingestion, history/retention, Redis outage/recovery, and a PostgreSQL durability canary across service restart.
 
 ## Phase 4 — Dashboard and Operational Features
 

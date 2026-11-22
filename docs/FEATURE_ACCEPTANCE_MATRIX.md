@@ -95,7 +95,7 @@ No item may be marked Verified based only on a code stub, mock UI, or documentat
 - [x] WebSocket tickets are one-use, session-bound, invalidated on logout, isolated by organization, bounded for slow clients, and reconnectable.
 - [x] Workload mappings verify Systemd project attribution while keeping host-total, unclassified, and shared resources separate.
 - [x] Agent collection/WAL, live event preparation, and TLS gRPC/PostgreSQL ingestion benchmarks execute in CI.
-- [x] All Phase 3 gates passed in [GitHub Actions run #45039870651](https://github.com/WorkRCS/monitor_me/actions/runs/45039870651). The current audit adds strict batch-ID validation and PostgreSQL outage/recovery checks before final closeout.
+- [x] All Phase 3 gates passed in [GitHub Actions run #45043161542](https://github.com/WorkRCS/monitor_me/actions/runs/45043161542); all four jobs succeeded, including canonical batch-ID validation and PostgreSQL outage/recovery.
 
 **Phase 3 boundaries:** Linux is the only implemented collector platform. Full Windows/macOS support, complete Docker Engine API discovery, per-process CPU, eBPF, HTTP request latency/error instrumentation, persistent materialized rollups, and dashboard UI remain later-phase work.
 

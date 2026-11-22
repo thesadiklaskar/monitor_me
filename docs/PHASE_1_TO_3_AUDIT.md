@@ -13,7 +13,7 @@
 | Phase 2 — Platform Foundation and Secure Connectivity | **Completed** | Authentication, tenancy, Postgres/Redis, migrations, TLS gRPC enrollment/heartbeat/reconnect and Compose checks pass CI |
 | Phase 3 — Monitoring Agent and Telemetry Data Engine | **Completed against its phase gate** | Native Linux agent, durable WAL, telemetry ingestion, history, retention, live delivery, workload attribution and benchmarks pass all Phase 3 acceptance gates |
 
-The last full four-job baseline before the additional audit hardening was [GitHub Actions run #45039870651 — success](https://github.com/WorkRCS/monitor_me/actions/runs/45039870651). The latest audit follow-up adds strict lowercase batch-ID validation and a PostgreSQL restart canary. Its CI run is the final verification gate for this report.
+The final audited `main` commit passed all four jobs in [GitHub Actions run #45043161542 — success](https://github.com/WorkRCS/monitor_me/actions/runs/45043161542). This run includes strict lowercase batch-ID validation and a PostgreSQL restart canary; Compose confirmed that the designated telemetry sample remained stored after the database recovered.
 
 **Phase completion is not the same as product MVP completion.** The first usable operator-facing MVP is not yet complete: authenticated login UI, server inventory UI, Add Server wizard, overall server dashboard and browser-facing live metric views remain Phase 4 requirements. The acceptance matrix keeps individual unfinished requirements in In Progress or Planned rather than marking them verified.
 

@@ -17,13 +17,13 @@ This file is the authoritative resume point for Monitor Me. Read it before makin
 | Current phase status | Not Started |
 | MVP status | Not complete — authenticated dashboard, server overview, Add Server UI, and live metric views remain Phase 4 requirements |
 | Implementation status | Phases 1–3 phase gates are complete and CI-verified. The Linux agent, durable WAL, TLS gRPC ingestion, PostgreSQL history/retention, authorized live delivery, workload attribution, and benchmarks are verified. The overall MVP is not complete because dashboard/login/Add Server and browser-facing views remain Phase 4 work. Several non-UI feature requirements remain In Progress/Planned in the acceptance matrix. |
-| Latest implementation commit | 1469206e4a98dfe0c2305e0523cc40a1464a18fc |
-| Latest verified CI run | [#45039870651 — success](https://github.com/WorkRCS/monitor_me/actions/runs/45039870651); final audit hardening and PostgreSQL restart checks await their own CI run |
+| Latest main commit | af3bab3ec5f273bbbf3006d4efa122db7cccdb5c |
+| Latest verified CI run | [#45043161542 — success](https://github.com/WorkRCS/monitor_me/actions/runs/45043161542); all four jobs passed, including PostgreSQL outage/recovery canary |
 | Next action | Implement the authenticated Next.js login/session flow and server inventory page using the verified auth and server APIs; include logout, empty/loading/error states, and the Add Server one-time enrollment-token flow. |
 
 ## Phase 1–3 Audit
 
-The latest completed full four-job baseline is [GitHub Actions run #45039870651 — success](https://github.com/WorkRCS/monitor_me/actions/runs/45039870651). The audit found and documented several individual product requirements that remain In Progress or Planned even though the Phase 1–3 exit gates are complete. A separate report is maintained at docs/PHASE_1_TO_3_AUDIT.md. The final hardening run adds strict canonical batch IDs and a PostgreSQL outage/recovery canary.
+The final Phase 1–3 audit passed all four jobs in [GitHub Actions run #45043161542 — success](https://github.com/WorkRCS/monitor_me/actions/runs/45043161542). This run includes strict lowercase batch-ID validation, telemetry integration, and a PostgreSQL outage/recovery canary. The audit also identified individual product requirements that remain In Progress or Planned; see docs/PHASE_1_TO_3_AUDIT.md.
 
 ### Explicit unfinished product requirements
 
@@ -109,7 +109,7 @@ At the moment Phase 2 was closed, the frontend was a foundation shell and the na
 
 **Status: Completed — Phase 3 acceptance gate verified. The overall P0 MVP remains incomplete until Phase 4 dashboard workflows are delivered.**
 
-**Verification evidence:** [GitHub Actions run #45039870651 — success](https://github.com/WorkRCS/monitor_me/actions/runs/45039870651). All four CI jobs passed on the audited baseline. The current audit adds canonical batch-ID validation and PostgreSQL service restart durability checks; their CI run must pass before this audit closeout is final.
+**Verification evidence:** [GitHub Actions run #45043161542 — success](https://github.com/WorkRCS/monitor_me/actions/runs/45043161542). All four jobs passed: Go backend, native Linux agent, Next.js frontend, and Docker Compose integration. The Compose job verified migrations, authenticated TLS enrollment, telemetry/history/retention, Redis outage/recovery, and PostgreSQL canary durability across service restart.
 
 ### Delivered implementation
 
@@ -193,4 +193,4 @@ Do not start charts, alerts, project switching or remote actions until the authe
 
 ## Session History
 
-Phase 1 and Phase 2 implementation/verification history is recorded above. Phase 3's baseline completion gate passed all four jobs in [GitHub Actions run #45039870651](https://github.com/WorkRCS/monitor_me/actions/runs/45039870651). The audit hardening follow-up is tracked by the latest CI run linked in the Current Snapshot.
+Phase 1 and Phase 2 implementation/verification history is recorded above. The final Phase 1–3 audit passed all four jobs in [GitHub Actions run #45043161542](https://github.com/WorkRCS/monitor_me/actions/runs/45043161542).
