@@ -149,3 +149,27 @@ Linux may expose detailed counters through `/proc`, `/sys`, cgroups, and optiona
 ## 13. Versioning
 
 Metric names, units, labels, and calculation semantics form a compatibility contract. Breaking changes require a documented schema/metric version change, migration plan, and dashboard compatibility review.
+
+
+## 12. Initial Linux Agent Source Semantics
+
+The first implemented Linux collector reads `/proc/stat`, `/proc/meminfo`, `/proc/diskstats`, `/proc/net/dev`, `/proc/uptime`, per-process `statm`/`comm`/`cgroup`, and `/proc/net/tcp`/`tcp6`. Its initial contract includes:
+
+| Metric | Unit | Initial calculation/source | Availability note |
+| --- | --- | --- | --- |
+| `host.cpu.utilization` | percent | Aggregate CPU busy delta / total delta | Omitted on first sample or counter reset |
+| `host.cpu.core.utilization` | percent | Per-logical-core CPU busy delta / total delta | One labelled sample per visible logical core |
+| `host.cpu.user`, `host.cpu.system`, `host.cpu.iowait` | percent | Corresponding aggregate CPU counter deltas | Linux procfs semantics |
+| `host.memory.total`, `host.memory.available`, `host.memory.used` | bytes | `MemTotal`, `MemAvailable`, and their documented difference | Available falls back to free+buffers+cached only when the kernel lacks `MemAvailable` |
+| `host.memory.cache` | bytes | `Cached + SReclaimable + Buffers - Shmem`, clamped at zero | Estimate rather than unique reclaimable memory |
+| `host.memory.swap.total`, `host.memory.swap.used` | bytes | `SwapTotal` and `SwapTotal - SwapFree` | Linux procfs semantics |
+| `host.disk.read.bytes_per_second`, `host.disk.write.bytes_per_second` | bytes/second | Sector counter delta × 512 / elapsed seconds | Linux diskstats sector accounting unit is 512 bytes |
+| `host.disk.read.operations_per_second`, `host.disk.write.operations_per_second` | operations/second | Read/write operation counter delta / elapsed seconds | Missing on first sample or counter reset |
+| `host.network.receive.bytes_per_second`, `host.network.transmit.bytes_per_second` | bytes/second | RX/TX byte counter delta / elapsed seconds | Labelled by interface |
+| `host.network.receive.packets_per_second`, `host.network.transmit.packets_per_second` | packets/second | RX/TX packet counter delta / elapsed seconds | Labelled by interface |
+| `host.network.receive.errors_per_second`, `host.network.transmit.errors_per_second` | errors/second | RX/TX error counter delta / elapsed seconds | Labelled by interface |
+| `host.network.tcp.connections` | connections | Current `/proc/net/tcp`/`tcp6` rows grouped by state and family | Snapshot count, not a traffic rate |
+| `host.network.tcp.listening_port` | sockets | TCP rows in LISTEN state grouped by port and family | Snapshot inventory, not HTTP request visibility |
+| `process.memory.rss` | bytes | Resident pages × OS page size | Up to 128 readable processes; not unique system memory |
+
+Process cgroup labels include `cgroup_path`, `workload_type`, `workload_selector`, and `attribution_method` when visible. A server/project mapping is required before a process sample receives a `project_id`; unmapped selectors remain `unclassified`, while aggregate host metrics remain `host_total`. The collector does not currently claim per-process CPU, filesystem capacity, application request latency, or eBPF metrics.

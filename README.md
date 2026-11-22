@@ -4,7 +4,7 @@
 
 The product is being built around its own native host agent, telemetry ingestion pipeline, metric model, project attribution, alert engine, and operator dashboard. It is intended for infrastructure engineers, platform teams, and organizations that need clear visibility into servers, workloads, and applications.
 
-> **Current status:** Phases 1 and 2 are complete. Phase 2 delivers the Go/Next.js platform foundation, PostgreSQL/Redis integration, owner authentication, organization-scoped authorization, and TLS-protected gRPC agent enrollment/heartbeat. The full Go, frontend, and Docker Compose integration pipeline passed in [GitHub Actions run #45030320358](https://github.com/WorkRCS/monitor_me/actions/runs/45030320358). Phase 3 — Monitoring Agent and Telemetry Data Engine is next; no native collector or telemetry ingestion is claimed yet.
+> **Current status:** Phases 1 and 2 are complete. Phase 3 — Monitoring Agent and Telemetry Data Engine is in progress on `main`. The current implementation includes a native Linux Go agent, procfs host/process/TCP collectors, a durable bounded local WAL, TLS gRPC enrollment/heartbeat/batch delivery, PostgreSQL idempotent telemetry storage, bounded historical queries, retention cleanup, organization-scoped WebSocket notifications, and cgroup/Systemd/container workload labels. Phase 3 is not marked complete until the full Compose integration and benchmark CI gates pass.
 
 ---
 
@@ -52,12 +52,30 @@ The long-term objective is an enterprise-oriented product with a straightforward
 | Frontend implementation | **Foundation verified** | Next.js shell passes ESLint, TypeScript, and production build; product authentication and monitoring screens remain later-phase work |
 | Local platform stack | **Runtime verified** | PostgreSQL, Redis, migration runner, API, and web services start through Docker Compose |
 | Database and cache integration | **Runtime verified** | PostgreSQL remains durable; Redis dependency outage and recovery behavior are tested |
-| Agent protocol runtime | **Phase 2 verified** | Generated Protobuf contract, TLS gRPC, single-use enrollment, heartbeat, reconnect, and revocation pass integration tests |
-| Native host agent | **Planned** | Workspace boundary is defined; executable, collectors, and persistent spool begin in Phase 3 |
+| Agent protocol and ingestion | **Phase 3 in progress** | TLS enrollment, persisted agent session, heartbeat, reconnect/backoff, streaming batches, post-commit ACK, and idempotent PostgreSQL persistence are implemented; end-to-end verification is pending |
+| Native Linux host agent | **Phase 3 in progress** | Native Go process, procfs metrics, TCP inventory, cgroup workload selectors, secure session state, and durable spool are implemented; current CI verification is pending |
+| Telemetry history and live transport | **Phase 3 in progress** | Bounded PostgreSQL range query, 30-day raw retention, 90-day idempotency retention, single-use WebSocket tickets, and bounded live subscriber queues are implemented; CI verification is pending |
+| Project/workload attribution | **Partial** | Linux cgroup selectors, Systemd/container identification, and explicit mapping/unclassified/shared labels are implemented; full Docker runtime discovery and project dashboards remain |
 | Monitoring dashboard | Not started | Planned for Phase 4 |
 | Production release | Not started | Planned for Phase 5 |
 
 **Status vocabulary:** Completed means implemented and verified for the documented environment. Specified means requirements are documented but implementation is not complete. Planned means work has not started. A design document or mock screen does not count as a working feature.
+
+## Current Phase 3 Implementation
+
+The current Linux-first implementation provides a real telemetry path rather than a collector mock:
+
+- **Native Linux agent:** aggregate and per-core CPU, memory available/used/cache/swap, disk byte and operation rates, network byte/packet/error rates, host/agent uptime, process count, top-128 readable process RSS, TCP state counts, and listening-port metadata.
+- **Correct rate semantics:** counter deltas use actual monotonic elapsed time. Initial samples have no fabricated rate; resets and invalid intervals produce missing values rather than negative rates.
+- **Workload metadata:** process RSS samples include cgroup path and workload selector. Systemd units and container cgroup IDs are identified when present. Unmapped and shared resource labels remain explicit.
+- **Agent durability:** append-only JSONL local WAL, fsync per batch, 0600 file/0700 directory, configurable disk quota, restart recovery for a truncated trailing record, and atomic compaction after accepted acknowledgements.
+- **Secure delivery:** TLS gRPC enrollment with a short-lived one-use server token; session secret is persisted locally with private permissions. The agent reports heartbeats, retries with bounded backoff, and removes a revoked local session when re-enrollment credentials are available.
+- **Durable ingestion:** the backend validates authenticated batches, limits message/sample/label sizes, stores batch hashes and telemetry samples in PostgreSQL in one transaction, and sends ACK only after commit. Same-payload retries are idempotent; changed content under the same batch ID is rejected.
+- **Historical query:** authenticated server-scoped range queries aggregate with PostgreSQL `date_bin`. The query enforces a 100ms minimum step, a 30-day raw range, a 5,000-point maximum and rejects a bucket grid that would be silently truncated.
+- **Live delivery:** post-commit latest-value events publish to organization-specific Redis Pub/Sub channels. Browsers exchange their bearer session for a 30-second, single-use ticket; only the ticket hash is stored. WebSocket output queues are bounded to 32 events; slow clients are disconnected and should reconnect and fetch history to catch up.
+- **Retention:** default raw samples are kept for 30 days; batch idempotency records for 90 days; expired live tickets are removed in bounded cleanup batches. Redis is notification/cache infrastructure, never the durable telemetry store.
+
+The first Linux implementation does **not** yet claim Windows/macOS collection, per-process CPU, eBPF, complete Docker Engine metadata, HTTP request latency/error instrumentation, downsampled materialized rollups, or a dashboard UI. Those items remain in later delivery phases. A monitored Linux host does not need Docker installed.
 
 ## What the Product Will Provide
 
@@ -126,7 +144,38 @@ docker compose up --build -d
 docker compose ps
 ```
 
-The API exposes `/health/live` and `/health/ready`. Liveness reports process health independently; readiness checks PostgreSQL and Redis and returns HTTP 503 when either dependency is unavailable. Docker Compose runs a one-shot migration service before the API starts. The frontend is a foundation preview and does not display live monitoring data.
+The API exposes `/health/live` and `/health/ready`. Liveness reports process health independently; readiness checks PostgreSQL and Redis and returns HTTP 503 when either dependency is unavailable. Docker Compose runs a one-shot migration service before the API starts. The frontend remains a foundation preview and does not yet render the telemetry stream.
+
+Build the native agent and its tests:
+
+```sh
+cd agent
+go mod tidy
+go test -race ./...
+go vet ./...
+go build -trimpath ./cmd/monitor-agent
+```
+
+To run a Linux agent against a local control plane, create a server through the authenticated API, copy its one-time enrollment token, then start the agent with the local development CA:
+
+```sh
+MONITOR_GRPC_ADDRESS=localhost:8443 \
+MONITOR_TLS_CA_FILE=../.data/certs/server.crt \
+MONITOR_ENROLLMENT_TOKEN="$ENROLLMENT_TOKEN" \
+MONITOR_SPOOL_DIR=./.monitor-me/spool \
+MONITOR_AGENT_STATE_FILE=./.monitor-me/agent-state.json \
+./monitor-agent
+```
+
+The enrollment token is single-use and should not be committed to shell history or source control. The agent stores the returned session in a private local state file; after the initial enrollment, a restart can reuse that session without the enrollment token while it remains valid.
+
+Authenticated history endpoint:
+
+```text
+GET /v1/servers/{serverID}/metrics?metric=host.cpu.utilization&from=2026-11-22T10:00:00Z&to=2026-11-22T10:05:00Z&step=1s&limit=300
+```
+
+Browser live connections first call `POST /v1/live/ticket` with the bearer session, then connect to `GET /v1/live/ws?ticket={single-use-ticket}`. The ticket is valid for 30 seconds and cannot be reused.
 
 ## Architecture at a Glance
 
@@ -167,7 +216,7 @@ The API exposes `/health/live` and `/health/ready`. Liveness reports process hea
        - Alerts, events, and operations
 ```
 
-The Phase 2 control plane currently implements owner bootstrap, bearer authentication, organization-scoped server inventory, enrollment-token lifecycle, and TLS-protected gRPC enrollment/heartbeat. Telemetry ingestion, collectors, WebSocket fan-out, dashboards, and operational workflows remain in their later phases. The diagram shows the intended end-state data flow, not a claim that every component is already implemented.
+The control plane implements owner bootstrap, bearer authentication, organization-scoped server inventory, enrollment-token lifecycle, and TLS-protected gRPC enrollment/heartbeat. Phase 3 now provides a native Linux collector, durable spool, authenticated idempotent PostgreSQL ingestion, range queries, retention, and authorized WebSocket delivery. Dashboards and operator workflows remain in Phase 4. The diagram shows the intended end-state data flow, not a claim that every component is already implemented.
 
 ## Docker and Deployment Model
 
@@ -208,7 +257,7 @@ The initial collection target is configurable in the 100ms–500ms range where h
 | --- | --- | --- | --- |
 | 1 | Product Specification and Technical Blueprint | **Completed** | Requirements, metric catalog, acceptance matrix, and architecture baseline |
 | 2 | Platform Foundation and Secure Connectivity | **Completed** | Go/Next.js foundation, PostgreSQL/Redis, migrations, owner authentication, organization authorization, TLS gRPC enrollment, heartbeat, reconnect, and revocation pass CI |
-| 3 | Monitoring Agent and Telemetry Data Engine | Not started | Native Linux agent, core host metrics, durable spool, ingestion, historical storage, live distribution, and workload attribution |
+| 3 | Monitoring Agent and Telemetry Data Engine | **In progress** | Native Linux collector, durable spool, TLS delivery, PostgreSQL history, range queries, retention, live events, and initial workload attribution; full acceptance CI gate is pending |
 | 4 | Dashboard and Operational Features | Not started | Server/project dashboards, custom charts, application visibility, alerts, notifications, one-click installation workflow, and secure remote actions |
 | 5 | Cross-Platform Production and Scale | Not started | Windows/macOS agents, signed lifecycle tooling, security hardening, benchmarks, production operations, and final as-built design |
 

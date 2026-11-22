@@ -1,13 +1,13 @@
 # Local Development
 
-This guide describes the Phase 2 local development environment. It is intended for local development only, not as a production hardening guide.
+This guide describes the current Phase 2 control plane and Phase 3 Linux telemetry implementation. It is for local development, not production deployment.
 
 ## Toolchain Baseline
 
 | Tool | Baseline |
 | --- | --- |
 | Go | 1.27.4 |
-| Node.js | 26.13.0 LTS |
+| Node.js | 26.13.0 |
 | Next.js | 16.4.6 |
 | React | 19.3.1 |
 | Tailwind CSS | 4.3.5 |
@@ -15,39 +15,27 @@ This guide describes the Phase 2 local development environment. It is intended f
 | Redis container | 8.10.3 |
 | Docker Compose | Compose v2 |
 
-Runtime versions are pinned in the project files. Review compatibility and security updates before changing them.
+## Prerequisites and setup
 
-## Prerequisites
-
-- Git
 - Go 1.27.4
 - Node.js 26.13.0 and npm
-- Docker Engine or Docker Desktop with Docker Compose v2
-- A terminal with Make (optional; equivalent commands are shown below)
-
-## Configure Local Environment
+- Docker Engine or Docker Desktop with Compose v2
+- Protocol Buffers compiler (`protoc`) for local generation
+- OpenSSL for a local development certificate
 
 From the repository root:
 
-\`\`\`sh
+```sh
 cp .env.example .env
-\`\`\`
-
-Change \`POSTGRES_PASSWORD\` and \`REDIS_PASSWORD\` in \`.env\` before starting the stack. The sample values are for isolated local development only and must never be reused in shared or production environments.
-
-Database URLs must be valid PostgreSQL URLs. If a password contains reserved URL characters, percent-encode it before including it in \`DATABASE_URL\`.
-
-## Start the Control Plane
-
-\`\`\`sh
+# Replace local-only PostgreSQL and Redis passwords before exposing services.
+make certs
 docker compose up --build -d
 docker compose ps --all
-docker compose logs -f --tail=100
-\`\`\`
+```
 
-Compose starts PostgreSQL and Redis, runs the one-shot migration service, and starts the API only after the migration service exits successfully. The API checks PostgreSQL and Redis during startup.
+Compose starts PostgreSQL and Redis, runs all embedded SQL migrations in the one-shot migration container, then starts the API and Next.js shell.
 
-The local endpoints are bound to loopback by default:
+## Local endpoints
 
 - Web application: http://localhost:3000
 - API liveness: http://localhost:8080/health/live
@@ -56,13 +44,11 @@ The local endpoints are bound to loopback by default:
 - PostgreSQL: localhost:5432
 - Redis: localhost:6379
 
-PostgreSQL and Redis ports are exposed only on loopback for local tooling. Do not expose these ports publicly.
+The API readiness endpoint requires PostgreSQL and Redis. Liveness is independent of these dependencies. The frontend is still a foundation shell and does not yet render monitoring dashboards.
 
-\`/health/live\` reports whether the API process can answer requests. \`/health/ready\` checks PostgreSQL and Redis and returns HTTP 503 when either dependency is unavailable. It reports only dependency state and never returns connection strings or driver errors.
+## First owner and server enrollment
 
-## First-Time Owner and Server Enrollment
-
-The first user account is bootstrapped once per database. Register the owner with the API, then log in to receive a 24-hour opaque bearer token:
+The initial owner is created once per database. Register and log in using the API:
 
 ```sh
 curl -sS http://localhost:8080/v1/auth/register \
@@ -74,7 +60,7 @@ curl -sS http://localhost:8080/v1/auth/login \
   -d '{"email":"owner@example.com","password":"replace-with-a-long-password"}'
 ```
 
-Use the returned `access_token` as a `Bearer` token. Create a server and receive a one-time enrollment token:
+Create a server with the returned bearer token:
 
 ```sh
 curl -sS http://localhost:8080/v1/servers \
@@ -83,69 +69,123 @@ curl -sS http://localhost:8080/v1/servers \
   -d '{"name":"production-node-01","hostname":"production-node-01"}'
 ```
 
-Enrollment tokens expire after 15 minutes and can be used once. If installation is delayed, request a replacement with `POST /v1/servers/{serverID}/enrollment-token`. Owners and administrators can revoke unused enrollment tokens and revoke enrolled agents. Agent session tokens expire after 30 days and are stored as SHA-256 digests.
+The server creation response contains a scoped, single-use enrollment token with a 15-minute lifetime. Treat it as a secret and do not commit it or expose it in logs.
 
-The agent protocol is defined in `proto/monitor/v1/agent.proto`. The TLS-protected gRPC endpoint supports `Enroll` and `ReportHeartbeat`. The telemetry `Stream` remains unimplemented until Phase 3 can durably persist and acknowledge incoming telemetry.
+## Run the native Linux agent
 
-## Database Migrations
+The agent runs directly on the monitored Linux host; Docker is not required on that host.
 
-Migrations are embedded in the migration runner binary and applied by the one-shot \`migrate\` Compose service before the API starts.
+```sh
+cd agent
+go mod tidy
+go test -race ./...
+go vet ./...
+go build -trimpath ./cmd/monitor-agent
+```
 
-To run the migration service manually:
+To enroll against the local control plane, use the one-time token and the development CA:
 
-\`\`\`sh
-docker compose run --rm migrate
-\`\`\`
+```sh
+MONITOR_GRPC_ADDRESS=localhost:8443 \
+MONITOR_TLS_CA_FILE=../.data/certs/server.crt \
+MONITOR_ENROLLMENT_TOKEN="$ENROLLMENT_TOKEN" \
+MONITOR_SPOOL_DIR=./.monitor-me/spool \
+MONITOR_AGENT_STATE_FILE=./.monitor-me/agent-state.json \
+./monitor-agent
+```
 
-To inspect the migration version:
+The agent writes its session credential into a mode-0600 state file within a mode-0700 directory. On restarts it reuses the stored session and does not need the original enrollment token until that session expires or is revoked. If the agent has no valid local session, supply a fresh enrollment token.
 
-\`\`\`sh
-docker compose exec -T postgres psql -U monitor_me -d monitor_me -c "SELECT * FROM schema_migrations;"
-\`\`\`
+## Current Linux collector contract
 
-The down migration exists for disposable development databases. Do not reverse migrations in an environment containing data that must be retained.
+The initial native collector reads Linux procfs:
 
-## Run Services Without Docker
+| Area | Initial metrics or inventory |
+| --- | --- |
+| CPU | Aggregate and logical-core busy percentage; user, system, and iowait |
+| Memory | Total, available, used, cache estimate, swap total/used |
+| Disk | Read/write bytes/sec and operations/sec by device |
+| Network | Receive/transmit bytes/sec, packets/sec, errors/sec by interface |
+| Host/agent | Host uptime, agent uptime, process count, agent RSS when visible |
+| Processes | Up to 128 readable processes, per-process RSS, cgroup labels |
+| TCP | Connection state counts by address family and listening-port inventory |
+| Workloads | cgroup path, Systemd unit names, Docker/container cgroup IDs where exposed |
 
-PostgreSQL and Redis must be available locally. Set \`DATABASE_URL\`, \`REDIS_ADDR\`, and \`REDIS_PASSWORD\` before starting the API.
+CPU, disk, and network rates are calculated from counter deltas using monotonic elapsed time. The first snapshot intentionally omits rates. Counter reset and invalid intervals produce missing samples rather than negative values. No claim is made that a 100ms sample interval implies 1ms dashboard freshness.
 
-Backend:
+## Historical query and live WebSocket
 
-\`\`\`sh
+Authenticated server history:
+
+```text
+GET /v1/servers/{serverID}/metrics?metric=host.cpu.utilization&from=2026-11-22T10:00:00Z&to=2026-11-22T10:05:00Z&step=1s&limit=300
+```
+
+The query requires organization and server context from the bearer session, enforces a 100ms minimum aggregation step, a maximum 30-day raw range, and at most 5,000 output points. Range/step combinations that exceed the limit are rejected rather than silently truncated.
+
+A browser first obtains a 30-second single-use ticket:
+
+```text
+POST /v1/live/ticket
+GET  /v1/live/ws?ticket={single-use-ticket}
+```
+
+The ticket is hash-only persisted and bound to the authenticated user session and organization. A WebSocket subscription receives only the current organization channel. The server uses a bounded 32-event output queue and disconnects a slow client; reconnect using a fresh ticket and query PostgreSQL history to catch up. Redis Pub/Sub is ephemeral and never replaces the durable PostgreSQL record.
+
+## Data durability and retention
+
+- PostgreSQL is the durable source for telemetry and identity state.
+- Redis transports ephemeral organization-scoped live notifications.
+- The agent WAL is append-only JSONL, fsyncs each batch, applies a configurable disk quota, and retains batches until the backend ACKs the committed transaction.
+- An incomplete trailing WAL record is recovered at startup without deleting previously committed records.
+- Default raw metric retention is 30 days; batch idempotency tombstones are kept for 90 days; expired WebSocket tickets are cleaned in bounded batches.
+- Query aggregation is implemented with PostgreSQL `date_bin`; persistent rollup tables and background downsampling are not yet implemented.
+
+## Backend checks
+
+```sh
 cd backend
 go mod tidy
-go test ./...
-go run ./cmd/migrate
-go run ./cmd/api
-\`\`\`
+go test -race -cover ./...
+go vet ./...
+go build -trimpath ./cmd/api
+go build -trimpath ./cmd/migrate
+```
 
-Frontend, in a separate terminal:
+Generate versioned Protobuf sources for both modules:
 
-\`\`\`sh
+```sh
+make proto
+```
+
+## Benchmark commands
+
+Run the native collector and WAL benchmarks from the repository root:
+
+```sh
+cd agent
+go test -run '^$' -bench 'Benchmark(ProcCollectorCollect|CounterRate|SpoolAppend)' -benchmem -benchtime=3s ./internal/collector ./internal/spool
+```
+
+The Compose CI job also runs a TLS gRPC-to-PostgreSQL ingestion benchmark with 64 samples per batch. Benchmark results are environment-specific and must be reported with the runner/host information; they are not universal capacity guarantees.
+
+## Frontend checks
+
+```sh
 cd web
 npm install
-npm run dev
-\`\`\`
+npm run lint
+npm run typecheck
+npm run build
+```
 
-## Quality Checks
+## Current limitations
 
-From the repository root:
-
-\`\`\`sh
-make test
-make vet
-make web-lint
-make web-typecheck
-make web-build
-\`\`\`
-
-The CI workflow runs backend, frontend, and Compose integration checks. A green CI run is required before the corresponding foundation slice is marked verified.
-
-## Current Limitations
-
-- The API implements first-owner bootstrap, bearer login/logout, session validation, organization-scoped server inventory, role checks, server provisioning, enrollment-token issuance/reissue/revocation, and agent revocation.
-- Agent communication is TLS gRPC with bounded messages/streams, one-time enrollment, heartbeat, capability reporting, reconnect, and session rotation. Telemetry streaming is intentionally deferred until Phase 3 durable ingestion is available.
-- PostgreSQL is the durable identity store. Redis is used only for ephemeral availability/coordination; CI verifies that PostgreSQL state survives a Redis outage and that API readiness recovers.
-- The frontend remains a foundation shell. It does not display real telemetry and does not yet implement product authentication, project switching, dashboards, or alert workflows.
-- The native Go agent directory is an architectural boundary only. The executable, collectors, local credential store, and spool are Phase 3 implementation work.
-- The current Compose stack is a local development environment, not a production deployment topology. Production requires managed TLS certificates, HTTPS ingress, secrets management, backup/restore, and deployment hardening.
+- The native collector is Linux-only. Windows and macOS collectors are Phase 5 work.
+- Docker container metadata is currently inferred from exposed cgroup paths; a full Docker Engine API integration is not yet implemented.
+- Process RSS is collected, but per-process CPU attribution is not yet implemented.
+- Application HTTP request rate, latency, and status metrics require application instrumentation, a supported reverse-proxy integration, or tracing; they are not inferred from open ports.
+- eBPF and kernel-level event tracing are not yet implemented.
+- Historical queries aggregate raw samples; persistent materialized downsampling/rollups remain future work.
+- The frontend is still a foundation shell. Authentication UI, server dashboards, project switching, graph rendering, alert workflows, and operational actions are Phase 4.
+- The current Compose deployment is a local development topology, not a production architecture.

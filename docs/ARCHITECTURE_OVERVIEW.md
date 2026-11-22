@@ -152,3 +152,12 @@ The following must be resolved and recorded in ADRs before or during Phase 2:
 - Docker Engine access strategy and required permissions.
 - Remote-action allowlist and execution identity.
 - Installer signing and artifact distribution strategy.
+
+
+## Phase 3 Implementation Status
+
+The Phase 3 data path now has an initial implementation: native Linux procfs agent -> TLS gRPC stream -> authenticated batch validation -> PostgreSQL transaction -> post-commit organization-scoped Redis Pub/Sub event. The agent retains each batch in a local JSONL WAL until the backend returns an acknowledgement. Redis notifications are ephemeral; historical metric values and batch idempotency hashes live in PostgreSQL.
+
+The browser live endpoint uses a 30-second single-use ticket derived from a valid user bearer session. The ticket is stored by hash and consumed once; WebSocket subscribers are isolated by organization and have a fixed-size outbound queue. Historical queries are authenticated and scoped to the user's organization and requested server. Slow clients reconnect with a fresh ticket and use the durable history endpoint to fill gaps.
+
+This implementation is Linux-first. Windows/macOS collectors, full Docker Engine discovery, process CPU metrics, app request instrumentation, persistent rollup tables, dashboard UI, and production installers are not claimed as implemented.
