@@ -213,6 +213,57 @@ func (c *ProcCollector) Collect(ctx context.Context) ([]Sample, error) {
 		c.previousNetwork = current
 	}
 
+	tcpStates := make(map[string]float64)
+	tcpListeners := make(map[uint16]float64)
+	for _, source := range []struct {
+		file   string
+		family string
+	}{
+		{file: "net/tcp", family: "ipv4"},
+		{file: "net/tcp6", family: "ipv6"},
+	} {
+		raw, readErr := os.ReadFile(filepath.Join(c.root, source.file))
+		if readErr != nil {
+			if source.family == "ipv4" {
+				collectionErrors = append(collectionErrors, fmt.Errorf("read procfs TCP inventory: %w", readErr))
+			}
+			continue
+		}
+		states, listeners, parseErr := parseTCPTable(string(raw), source.family)
+		if parseErr != nil {
+			collectionErrors = append(collectionErrors, parseErr)
+			continue
+		}
+		for state, count := range states {
+			key := source.family + ":" + state
+			tcpStates[key] += float64(count)
+		}
+		for port, count := range listeners {
+			key := uint16(port)
+			if source.family == "ipv6" {
+				key |= 0x8000
+			}
+			tcpListeners[key] += float64(count)
+		}
+	}
+	for key, count := range tcpStates {
+		parts := strings.SplitN(key, ":", 2)
+		add("host.network.tcp.connections", count, "connections", map[string]string{
+			"family": parts[0], "state": parts[1],
+		})
+	}
+	for key, count := range tcpListeners {
+		family := "ipv4"
+		port := key
+		if key&0x8000 != 0 {
+			family = "ipv6"
+			port = key & 0x7fff
+		}
+		add("host.network.tcp.listening_port", count, "sockets", map[string]string{
+			"family": family, "port": strconv.Itoa(int(port)),
+		})
+	}
+
 	uptimeRaw, err := os.ReadFile(filepath.Join(c.root, "uptime"))
 	if err == nil {
 		fields := strings.Fields(string(uptimeRaw))
@@ -231,9 +282,20 @@ func (c *ProcCollector) Collect(ctx context.Context) ([]Sample, error) {
 	} else {
 		add("host.process.count", float64(processes.count), "processes", nil)
 		for _, process := range processes.top {
-			add("process.memory.rss", float64(process.rss), "bytes", map[string]string{
+			labels := map[string]string{
 				"pid": strconv.Itoa(process.pid), "process": process.name,
-			})
+				"attribution_method": process.attributionMethod,
+			}
+			if process.cgroupPath != "" {
+				labels["cgroup_path"] = process.cgroupPath
+			}
+			if process.workloadType != "" {
+				labels["workload_type"] = process.workloadType
+			}
+			if process.workloadSelector != "" {
+				labels["workload_selector"] = process.workloadSelector
+			}
+			add("process.memory.rss", float64(process.rss), "bytes", labels)
 			if process.pid == os.Getpid() {
 				add("agent.memory.rss", float64(process.rss), "bytes", nil)
 			}
@@ -432,6 +494,19 @@ func readProcesses(procRoot string) (processSnapshot, error) {
 	sort.Slice(snapshot.top, func(i, j int) bool { return snapshot.top[i].rss > snapshot.top[j].rss })
 	if len(snapshot.top) > 128 {
 		snapshot.top = snapshot.top[:128]
+	}
+	for index := range snapshot.top {
+		process := &snapshot.top[index]
+		raw, readErr := os.ReadFile(filepath.Join(procRoot, strconv.Itoa(process.pid), "cgroup"))
+		if readErr != nil {
+			process.attributionMethod = "unclassified"
+			continue
+		}
+		workload := parseWorkloadCgroup(string(raw))
+		process.cgroupPath = workload.CgroupPath
+		process.workloadType = workload.WorkloadType
+		process.workloadSelector = workload.WorkloadSelector
+		process.attributionMethod = workload.AttributionMethod
 	}
 	return snapshot, nil
 }

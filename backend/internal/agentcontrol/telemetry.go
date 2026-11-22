@@ -179,6 +179,7 @@ func (s *Service) persistTelemetryBatch(ctx context.Context, agentID, sessionTok
 			mapping.project_id,
 			CASE
 				WHEN sample.labels->>'attribution_method' = 'shared' THEN 'shared'
+				WHEN sample.labels->>'attribution_method' = 'unclassified' THEN 'unclassified'
 				WHEN sample.labels ? 'workload_selector' THEN COALESCE(mapping.attribution_method, 'unclassified')
 				ELSE 'host_total'
 			END

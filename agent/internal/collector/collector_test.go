@@ -96,3 +96,33 @@ func TestProcCollectorCollectsFixture(t *testing.T) {
 		t.Fatal("expected the documented memory-used gauge")
 	}
 }
+
+func TestParseWorkloadCgroupIdentifiesSystemdAndContainers(t *testing.T) {
+	systemd := parseWorkloadCgroup("0::/system.slice/sshd.service\n")
+	if systemd.WorkloadType != "systemd" || systemd.WorkloadSelector != "/system.slice/sshd.service" ||
+		systemd.AttributionMethod != "systemd" {
+		t.Fatalf("unexpected systemd attribution: %+v", systemd)
+	}
+	container := parseWorkloadCgroup("0::/system.slice/docker-abcdef012345.scope\n")
+	if container.WorkloadType != "container" || container.WorkloadSelector != "abcdef012345" ||
+		container.AttributionMethod != "container" {
+		t.Fatalf("unexpected container attribution: %+v", container)
+	}
+	unknown := parseWorkloadCgroup("0::/user.slice/user-1000.slice/session-3.scope\n")
+	if unknown.AttributionMethod != "cgroup" || unknown.WorkloadType != "process_tree" {
+		t.Fatalf("unknown cgroup must remain explicit: %+v", unknown)
+	}
+}
+
+func TestParseTCPTableCountsStatesAndListeningPorts(t *testing.T) {
+	raw := "  sl  local_address rem_address   st\n" +
+		"   0: 0100007F:1F90 00000000:0000 0A 00000000:00000000 00:00000000 00000000 1000 0 12345\n" +
+		"   1: 0100007F:1F91 00000000:0000 01 00000000:00000000 00:00000000 00000000 1000 0 12346\n"
+	counts, listeners, err := parseTCPTable(raw, "ipv4")
+	if err != nil {
+		t.Fatalf("parseTCPTable() error = %v", err)
+	}
+	if counts["LISTEN"] != 1 || counts["ESTABLISHED"] != 1 || listeners[8080] != 1 {
+		t.Fatalf("unexpected TCP inventory: states=%v listeners=%v", counts, listeners)
+	}
+}
