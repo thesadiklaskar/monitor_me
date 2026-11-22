@@ -112,12 +112,12 @@ A feature can be implemented before its phase is complete, but its status must r
 3. Counter-derived rates using monotonic elapsed time, with missing values on first samples, resets, and invalid counter intervals.
 4. Bounded append-only agent JSONL WAL with fsync, disk quota, private permissions, trailing-record recovery, and atomic compaction after accepted ACKs.
 5. TLS gRPC enrollment, persisted agent sessions, heartbeat, reconnect/backoff, and streaming batch delivery.
-6. Authenticated ingestion with 1 MiB transport bounds, a 4,096-sample batch ceiling, payload validation, idempotency hashes, sequential ACK/backpressure, and oversized-batch rejection.
+6. Authenticated ingestion with 1 MiB transport bounds, a 4,096-sample batch ceiling, 128 concurrent gRPC streams, a 16-batch agent delivery window, sequential durable ACKs, payload validation, idempotency hashes, and oversized-batch rejection. A separate in-memory ingestion worker queue is not used; sustained concurrent overload/capacity limits remain Phase 5 work.
 7. Atomic PostgreSQL batch/sample persistence; ACKs are sent only after commit. Redis remains an ephemeral post-commit notification path.
 8. Authenticated, organization/server-scoped historical range query using epoch-aligned PostgreSQL `date_bin` aggregation, a 100ms minimum step, 30-day raw range, and a 5,000-point cap.
 9. Bounded retention: raw metric samples for 30 days, batch idempotency records for 90 days, and expired live tickets removed in bounded batches.
 10. Session-bound, 30-second single-use WebSocket tickets, organization-scoped channels, 32-event subscriber queues, 128-point event caps, slow-client disconnect, reconnect, and history catch-up.
-11. Linux cgroup/Systemd/container selector recognition and explicit server/project workload mappings. Host-total, unclassified, and shared resources remain separately represented.
+11. Linux cgroup/Systemd/container selector recognition and database-backed server/project workload mappings. Host-total, unclassified, and shared resources remain separately represented. User-facing mapping administration remains unfinished.
 12. TCP connection-state/listening-port metadata and documented limits: port discovery does not infer application HTTP request latency or error rates.
 13. On-query aggregation and reproducible collector, WAL, live-event, and TLS gRPC/PostgreSQL benchmarks. Persistent rollup tables and partitioning remain future scale optimizations.
 
@@ -134,7 +134,7 @@ A feature can be implemented before its phase is complete, but its status must r
 - [x] Collection, WAL, event preparation, and TLS gRPC/PostgreSQL ingestion are benchmarked in CI.
 - [x] README, metric catalog, development guide, architecture overview, acceptance matrix, roadmap, and project state match the implementation.
 
-**Verification evidence:** [GitHub Actions run #45039191041 — success](https://github.com/WorkRCS/monitor_me/actions/runs/45039191041). All four jobs passed: Go backend, native Linux agent, Next.js frontend, and Docker Compose integration. The Compose job applied migrations, exercised authenticated TLS enrollment and telemetry ingestion, verified idempotency/history/tenant isolation/live reconnect/workload attribution/retention, ran the 64-sample TLS gRPC-to-PostgreSQL benchmark, and tested Redis outage/recovery with PostgreSQL durability.
+**Verification evidence:** [GitHub Actions run #45039870651 — success](https://github.com/WorkRCS/monitor_me/actions/runs/45039870651) verified all four jobs on the audited main commit. The current audit adds strict lowercase batch-ID validation and PostgreSQL outage/recovery tests; those changes are being re-run by CI before the audit is closed.
 
 ## Phase 4 — Dashboard and Operational Features
 
