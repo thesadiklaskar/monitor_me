@@ -143,9 +143,9 @@ The CI workflow runs backend, frontend, and Compose integration checks. A green 
 
 ## Current Limitations
 
-- The API implements first-owner bootstrap, bearer login/logout, session validation, organization-scoped server inventory, and enrollment-token issuance/revocation.
-- PostgreSQL stores durable identity and agent state. Redis is connected for startup/readiness but is not yet used for durable application data.
-- The initial migration creates identity and inventory foundations; metric tables and time-series retention are planned for Phase 3.
-- The frontend is a static foundation preview. It does not display real telemetry and does not yet implement authentication or enrollment.
-- TLS gRPC enrollment and heartbeat are implemented. Telemetry streaming is explicitly deferred to Phase 3 until durable ingestion and acknowledgement are available.
-- The current Compose stack is a local development environment, not a production deployment topology.
+- The API implements first-owner bootstrap, bearer login/logout, session validation, organization-scoped server inventory, role checks, server provisioning, enrollment-token issuance/reissue/revocation, and agent revocation.
+- Agent communication is TLS gRPC with bounded messages/streams, one-time enrollment, heartbeat, capability reporting, reconnect, and session rotation. Telemetry streaming is intentionally deferred until Phase 3 durable ingestion is available.
+- PostgreSQL is the durable identity store. Redis is used only for ephemeral availability/coordination; CI verifies that PostgreSQL state survives a Redis outage and that API readiness recovers.
+- The frontend remains a foundation shell. It does not display real telemetry and does not yet implement product authentication, project switching, dashboards, or alert workflows.
+- The native Go agent directory is an architectural boundary only. The executable, collectors, local credential store, and spool are Phase 3 implementation work.
+- The current Compose stack is a local development environment, not a production deployment topology. Production requires managed TLS certificates, HTTPS ingress, secrets management, backup/restore, and deployment hardening.
