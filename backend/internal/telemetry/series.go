@@ -56,6 +56,12 @@ func ValidateRangeQuery(query RangeQuery, now time.Time) error {
 	if requiredPoints > time.Duration(query.Limit) {
 		return errors.New("series range and step would exceed the requested point limit")
 	}
+	// Reject oversized bucket grids instead of scanning a long range and silently
+	// truncating the response at LIMIT.
+	requiredPoints := (query.To.Sub(query.From) + query.Step - 1) / query.Step
+	if requiredPoints > time.Duration(query.Limit) {
+		return errors.New("series range and step would exceed the requested point limit")
+	}
 	return nil
 }
 

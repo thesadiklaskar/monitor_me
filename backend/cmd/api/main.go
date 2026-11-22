@@ -19,6 +19,7 @@ import (
 	"github.com/WorkRCS/monitor_me/backend/internal/httpapi"
 	"github.com/WorkRCS/monitor_me/backend/internal/identity"
 	"github.com/WorkRCS/monitor_me/backend/internal/storage/postgres"
+	"github.com/WorkRCS/monitor_me/backend/internal/telemetry"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 )
@@ -110,6 +111,7 @@ func run(logger *slog.Logger) error {
 
 	shutdownSignals, stopSignals := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stopSignals()
+	go telemetry.RunRetention(shutdownSignals, database, telemetry.DefaultRetentionPolicy(), logger)
 
 	serverErrors := make(chan error, 2)
 	go func() {

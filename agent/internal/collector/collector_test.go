@@ -84,6 +84,12 @@ func TestProcCollectorCollectsFixture(t *testing.T) {
 	write("123/statm", "100 10 0 0 0 0 0\n")
 	write("123/comm", "fixture-worker\n")
 	write("123/cgroup", "0::/system.slice/example.service\n")
+	write("net/tcp", "  sl  local_address rem_address   st\n"+
+		"   0: 0100007F:1F90 00000000:0000 0A 00000000:00000000 00:00000000 00000000 1000 0 12345\n")
+	write("net/tcp6", "  sl  local_address                         remote_address                        st\n")
+	write("123/statm", "100 10 0 0 0 0 0\n")
+	write("123/comm", "fixture-worker\n")
+	write("123/cgroup", "0::/system.slice/example.service\n")
 	collector := NewProcCollector(root)
 	samples, err := collector.Collect(t.Context())
 	if err != nil {

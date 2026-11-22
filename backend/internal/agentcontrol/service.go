@@ -14,7 +14,6 @@ import (
 	"time"
 
 	monitorv1 "github.com/WorkRCS/monitor_me/backend/gen/monitor/v1"
-	"github.com/WorkRCS/monitor_me/backend/internal/telemetry"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
