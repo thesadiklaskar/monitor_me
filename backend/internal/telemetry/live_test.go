@@ -25,10 +25,10 @@ func TestPublishCommittedBatchBoundsAndScopesLivePayload(t *testing.T) {
 	samples := make([]LiveSample, 0, 200)
 	for index := 0; index < 200; index++ {
 		samples = append(samples, LiveSample{
-			MetricName: "process.memory.rss",
-			Value: float64(index),
-			Unit: "bytes",
-			Labels: map[string]string{"pid": "123", "process": "worker"},
+			MetricName:          "process.memory.rss",
+			Value:               float64(index),
+			Unit:                "bytes",
+			Labels:              map[string]string{"pid": "123", "process": "worker"},
 			ObservedAtUnixNanos: time.Now().UnixNano(),
 		})
 	}
@@ -57,10 +57,10 @@ func BenchmarkPublishCommittedBatch(b *testing.B) {
 	samples := make([]LiveSample, 0, 96)
 	for index := 0; index < 96; index++ {
 		samples = append(samples, LiveSample{
-			MetricName: "host.cpu.core.utilization",
-			Value: float64(index),
-			Unit: "percent",
-			Labels: map[string]string{"cpu": "cpu" + strconv.Itoa(index)},
+			MetricName:          "host.cpu.core.utilization",
+			Value:               float64(index),
+			Unit:                "percent",
+			Labels:              map[string]string{"cpu": "cpu" + strconv.Itoa(index)},
 			ObservedAtUnixNanos: time.Now().UnixNano(),
 		})
 	}

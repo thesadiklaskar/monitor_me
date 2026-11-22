@@ -7,9 +7,9 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/gorilla/websocket"
 	"github.com/WorkRCS/monitor_me/backend/internal/identity"
 	"github.com/WorkRCS/monitor_me/backend/internal/telemetry"
+	"github.com/gorilla/websocket"
 )
 
 var errSlowLiveClient = errors.New("live client exceeded its bounded output buffer")
@@ -40,7 +40,7 @@ func (api *API) createLiveTicket(writer http.ResponseWriter, request *http.Reque
 		"ticket":             ticket.Token,
 		"expires_at":         ticket.ExpiresAt,
 		"expires_in_seconds": 30,
-		"single_use": true,
+		"single_use":         true,
 	})
 }
 

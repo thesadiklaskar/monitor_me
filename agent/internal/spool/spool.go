@@ -189,7 +189,6 @@ func (s *Store) Ack(batchIDs []string) error {
 	return nil
 }
 
-
 func (s *Store) recoverTrailingRecord() error {
 	data, err := os.ReadFile(s.path)
 	if err != nil {

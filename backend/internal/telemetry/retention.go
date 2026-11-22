@@ -15,8 +15,8 @@ type RetentionPolicy struct {
 }
 
 type RetentionResult struct {
-	SamplesDeleted int64
-	BatchesDeleted int64
+	SamplesDeleted     int64
+	BatchesDeleted     int64
 	LiveTicketsDeleted int64
 }
 
@@ -124,8 +124,8 @@ func PruneBatch(ctx context.Context, db *sql.DB, now time.Time, policy Retention
 		return RetentionResult{}, fmt.Errorf("commit telemetry retention transaction: %w", err)
 	}
 	return RetentionResult{
-		SamplesDeleted: samplesDeleted,
-		BatchesDeleted: batchesDeleted,
+		SamplesDeleted:     samplesDeleted,
+		BatchesDeleted:     batchesDeleted,
 		LiveTicketsDeleted: liveTicketsDeleted,
 	}, nil
 }

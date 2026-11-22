@@ -13,10 +13,10 @@ func BenchmarkSpoolAppend(b *testing.B) {
 		b.Fatal(err)
 	}
 	sample := collector.Sample{
-		Name: "host.cpu.utilization",
-		Value: 42.5,
-		Unit: "percent",
-		Labels: map[string]string{"cpu": "cpu0"},
+		Name:                "host.cpu.utilization",
+		Value:               42.5,
+		Unit:                "percent",
+		Labels:              map[string]string{"cpu": "cpu0"},
 		ObservedAtUnixNanos: time.Now().UnixNano(),
 	}
 	b.ReportAllocs()
