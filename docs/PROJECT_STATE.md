@@ -7,17 +7,18 @@ This file is the authoritative resume point for Monitor Me. Read it before makin
 | Field | Value |
 | --- | --- |
 | Project | Monitor Me |
-| Repository | `WorkRCS/monitor_me` |
-| Default branch | `main` |
-| Working branch | `phase-2/platform-foundation` |
+| Repository | WorkRCS/monitor_me |
+| Default branch | main |
+| Working branch | main |
+| Branch policy | All work and commits are made directly on main; do not create another branch |
 | Repository visibility | Private |
-| Completed phase | Phase 1 — Product Specification and Technical Blueprint |
-| Current phase | Phase 2 — Platform Foundation and Secure Connectivity |
-| Current phase status | In Progress |
-| Implementation status | Go/Next.js foundations, PostgreSQL/Redis startup integration, automatic migrations, and full local Compose smoke checks are CI-verified; authentication and agent enrollment remain incomplete |
-| Latest integration commit | `ab806951ed0e1cb2534d2b3a5ce1808aa3ab18ad` |
-| Latest CI run | [#45023682627 — success](https://github.com/WorkRCS/monitor_me/actions/runs/45023682627) |
-| Next action | Implement generated Protocol Buffer code and the authenticated gRPC enrollment service, then add token issuance/verification, agent identity binding, and integration tests. |
+| Completed phases | Phase 1 — Product Specification and Technical Blueprint; Phase 2 — Platform Foundation and Secure Connectivity |
+| Current phase | Phase 3 — Monitoring Agent and Telemetry Data Engine |
+| Current phase status | Not Started |
+| Implementation status | Phase 2 control-plane foundation, authentication/authorization, TLS gRPC enrollment/heartbeat, Docker Compose runtime, PostgreSQL migrations, Redis outage/recovery checks, and frontend shell are CI-verified. Native agent executable, host collectors, telemetry spool/ingestion, and live delivery are not implemented yet. |
+| Latest implementation commit | 1ad3e70d6e3a6174da2ebae6b43fdf117117f465 |
+| Latest verified CI run | [#45030320358 — success](https://github.com/WorkRCS/monitor_me/actions/runs/45030320358) |
+| Next action | Initialize the native Go agent module in agent/: add go.mod, a cmd/monitor-agent entry point, validated configuration, structured logging, graceful shutdown, and focused unit tests; wire its build/test checks into CI. |
 
 ## Completed Phase 1 — Product Specification and Technical Blueprint
 
@@ -25,93 +26,117 @@ This file is the authoritative resume point for Monitor Me. Read it before makin
 
 - [x] Product requirements and MVP boundary.
 - [x] Functional requirements with stable IDs and acceptance criteria.
-- [x] Metric catalog with units, sources, calculations, timestamps, and platform limits.
+- [x] Metric catalog with units, sources, calculations, timestamps, and platform limitations.
 - [x] Feature acceptance matrix.
-- [x] Proposed architecture and data flow.
+- [x] Architecture overview and data flow.
 - [x] Five-phase delivery roadmap.
-- [x] Professional README with continuous maintenance rules.
+- [x] Professional README and continuous maintenance rules.
 
 Key Phase 1 commits:
 
-- `5c4bf9b3684107bfb3884ebf26181013ed42ea4b` — Product requirements.
-- `4f982c881823b9cdea6250432f96cdad407af94f` — Metric catalog.
-- `5bd649196345de671d58fa3d01a3187e6f689608` — Feature acceptance matrix.
-- `6d4719e81ab032c9f35f9631275212f78aceef7d` — Architecture overview.
+- 5c4bf9b3684107bfb3884ebf26181013ed42ea4b — Product requirements.
+- 4f982c881823b9cdea6250432f96cdad407af94f — Metric catalog.
+- 5bd649196345de671d58fa3d01a3187e6f689608 — Feature acceptance matrix.
+- 6d4719e81ab032c9f35f9631275212f78aceef7d — Architecture overview.
 
-## Current Phase 2 — Platform Foundation and Secure Connectivity
+## Completed Phase 2 — Platform Foundation and Secure Connectivity
 
-**Status: In Progress**
+**Status: Completed**
 
-### Verified platform foundation
+### Delivered implementation
 
-- [x] Repository layout for backend, frontend, protocol, and deployment configuration.
-- [x] Go API bootstrap using the standard library.
-- [x] JSON structured logging, HTTP timeouts, and graceful shutdown.
-- [x] Liveness endpoint independent of backend dependency availability.
-- [x] Dependency-aware readiness endpoint with bounded checks and no secret leakage.
-- [x] Unit tests for healthy dependencies, unavailable dependency response, and method restrictions.
+- [x] Repository boundaries for backend, frontend, protocol, deployment, and native agent workspace.
+- [x] Go API with environment configuration, JSON structured logging, bounded HTTP timeouts, health/readiness endpoints, and graceful shutdown.
 - [x] Next.js, TypeScript, React, and Tailwind application shell.
-- [x] Docker Compose services for PostgreSQL, Redis, API, migration runner, and web frontend.
-- [x] PostgreSQL connection pool using pgx through `database/sql`.
+- [x] Docker Compose services for PostgreSQL, Redis, migration runner, API, and frontend.
+- [x] PostgreSQL connection pool and embedded versioned migration runner.
 - [x] Redis client with bounded pool settings and explicit timeouts.
-- [x] Embedded versioned PostgreSQL migration runner as a one-shot executable.
-- [x] Initial PostgreSQL identity/inventory schema applies successfully on a clean database.
-- [x] Versioned Protocol Buffer agent contract draft.
-- [x] Local development guide and GitHub Actions CI.
+- [x] Dependency-aware readiness; liveness remains independent of PostgreSQL/Redis availability.
+- [x] First-owner bootstrap, Argon2id password hashing, opaque bearer sessions, login/logout, and authenticated profile.
+- [x] Role-based API authorization and organization-scoped server inventory.
+- [x] Server creation, one-time enrollment-token issuance/reissue/revocation, and agent revocation.
+- [x] Generated versioned Protobuf contract and TLS-protected gRPC server.
+- [x] Hash-only agent credentials, 15-minute single-use enrollment tokens, stable agent identity, 30-day agent sessions, heartbeat, capability reporting, reconnect, and re-enrollment/session rotation.
+- [x] Bounded gRPC messages (1 MiB) and concurrent streams (128 per connection).
+- [x] Telemetry stream explicitly deferred until Phase 3 durable ingestion is implemented.
 
-### CI verification evidence
+### Verification evidence
 
-GitHub Actions run [#45023682627](https://github.com/WorkRCS/monitor_me/actions/runs/45023682627) completed successfully:
+GitHub Actions run [#45030320358](https://github.com/WorkRCS/monitor_me/actions/runs/45030320358) completed successfully:
 
-- [x] Go module resolution and verification.
-- [x] Go formatting check.
-- [x] Go unit tests with race detection and coverage.
-- [x] Go static analysis with `go vet`.
-- [x] Go API and migration-runner builds.
-- [x] Frontend dependency install, ESLint, TypeScript typecheck, and Next.js production build.
-- [x] Docker Compose configuration validation.
-- [x] Full Compose startup with PostgreSQL, Redis, migration service, API, and frontend image.
-- [x] API readiness succeeds with live PostgreSQL and Redis.
-- [x] CI verifies the migrated `organizations` table exists.
-- [x] CI verifies Redis responds with `PONG`.
-- [x] CI verifies dependency-aware readiness and cleans up the test stack.
+- [x] Go dependency resolution and verification, Protobuf generation, gofmt, race-enabled tests, go vet, and backend builds.
+- [x] Frontend dependency install, ESLint, TypeScript check, and production build.
+- [x] Docker Compose configuration validation and full stack startup.
+- [x] PostgreSQL migrations and Redis connectivity checks.
+- [x] Owner registration/login/logout and role/organization authorization integration tests.
+- [x] TLS gRPC enrollment, heartbeat, reconnect, re-enrollment, credential expiry/rejection, and agent revocation.
+- [x] PostgreSQL durability and readiness recovery during Redis outage.
+- [x] Full stack cleanup after CI.
 
-### Still incomplete
+### Phase 2 boundaries
 
-- [ ] Generated Protocol Buffer code and version compatibility checks.
-- [ ] Running authenticated gRPC server.
-- [ ] Authentication and server-side authorization foundations.
-- [ ] Secure enrollment-token issuance, hashing, expiry, one-time consumption, and revocation.
-- [ ] Agent identity binding and heartbeat/reconnect lifecycle.
-- [ ] Integration tests for enrollment rejection and revocation.
-- [ ] Application repositories and durable application workflows.
-- [ ] Explicit Redis outage/fallback behavior tests for application data paths.
-- [ ] Full Phase 2 security review and protocol integration.
+- The frontend is still a foundation shell. Authentication screens, project switching, dashboards, graphs, alerts, and operational workflows are later-phase work.
+- No native agent executable or collectors are shipped yet. The agent workspace boundary is reserved for Phase 3.
+- The gRPC telemetry stream intentionally returns UNIMPLEMENTED until Phase 3 can validate, durably persist, and idempotently acknowledge telemetry.
+- The Compose deployment is a local development topology, not a production deployment design.
 
-## Exact Resume Instructions
+### Key Phase 2 commits
 
-Continue on `phase-2/platform-foundation`. Do not restart the verified platform/database/cache work.
+- 1ce85a0b91cf0cce5fa1a29b94967a70c08f87d0 — Authentication, identity, TLS gRPC enrollment, and integration tests.
+- 5873f5310b7d7e91a74ef4bcd68ec8bbd12cf142 — Go formatting.
+- 17fd0f00c6a094febe768693d9b11101987d806c — Integration/server formatting.
+- 9d75c7bcc2027fbd2ee7220ff8e06a8c5a3086a9 — Final integration-test formatting.
+- 6b250d32b9e87d3fa8a909594df2284cc0738c8f — Tenant isolation and Redis outage/recovery tests.
+- 3afe7bd43715ea7b6bc0c797e2c311f574798d83 — Health endpoint HEAD support and test correction.
+- f93f2be2a72abae3056c9610834fad577c4a2d14 — Resolve Protobuf integration-test dependencies in CI.
+- 8ba37d96ce10bd5781a02df20f28f0453e6a0be1 — Correct integration TLS certificate path.
+- 3f67f317676227f287096c28388acbf90541cf4f — Explicit gRPC reconnect integration test.
+- 1ad3e70d6e3a6174da2ebae6b43fdf117117f465 — Bound concurrent gRPC streams and document native agent workspace.
+- 694ffccdf8676b03fe9212366c3abaa17b2de985 — Format the reconnect heartbeat request.
 
-**Next implementation slice: generated Protobuf code and authenticated gRPC enrollment.**
+## Current Phase 3 — Monitoring Agent and Telemetry Data Engine
 
-1. Add a pinned Protocol Buffer toolchain and reproducible code-generation commands.
-2. Generate Go message and gRPC service code from `proto/monitor/v1/agent.proto`.
-3. Implement the server-side gRPC service with TLS requirements and strict message-size/deadline limits.
-4. Implement enrollment-token issuance, secure random generation, hash-only persistence, expiry, single-use consumption, and revocation.
-5. Bind enrolled agent identity to its server record and persist agent capabilities/heartbeat state.
-6. Add integration tests for valid, expired, invalid, consumed, and revoked enrollment tokens.
-7. Add tests for invalid agent identity/session, malformed messages, reconnect, and heartbeat state transitions.
-8. Update README, roadmap, feature acceptance matrix, and this state file as each capability is verified.
-9. Commit the coherent gRPC/enrollment slice using a Conventional Commit.
+**Status: Not Started**
 
-Do not start host metric collection before enrollment and authenticated agent communication are working and tested.
+### Phase 3 scope
+
+- [ ] Native Go agent module, command lifecycle, configuration, structured logs, and capabilities.
+- [ ] Secure enrollment client using the Phase 2 TLS gRPC contract; persist/reload session credentials safely.
+- [ ] Linux CPU and per-core collection.
+- [ ] Linux memory, cache, swap, and process RSS collection with documented semantics.
+- [ ] Disk read/write throughput and IOPS; network throughput and packet counters.
+- [ ] Agent health, uptime, collector errors, and process inventory.
+- [ ] Counter-delta calculations with monotonic elapsed time and reset handling.
+- [ ] Bounded queue and persistent local spool/WAL.
+- [ ] Authenticated, versioned, idempotent telemetry ingestion with validation, batching, and backpressure.
+- [ ] Durable PostgreSQL telemetry storage and retention/partition strategy.
+- [ ] Authorized WebSocket live fan-out and reconnect behavior.
+- [ ] Docker/Systemd discovery, cgroups attribution, port/connection metadata, and application instrumentation foundations.
+- [ ] Aggregation/downsampling and reproducible collection/ingestion benchmarks.
+
+### Exact resume instructions
+
+Continue directly on main. Do not create a new branch.
+
+**Next implementation slice:** initialize the native Go agent module in agent/.
+
+1. Add a standalone Go module and the cmd/monitor-agent entry point.
+2. Add validated environment/config-file loading without logging secrets.
+3. Add JSON structured logging and graceful shutdown.
+4. Define an explicit agent capability/version structure and unit tests.
+5. Add CI steps for go test -race ./..., go vet ./..., and agent binary build.
+6. Update README, feature acceptance matrix, and this state file when the slice is verified.
+7. Only after this foundation, implement the TLS enrollment client and Linux CPU/memory collector slices.
+
+Do not implement unbounded queues, acknowledge telemetry before durable persistence, or claim metric accuracy/performance without source-based tests and benchmarks.
 
 ## Repository Rules
 
 - English only in source code, comments, documentation, UI strings, logs, tests, and commit messages.
+- All work must be committed directly on main; do not create a branch or PR unless the user explicitly changes this instruction.
 - Build the monitoring product itself; do not embed Grafana, Prometheus, Zabbix, Netdata, or another ready-made monitoring platform.
 - Go, Next.js/TypeScript, PostgreSQL, Redis, Docker Compose, gRPC, Protocol Buffers, and WebSocket are allowed technologies.
-- The host monitoring agent will run as a native Go service; Docker is for control-plane deployment and optional container discovery.
+- The host monitoring agent will run as a native Go service; Docker is for control-plane development/deployment and optional container discovery.
 - Comments explain intent, invariants, security boundaries, and non-obvious logic; do not comment every trivial line mechanically.
 - Use descriptive Conventional Commits.
 - Update README whenever a feature is verified and at each phase completion.
@@ -119,18 +144,4 @@ Do not start host metric collection before enrollment and authenticated agent co
 
 ## Session History
 
-### Phase 2 — Initial Foundation and Database/Cache Integration
-
-Implementation commits:
-
-- `2b88d17fe66715d766d093eddc6348e339552392` — Initial Go API, Next.js shell, Compose stack, schema draft, and protocol contract.
-- `53c22126ce739a52fd2b86094510f26e6d51006a` — PostgreSQL/Redis clients, migration runner, and dependency-aware readiness.
-- `78a50d8d747f6641ab377d822974e11fb1e869aa` — Go import formatting.
-- `9bd98a2fed9699847860c37e845dc49b98623895` — Container dependency resolution fix (later refined).
-- `98cac4fc5616375d90501301a50ec0300736263b` — More actionable Go formatting diagnostics.
-- `a82910354695f3787f01f46e2c2f318cf3d82453` — PostgreSQL config formatting.
-- `ab806951ed0e1cb2534d2b3a5ce1808aa3ab18ad` — Resolve Go dependencies after source copy in Docker build.
-
-Verification: GitHub Actions run [#45023682627](https://github.com/WorkRCS/monitor_me/actions/runs/45023682627) passed all three jobs: backend, frontend, and full Compose integration. It verified clean migration execution, PostgreSQL schema presence, Redis connectivity, and API dependency readiness.
-
-Phase 2 remains In Progress because authentication, generated Protobuf/gRPC serving, and secure agent enrollment are not implemented yet.
+Phase 1 is recorded above. Phase 2 implementation and verification evidence is listed above. Phase 2 closed after all three jobs in [GitHub Actions run #45030320358](https://github.com/WorkRCS/monitor_me/actions/runs/45030320358) succeeded.
