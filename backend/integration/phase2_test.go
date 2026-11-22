@@ -284,10 +284,10 @@ func TestPhase2AuthenticationAndAgentLifecycle(t *testing.T) {
 	defer reconnectedConnection.Close()
 	agentClient = monitorv1.NewAgentControlClient(reconnectedConnection)
 	reconnectedHeartbeat, err := agentClient.ReportHeartbeat(ctx, &monitorv1.HeartbeatRequest{
-		AgentId: enrolled.GetAgentId(),
-		SessionToken: enrolled.GetSessionToken(),
-		AgentVersion: "0.1.0-test",
-		Capabilities: []string{"host.cpu", "host.memory"},
+		AgentId:          enrolled.GetAgentId(),
+		SessionToken:     enrolled.GetSessionToken(),
+		AgentVersion:     "0.1.0-test",
+		Capabilities:     []string{"host.cpu", "host.memory"},
 		SentAtUnixMillis: time.Now().UnixMilli(),
 	})
 	if err != nil || !reconnectedHeartbeat.GetAccepted() {
