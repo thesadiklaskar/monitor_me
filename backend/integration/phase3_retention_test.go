@@ -7,7 +7,6 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"fmt"
-	"os"
 	"testing"
 	"time"
 
