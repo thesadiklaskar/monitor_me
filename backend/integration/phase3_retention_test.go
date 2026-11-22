@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/WorkRCS/monitor_me/backend/internal/telemetry"
+	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
 func TestPostgresRetentionKeepsIdempotencyRecordsLongerThanSamples(t *testing.T) {
