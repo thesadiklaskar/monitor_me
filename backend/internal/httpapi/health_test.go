@@ -64,7 +64,7 @@ func TestReadinessFailsWhenDependencyIsUnavailable(t *testing.T) {
 		Name: "postgres",
 		Check: func(context.Context) error {
 			return errors.New("connection details must not be exposed")
-		}}, nil)
+		}}}, nil)
 
 	request := httptest.NewRequest(http.MethodGet, "/health/ready", nil)
 	recorder := httptest.NewRecorder()
