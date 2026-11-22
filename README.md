@@ -4,7 +4,7 @@
 
 The product is being built around its own native host agent, telemetry ingestion pipeline, metric model, project attribution, alert engine, and operator dashboard. It is intended for infrastructure engineers, platform teams, and organizations that need clear visibility into servers, workloads, and applications.
 
-> **Current status:** Phase 1 is complete. Phase 2 — Platform Foundation and Secure Connectivity is in progress. The initial foundation slice is committed and its GitHub Actions CI checks have passed: Go API health endpoints/tests, Next.js lint/typecheck/production build, Docker Compose configuration validation, and service image builds. Database/cache application clients, runtime Compose smoke tests, authentication, generated gRPC code, and agent enrollment are not complete yet.
+> **Current status:** Phases 1 and 2 are complete. Phase 2 delivers the Go/Next.js platform foundation, PostgreSQL/Redis integration, owner authentication, organization-scoped authorization, and TLS-protected gRPC agent enrollment/heartbeat. The full Go, frontend, and Docker Compose integration pipeline passed in [GitHub Actions run #45030320358](https://github.com/WorkRCS/monitor_me/actions/runs/45030320358). Phase 3 — Monitoring Agent and Telemetry Data Engine is next; no native collector or telemetry ingestion is claimed yet.
 
 ---
 
