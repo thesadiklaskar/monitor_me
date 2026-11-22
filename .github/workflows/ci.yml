@@ -74,6 +74,19 @@ jobs:
         with:
           go-version: "1.27.4"
           cache-dependency-path: agent/go.mod
+      - name: Install Protocol Buffers compiler and Go generators
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y protobuf-compiler
+          go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.12
+          go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.6.2
+      - name: Generate versioned gRPC sources for both modules
+        run: sh scripts/generate-proto.sh
+      - name: Resolve and verify agent module graph
+        working-directory: agent
+        run: |
+          go mod tidy
+          go mod verify
       - name: Format check
         working-directory: agent
         run: |
@@ -92,7 +105,6 @@ jobs:
       - name: Build native agent
         working-directory: agent
         run: go build -trimpath -o /tmp/monitor-me-agent ./cmd/monitor-agent
-
   frontend:
     name: Next.js frontend checks
     runs-on: ubuntu-latest

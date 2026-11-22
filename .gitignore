@@ -17,3 +17,5 @@ coverage.out
 .vscode/
 /.data/
 *.log
+
+/agent/gen/
