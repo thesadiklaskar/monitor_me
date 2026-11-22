@@ -14,7 +14,7 @@ This file is the authoritative resume point for Monitor Me. Update it whenever w
 | Current phase | Phase 1 — Product Requirements and Measurable Acceptance Criteria |
 | Current phase status | Not Started |
 | Implementation status | No application code yet |
-| Last verified commit | `919f5e99202c1f04718313c60bea254e90311bce` |
+| Last completed foundation commit before this state refresh | `5136d30c0c8317fe5b74bd6524803dbab06eada7` |
 | Next action | Create `docs/PRODUCT_REQUIREMENTS.md` from the agreed product brief, with testable acceptance criteria and an explicit MVP boundary. |
 
 ## Completed Work
@@ -28,7 +28,14 @@ This file is the authoritative resume point for Monitor Me. Update it whenever w
 - [x] Defined contributor/agent continuation rules.
 - [x] Created this resumable state record.
 
-**Verification:** Initial README commit created successfully on `main`.
+**Foundation commits:**
+
+- `919f5e99202c1f04718313c60bea254e90311bce` — Initialize README and engineering principles.
+- `522057605407da077f75b4335e487b0d4f7c70f9` — Add repository continuation and engineering rules.
+- `1176bf3fa3a5698c79ae1de4586059b1a105942e` — Define zero-to-production delivery phases.
+- `5136d30c0c8317fe5b74bd6524803dbab06eada7` — Add resumable project execution state.
+
+**Verification:** All four foundation files were fetched successfully from the `main` branch after creation.
 
 ## Current Work
 
