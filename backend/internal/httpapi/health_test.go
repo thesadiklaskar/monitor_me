@@ -25,7 +25,7 @@ func TestHealthEndpoints(t *testing.T) {
 		{name: "readiness", path: "/health/ready", expectedStatus: "ready"},
 	}
 
-	handler := NewRouter("test-version", dependencies...)
+	handler := NewRouter("test-version", dependencies, nil)
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -60,12 +60,11 @@ func TestHealthEndpoints(t *testing.T) {
 }
 
 func TestReadinessFailsWhenDependencyIsUnavailable(t *testing.T) {
-	handler := NewRouter("test-version", Dependency{
+	handler := NewRouter("test-version", []Dependency{{
 		Name: "postgres",
 		Check: func(context.Context) error {
 			return errors.New("connection details must not be exposed")
-		},
-	})
+		}}, nil)
 
 	request := httptest.NewRequest(http.MethodGet, "/health/ready", nil)
 	recorder := httptest.NewRecorder()
@@ -91,7 +90,7 @@ func TestReadinessFailsWhenDependencyIsUnavailable(t *testing.T) {
 }
 
 func TestHealthEndpointRejectsNonGetMethods(t *testing.T) {
-	handler := NewRouter("test-version")
+	handler := NewRouter("test-version", nil, nil)
 	request := httptest.NewRequest(http.MethodPost, "/health/live", nil)
 	recorder := httptest.NewRecorder()
 
