@@ -58,7 +58,7 @@ func (api *API) reissueEnrollmentToken(writer http.ResponseWriter, request *http
 				"token_id":   issued.EnrollmentTokenID,
 				"token":      issued.EnrollmentToken,
 				"expires_at": issued.TokenExpiresAt,
-				"protocol": "monitor.v1",
+				"protocol":   "monitor.v1",
 			},
 		})
 	}

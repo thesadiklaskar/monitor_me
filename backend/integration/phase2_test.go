@@ -28,7 +28,7 @@ import (
 
 type apiResponse struct {
 	AccessToken string `json:"access_token"`
-	User struct {
+	User        struct {
 		ID             string `json:"id"`
 		Role           string `json:"role"`
 		OrganizationID string `json:"organization_id"`
@@ -203,10 +203,10 @@ func TestPhase2AuthenticationAndAgentLifecycle(t *testing.T) {
 	}
 
 	heartbeat, err := agentClient.ReportHeartbeat(ctx, &monitorv1.HeartbeatRequest{
-		AgentId:      enrolled.GetAgentId(),
-		SessionToken: enrolled.GetSessionToken(),
-		AgentVersion: "0.1.0-test",
-		Capabilities: []string{"host.cpu", "host.memory"},
+		AgentId:          enrolled.GetAgentId(),
+		SessionToken:     enrolled.GetSessionToken(),
+		AgentVersion:     "0.1.0-test",
+		Capabilities:     []string{"host.cpu", "host.memory"},
 		SentAtUnixMillis: time.Now().UnixMilli(),
 	})
 	if err != nil || !heartbeat.GetAccepted() {
