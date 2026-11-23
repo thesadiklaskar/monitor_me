@@ -20,7 +20,7 @@ type LiveDependencies struct {
 	Cache              *redisv9.Client
 	Telemetry          *telemetry.Store
 	AllowedOrigins     []string
-	RemoteAllowedUnits []string
+	RemoteAllowedUnits    []string
 	DisableAuthentication bool
 }
 
