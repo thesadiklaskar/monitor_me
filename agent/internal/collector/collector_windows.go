@@ -60,7 +60,7 @@ func (c *ProcCollector) collectWindows(ctx context.Context) ([]Sample, error) {
 	}
 
 	aggregateTimes, aggregateErr := cpu.TimesWithContext(ctx, false)
-	perCPUTimes, perCPUErr := cpu.TimesWithContext(ctx, true)
+	perCPUTimes, _ := cpu.TimesWithContext(ctx, true)
 	if aggregateErr != nil {
 		collectionErrors = append(collectionErrors, fmt.Errorf("read Windows aggregate CPU counters: %w", aggregateErr))
 	}
