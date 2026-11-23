@@ -117,7 +117,6 @@ type ServerProjectMapping struct {
 	CreatedAt         time.Time `json:"created_at"`
 }
 
-
 type AlertRule struct {
 	ID         string    `json:"id"`
 	Name       string    `json:"name"`
@@ -887,7 +886,6 @@ func newOpaqueToken() (string, error) {
 	}
 	return base64.RawURLEncoding.EncodeToString(buffer), nil
 }
-
 
 func (s *Store) ListAlertRules(ctx context.Context, principal Principal) ([]AlertRule, error) {
 	rows, err := s.db.QueryContext(ctx, `
