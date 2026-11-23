@@ -356,7 +356,28 @@ jobs:
       - name: Stop local stack
         if: always()
         run: docker compose down --volumes
- -bench '^BenchmarkPhase3PostgresIngestion      - name: Verify database migration
+ -bench '^BenchmarkPhase3PostgresIngestion      - name: Verify anonymous local dashboard mode
+        env:
+          MONITOR_ME_AUTH_DISABLED: "true"
+        shell: bash
+        run: |
+          docker compose up --build -d api web
+          ready=0
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:3000/api/config -o /tmp/monitor-me-anonymous-config.json; then
+              ready=1
+              break
+            fi
+            sleep 2
+          done
+          test "$ready" = "1"
+          jq -e '.auth_disabled == true' /tmp/monitor-me-anonymous-config.json
+          curl -fsS http://127.0.0.1:3000/api/auth/me -o /tmp/monitor-me-anonymous-user.json
+          jq -e '.user.role == "owner" and .user.organization_id != ""' /tmp/monitor-me-anonymous-user.json
+          status="$(curl -sS -o /tmp/monitor-me-anonymous-login.json -w '%{http_code}' -H 'Origin: http://127.0.0.1:3000' -H 'Content-Type: application/json' --data '{"email":"disabled@example.invalid","password":"not-used"}' http://127.0.0.1:3000/api/auth/login)"
+          test "$status" = "404"
+          jq -e '.error.code == "authentication_disabled"' /tmp/monitor-me-anonymous-login.json
+      - name: Verify database migration
         run: |
           docker compose exec -T postgres \
             psql -v ON_ERROR_STOP=1 -U monitor_me -d monitor_me \
