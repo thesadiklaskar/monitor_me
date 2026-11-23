@@ -215,6 +215,104 @@ func TestPhase2AuthenticationAndAgentLifecycle(t *testing.T) {
 		t.Fatalf("cross-organization inventory leak: received %d foreign servers", len(otherInventory.Servers))
 	}
 
+	// Phase 4 project administration and server workload mapping authorization.
+	projectCreate := requestJSON(t, ctx, http.MethodPost, baseURL+"/v1/projects", bearer, map[string]any{
+		"name": "Payments API", "slug": "payments-api",
+	})
+	if projectCreate.StatusCode != http.StatusCreated {
+		t.Fatalf("owner project creation: expected 201, got %d: %s", projectCreate.StatusCode, projectCreate.Body)
+	}
+	var createdProject struct {
+		Project struct {
+			ID string `json:"id"`
+			Name string `json:"name"`
+		} `json:"project"`
+	}
+	decodeResponse(t, projectCreate.Body, &createdProject)
+	if createdProject.Project.ID == "" || createdProject.Project.Name != "Payments API" {
+		t.Fatalf("project creation returned an incomplete project: %#v", createdProject.Project)
+	}
+
+	viewerProjectCreate := requestJSON(t, ctx, http.MethodPost, baseURL+"/v1/projects", viewerSession.AccessToken, map[string]any{
+		"name": "Forbidden Project", "slug": "forbidden-project",
+	})
+	if viewerProjectCreate.StatusCode != http.StatusForbidden {
+		t.Fatalf("viewer project creation: expected 403, got %d: %s", viewerProjectCreate.StatusCode, viewerProjectCreate.Body)
+	}
+
+	mappingCreate := requestJSON(t, ctx, http.MethodPost,
+		baseURL+"/v1/servers/"+serverID+"/project-mappings", bearer, map[string]any{
+			"project_id": createdProject.Project.ID,
+			"workload_type": "systemd",
+			"workload_selector": "payments-api.service",
+			"attribution_method": "systemd",
+		})
+	if mappingCreate.StatusCode != http.StatusCreated {
+		t.Fatalf("owner workload mapping creation: expected 201, got %d: %s", mappingCreate.StatusCode, mappingCreate.Body)
+	}
+	var createdMapping struct {
+		Mapping struct {
+			ID string `json:"id"`
+			ProjectID string `json:"project_id"`
+			WorkloadSelector string `json:"workload_selector"`
+		} `json:"mapping"`
+	}
+	decodeResponse(t, mappingCreate.Body, &createdMapping)
+	if createdMapping.Mapping.ID == "" || createdMapping.Mapping.ProjectID != createdProject.Project.ID ||
+		createdMapping.Mapping.WorkloadSelector != "payments-api.service" {
+		t.Fatalf("mapping creation returned an incomplete mapping: %#v", createdMapping.Mapping)
+	}
+
+	mappingList := requestJSON(t, ctx, http.MethodGet,
+		baseURL+"/v1/servers/"+serverID+"/project-mappings", viewerSession.AccessToken, nil)
+	if mappingList.StatusCode != http.StatusOK {
+		t.Fatalf("viewer workload mapping list: expected 200, got %d: %s", mappingList.StatusCode, mappingList.Body)
+	}
+	var listedMappings struct {
+		Mappings []struct {
+			ID string `json:"id"`
+			ProjectID string `json:"project_id"`
+		} `json:"mappings"`
+	}
+	decodeResponse(t, mappingList.Body, &listedMappings)
+	if len(listedMappings.Mappings) != 1 || listedMappings.Mappings[0].ID != createdMapping.Mapping.ID {
+		t.Fatalf("server workload mapping was not returned in organization scope: %#v", listedMappings.Mappings)
+	}
+
+	viewerMappingCreate := requestJSON(t, ctx, http.MethodPost,
+		baseURL+"/v1/servers/"+serverID+"/project-mappings", viewerSession.AccessToken, map[string]any{
+			"project_id": createdProject.Project.ID,
+			"workload_type": "systemd",
+			"workload_selector": "forbidden.service",
+			"attribution_method": "systemd",
+		})
+	if viewerMappingCreate.StatusCode != http.StatusForbidden {
+		t.Fatalf("viewer workload mapping creation: expected 403, got %d: %s", viewerMappingCreate.StatusCode, viewerMappingCreate.Body)
+	}
+
+	mappingDelete := requestJSON(t, ctx, http.MethodDelete,
+		baseURL+"/v1/project-mappings/"+createdMapping.Mapping.ID, bearer, map[string]any{})
+	if mappingDelete.StatusCode != http.StatusNoContent {
+		t.Fatalf("owner workload mapping deletion: expected 204, got %d: %s", mappingDelete.StatusCode, mappingDelete.Body)
+	}
+	projectDelete := requestJSON(t, ctx, http.MethodDelete,
+		baseURL+"/v1/projects/"+createdProject.Project.ID, bearer, map[string]any{})
+	if projectDelete.StatusCode != http.StatusNoContent {
+		t.Fatalf("owner project deletion: expected 204, got %d: %s", projectDelete.StatusCode, projectDelete.Body)
+	}
+
+	otherProjects := requestJSON(t, ctx, http.MethodGet, baseURL+"/v1/projects", otherSession.AccessToken, nil)
+	if otherProjects.StatusCode != http.StatusOK {
+		t.Fatalf("second organization project list: expected 200, got %d", otherProjects.StatusCode)
+	}
+	var otherProjectList struct {
+		Projects []json.RawMessage `json:"projects"`
+	}
+	decodeResponse(t, otherProjects.Body, &otherProjectList)
+	if len(otherProjectList.Projects) != 0 {
+		t.Fatalf("cross-organization project leak: received %d foreign projects", len(otherProjectList.Projects))
+	}
+
 	certificatePEM, err := os.ReadFile(rootCAPath)
 	if err != nil {
 		t.Fatalf("read gRPC root certificate: %v", err)
