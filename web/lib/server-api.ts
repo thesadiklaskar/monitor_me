@@ -28,7 +28,30 @@ export function sameOriginMutation(request: NextRequest): boolean {
 
   try {
     const origin = new URL(originHeader);
-    return origin.origin === new URL(request.url).origin;
+    if (
+      !["http:", "https:"].includes(origin.protocol) ||
+      origin.username ||
+      origin.password ||
+      origin.pathname !== "/" ||
+      origin.search ||
+      origin.hash
+    ) {
+      return false;
+    }
+
+    // Next.js may see an internal container URL while the browser uses the
+    // public host. Validate against the request host and trusted proxy headers.
+    const forwardedHost = request.headers.get("x-forwarded-host")?.split(",")[0].trim();
+    const host = forwardedHost || request.headers.get("host") || request.nextUrl.host;
+    const forwardedProto = request.headers.get("x-forwarded-proto")?.split(",")[0].trim();
+    const protocol = forwardedProto
+      ? `${forwardedProto.replace(/:$/, "")}:`
+      : request.nextUrl.protocol;
+
+    if (!host || !["http:", "https:"].includes(protocol)) return false;
+
+    const expectedOrigin = new URL(`${protocol}//${host}`).origin;
+    return origin.origin === expectedOrigin;
   } catch {
     return false;
   }
