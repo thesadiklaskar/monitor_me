@@ -8,10 +8,12 @@ type Server = {
   name: string;
   hostname?: string;
   status: string;
+  agent_id?: string | null;
   agent_last_seen_at?: string | null;
+  created_at: string;
 };
 
-type SeriesPoint = {
+type MetricPoint = {
   bucket: string;
   average: number;
   minimum: number;
@@ -19,16 +21,15 @@ type SeriesPoint = {
   sample_count: number;
 };
 
-type SeriesResponse = {
+type MetricSeries = {
   server_id: string;
   metric: string;
   from: string;
   to: string;
   step: string;
-  points: SeriesPoint[];
+  points: MetricPoint[];
 };
 
-type LiveTicketResponse = { ticket: string; expires_at: string };
 type LiveSample = {
   metric_name: string;
   value: number;
@@ -36,119 +37,173 @@ type LiveSample = {
   labels?: Record<string, string>;
   observed_at_unix_nanos: number;
 };
-type LiveEvent = { type: string; server_id: string; samples: LiveSample[] };
 
-type MetricDefinition = {
-  key: string;
-  label: string;
-  description: string;
-  unit: "percent" | "bytes" | "bytes/second" | "count" | "seconds";
+type LiveEvent = {
+  type: string;
+  organization_id: string;
+  server_id: string;
+  batch_id: string;
+  samples: LiveSample[];
 };
 
-const METRICS: MetricDefinition[] = [
-  { key: "host.cpu.utilization", label: "CPU utilization", description: "Host-wide busy CPU time", unit: "percent" },
-  { key: "host.memory.used", label: "Memory used", description: "Total memory minus OS-reported available memory", unit: "bytes" },
-  { key: "host.memory.swap.used", label: "Swap used", description: "Swap pages currently in use", unit: "bytes" },
-  { key: "host.disk.read.bytes_per_second", label: "Disk read", description: "Read throughput across visible block devices", unit: "bytes/second" },
-  { key: "host.network.receive.bytes_per_second", label: "Network receive", description: "Receive throughput across visible interfaces", unit: "bytes/second" },
-  { key: "host.process.count", label: "Process count", description: "Readable processes observed by the Linux collector", unit: "count" },
-  { key: "host.uptime.seconds", label: "Host uptime", description: "Elapsed time since the host booted", unit: "seconds" },
+type LiveTicket = {
+  ticket: string;
+  expires_at: string;
+  expires_in_seconds: number;
+  single_use: boolean;
+};
+
+type TimeRange = "1h" | "6h" | "24h";
+
+type MetricDefinition = {
+  name: string;
+  label: string;
+  unit: string;
+};
+
+const metricDefinitions: MetricDefinition[] = [
+  { name: "host.cpu.utilization", label: "CPU utilization", unit: "percent" },
+  { name: "host.memory.used", label: "Memory used", unit: "bytes" },
+  { name: "host.memory.available", label: "Memory available", unit: "bytes" },
+  { name: "host.memory.cache", label: "Memory cache", unit: "bytes" },
+  { name: "host.memory.swap.used", label: "Swap used", unit: "bytes" },
+  { name: "host.disk.read.bytes_per_second", label: "Disk read throughput", unit: "bytes/second" },
+  { name: "host.disk.write.bytes_per_second", label: "Disk write throughput", unit: "bytes/second" },
+  { name: "host.network.receive.bytes_per_second", label: "Network receive throughput", unit: "bytes/second" },
+  { name: "host.network.transmit.bytes_per_second", label: "Network transmit throughput", unit: "bytes/second" },
+  { name: "agent.cpu.utilization", label: "Agent CPU utilization", unit: "percent" },
 ];
 
-const RANGES = [
-  { value: "15m", label: "Last 15 minutes", milliseconds: 15 * 60_000 },
-  { value: "1h", label: "Last hour", milliseconds: 60 * 60_000 },
-  { value: "6h", label: "Last 6 hours", milliseconds: 6 * 60 * 60_000 },
-  { value: "24h", label: "Last 24 hours", milliseconds: 24 * 60 * 60_000 },
-];
+const ranges: Record<TimeRange, { label: string; durationMs: number; step: string; stepMs: number }> = {
+  "1h": { label: "Last hour", durationMs: 60 * 60 * 1000, step: "15s", stepMs: 15_000 },
+  "6h": { label: "Last 6 hours", durationMs: 6 * 60 * 60 * 1000, step: "30s", stepMs: 30_000 },
+  "24h": { label: "Last 24 hours", durationMs: 24 * 60 * 60 * 1000, step: "2m", stepMs: 120_000 },
+};
 
-function formatValue(value: number, unit: MetricDefinition["unit"]): string {
-  if (!Number.isFinite(value)) return "—";
-  switch (unit) {
-    case "percent": return `${value.toFixed(1)}%`;
-    case "bytes": return `${(value / (1024 ** 3)).toFixed(2)} GiB`;
-    case "bytes/second": return `${(value / (1024 ** 2)).toFixed(2)} MiB/s`;
-    case "count": return Math.round(value).toLocaleString();
-    case "seconds": {
-      const total = Math.max(0, Math.floor(value));
-      const days = Math.floor(total / 86400);
-      const hours = Math.floor((total % 86400) / 3600);
-      const minutes = Math.floor((total % 3600) / 60);
-      return days > 0 ? `${days}d ${hours}h` : hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
-    }
-  }
-}
-
-function timeLabel(value: string): string {
+function formatTimestamp(value?: string | null): string {
+  if (!value) return "Not available";
   const date = new Date(value);
-  return Number.isNaN(date.getTime())
-    ? "Unknown"
-    : new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" }).format(date);
+  if (Number.isNaN(date.getTime())) return "Not available";
+  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "medium" }).format(date);
 }
 
-function safeWebSocketURL(apiPublicURL: string): URL {
-  const base = new URL(apiPublicURL);
-  if (!["http:", "https:"].includes(base.protocol) || base.username || base.password) {
-    throw new Error("The public API URL is not a valid HTTP(S) origin.");
+function formatBytes(value: number): string {
+  if (!Number.isFinite(value)) return "Unavailable";
+  const units = ["B", "KiB", "MiB", "GiB", "TiB"];
+  let scaled = Math.abs(value);
+  let index = 0;
+  while (scaled >= 1024 && index < units.length - 1) {
+    scaled /= 1024;
+    index += 1;
   }
-  const socketURL = new URL("/v1/live/ws", base);
-  socketURL.protocol = socketURL.protocol === "https:" ? "wss:" : "ws:";
-  return socketURL;
+  const signed = value < 0 ? -scaled : scaled;
+  return `${signed.toFixed(index === 0 ? 0 : 2)} ${units[index]}`;
 }
 
-function MetricChart({ points, unit }: { points: SeriesPoint[]; unit: MetricDefinition["unit"] }) {
-  const width = 760;
-  const height = 250;
-  const left = 58;
-  const right = 18;
-  const top = 14;
-  const bottom = 35;
-  const innerWidth = width - left - right;
-  const innerHeight = height - top - bottom;
-  const values = points.map((point) => point.average).filter(Number.isFinite);
-  const maximum = Math.max(1, ...values);
-  const minimum = Math.min(0, ...values);
-  const range = Math.max(1, maximum - minimum);
-  const coordinates = points.map((point, index) => {
-    const x = left + (points.length < 2 ? innerWidth / 2 : (index / (points.length - 1)) * innerWidth);
-    const y = top + ((maximum - point.average) / range) * innerHeight;
-    return { x, y, point };
-  });
-  const line = coordinates.map((point) => `${point.x.toFixed(1)},${point.y.toFixed(1)}`).join(" ");
-  const area = coordinates.length
-    ? `${left},${top + innerHeight} ${line} ${left + innerWidth},${top + innerHeight}`
-    : "";
+function formatValue(value: number, unit: string): string {
+  if (!Number.isFinite(value)) return "Unavailable";
+  if (unit === "percent") return `${value.toFixed(1)}%`;
+  if (unit === "bytes") return formatBytes(value);
+  if (unit === "bytes/second") return `${formatBytes(value)}/s`;
+  return `${value.toFixed(2)} ${unit}`;
+}
+
+function ServerMetricChart({
+  points,
+  range,
+  unit,
+  loading,
+}: {
+  points: MetricPoint[];
+  range: TimeRange;
+  unit: string;
+  loading: boolean;
+}) {
+  const chart = useMemo(() => {
+    if (points.length === 0) return null;
+    const config = ranges[range];
+    const start = Date.now() - config.durationMs;
+    const values = points
+      .map((point) => ({ ...point, time: new Date(point.bucket).getTime() }))
+      .filter((point) => Number.isFinite(point.time) && Number.isFinite(point.average) && point.time >= start)
+      .sort((left, right) => left.time - right.time);
+    if (values.length === 0) return null;
+
+    const rawMin = Math.min(...values.map((point) => point.minimum));
+    const rawMax = Math.max(...values.map((point) => point.maximum));
+    const spread = rawMax - rawMin;
+    const padding = spread > 0 ? spread * 0.12 : Math.max(Math.abs(rawMax) * 0.12, 1);
+    const min = Math.min(0, rawMin - padding);
+    const max = rawMax + padding;
+    const verticalRange = max - min || 1;
+
+    const segments: string[] = [];
+    let current: string[] = [];
+    let previousTime: number | null = null;
+    for (const point of values) {
+      if (previousTime !== null && point.time - previousTime > config.stepMs * 2.2) {
+        if (current.length > 0) segments.push(current.join(" "));
+        current = [];
+      }
+      const x = Math.min(890, Math.max(10, ((point.time - start) / config.durationMs) * 890 + 10));
+      const y = 224 - ((point.average - min) / verticalRange) * 190;
+      current.push(`${x.toFixed(1)},${y.toFixed(1)}`);
+      previousTime = point.time;
+    }
+    if (current.length > 0) segments.push(current.join(" "));
+
+    const latest = values[values.length - 1];
+    const average = values.reduce((sum, point) => sum + point.average, 0) / values.length;
+    return {
+      segments,
+      min: rawMin,
+      max: rawMax,
+      average,
+      latest,
+      count: values.reduce((sum, point) => sum + point.sample_count, 0),
+      values,
+    };
+  }, [points, range]);
+
+  if (loading && !chart) {
+    return <div className="metric-chart-state">Loading historical samples…</div>;
+  }
+  if (!chart) {
+    return (
+      <div className="metric-chart-state">
+        <strong>No samples in this time range</strong>
+        <span>The selected metric has no stored values for this server and period. Missing data is not shown as zero.</span>
+      </div>
+    );
+  }
 
   return (
     <div className="metric-chart-wrap">
-      <svg className="metric-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Historical metric line chart">
-        {[0, 1, 2, 3].map((step) => {
-          const y = top + (innerHeight / 3) * step;
-          const value = maximum - (range / 3) * step;
-          return (
-            <g key={step}>
-              <line x1={left} y1={y} x2={width - right} y2={y} className="chart-grid-line" />
-              <text x={left - 9} y={y + 4} textAnchor="end" className="chart-axis-label">
-                {unit === "percent" ? `${value.toFixed(0)}%` : formatValue(value, unit)}
-              </text>
-            </g>
-          );
-        })}
-        {coordinates.length > 1 && <polygon points={area} className="chart-area" />}
-        {coordinates.length > 1 && <polyline points={line} className="chart-line" />}
-        {coordinates.length === 1 && <circle cx={coordinates[0].x} cy={coordinates[0].y} r="5" className="chart-point" />}
-        {coordinates.length > 0 && (
-          <>
-            <text x={left} y={height - 8} className="chart-axis-label">{timeLabel(points[0].bucket)}</text>
-            <text x={width - right} y={height - 8} textAnchor="end" className="chart-axis-label">{timeLabel(points[points.length - 1].bucket)}</text>
-          </>
-        )}
+      <div className="metric-summary-row">
+        <div><span>Latest average</span><strong>{formatValue(chart.latest.average, unit)}</strong></div>
+        <div><span>Range average</span><strong>{formatValue(chart.average, unit)}</strong></div>
+        <div><span>Minimum</span><strong>{formatValue(chart.min, unit)}</strong></div>
+        <div><span>Maximum</span><strong>{formatValue(chart.max, unit)}</strong></div>
+      </div>
+      <svg className="metric-chart" viewBox="0 0 920 260" role="img" aria-label={`Historical ${unit} metric over the selected time range`}>
+        <title>Historical metric values. Empty periods are left as gaps.</title>
+        {[34, 81, 128, 175, 224].map((y) => (
+          <line key={y} x1="10" x2="900" y1={y} y2={y} className="chart-grid-line" />
+        ))}
+        {chart.segments.map((segment, index) => (
+          <polyline key={index} points={segment} className="chart-series-line" />
+        ))}
       </svg>
+      <div className="chart-axis-row">
+        <span>{formatTimestamp(new Date(Date.now() - ranges[range].durationMs).toISOString())}</span>
+        <span>{chart.count.toLocaleString()} stored samples · gaps remain visible</span>
+        <span>Now</span>
+      </div>
     </div>
   );
 }
 
-export function ServerDetail({
+export default function ServerDetail({
   server,
   apiPublicURL,
   onBack,
@@ -157,123 +212,135 @@ export function ServerDetail({
   apiPublicURL: string | null;
   onBack: () => void;
 }) {
-  const [metricKey, setMetricKey] = useState(METRICS[0].key);
-  const [rangeKey, setRangeKey] = useState(RANGES[1].value);
-  const [series, setSeries] = useState<SeriesResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [liveStatus, setLiveStatus] = useState("Connecting");
-  const [liveValue, setLiveValue] = useState<{ value: number; observedAt: string } | null>(null);
+  const [metric, setMetric] = useState(metricDefinitions[0].name);
+  const [range, setRange] = useState<TimeRange>("1h");
+  const [series, setSeries] = useState<MetricSeries | null>(null);
+  const [livePoints, setLivePoints] = useState<MetricPoint[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [historyError, setHistoryError] = useState("");
+  const [liveState, setLiveState] = useState<"disabled" | "connecting" | "live" | "reconnecting">("connecting");
+  const [liveMessage, setLiveMessage] = useState("");
 
-  const metric = useMemo(() => METRICS.find((candidate) => candidate.key === metricKey) ?? METRICS[0], [metricKey]);
-  const selectedRange = useMemo(() => RANGES.find((candidate) => candidate.value === rangeKey) ?? RANGES[1], [rangeKey]);
+  const selectedMetric = metricDefinitions.find((item) => item.name === metric) ?? metricDefinitions[0];
+  const rangeConfig = ranges[range];
 
   const loadHistory = useCallback(async () => {
     setLoading(true);
-    setError("");
+    setHistoryError("");
     const to = new Date();
-    const from = new Date(to.getTime() - selectedRange.milliseconds);
-    const stepSeconds = Math.max(1, Math.ceil(selectedRange.milliseconds / 500 / 1000));
+    const from = new Date(to.getTime() - rangeConfig.durationMs);
     const query = new URLSearchParams({
-      metric: metric.key,
+      metric,
       from: from.toISOString(),
       to: to.toISOString(),
-      step: `${stepSeconds}s`,
-      limit: "500",
+      step: rangeConfig.step,
+      limit: "1000",
     });
     try {
-      const result = await apiRequest<SeriesResponse>(
+      const response = await apiRequest<MetricSeries>(
         `/api/servers/${encodeURIComponent(server.id)}/metrics?${query.toString()}`,
       );
-      setSeries({ ...result, points: Array.isArray(result.points) ? result.points : [] });
-      setLiveValue(null);
-    } catch (loadError) {
-      setSeries(null);
-      setError(loadError instanceof Error ? loadError.message : "Historical metric data could not be loaded.");
+      setSeries(response);
+    } catch (error) {
+      setHistoryError(error instanceof Error ? error.message : "Historical metric data could not be loaded.");
     } finally {
       setLoading(false);
     }
-  }, [metric.key, selectedRange.milliseconds, server.id]);
+  }, [metric, rangeConfig.durationMs, rangeConfig.step, server.id]);
 
   useEffect(() => {
+    setLivePoints([]);
     void loadHistory();
   }, [loadHistory]);
 
   useEffect(() => {
     if (!apiPublicURL) {
-      setLiveStatus("Live endpoint not configured");
+      setLiveState("disabled");
+      setLiveMessage("Live updates are not configured. Historical data remains available.");
       return;
     }
+
     let stopped = false;
     let socket: WebSocket | null = null;
-    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
     let attempts = 0;
 
     const scheduleReconnect = () => {
-      if (stopped || reconnectTimer) return;
+      if (stopped) return;
       attempts += 1;
-      const delay = Math.min(30_000, 1_000 * (2 ** Math.min(attempts - 1, 5)));
-      setLiveStatus(`Reconnecting in ${Math.ceil(delay / 1000)}s`);
-      reconnectTimer = setTimeout(() => {
-        reconnectTimer = null;
-        void connect();
-      }, delay);
+      const delay = Math.min(30_000, 1_000 * 2 ** Math.min(attempts - 1, 5));
+      reconnectTimer = setTimeout(() => { void connect(); }, delay);
+    };
+
+    const catchUpAndReconnect = async () => {
+      await loadHistory();
+      scheduleReconnect();
     };
 
     const connect = async () => {
+      if (stopped) return;
+      setLiveState("connecting");
+      setLiveMessage("");
       try {
-        setLiveStatus("Refreshing live ticket");
-        const ticket = await apiRequest<LiveTicketResponse>("/api/live/ticket", {
+        // A new single-use 30-second ticket is requested for every connection.
+        const ticket = await apiRequest<LiveTicket>("/api/live/ticket", {
           method: "POST",
           body: "{}",
         });
         if (stopped) return;
-        const url = safeWebSocketURL(apiPublicURL);
-        url.searchParams.set("ticket", ticket.ticket);
-        socket = new WebSocket(url);
+
+        const target = new URL("/v1/live/ws", apiPublicURL);
+        target.protocol = target.protocol === "https:" ? "wss:" : "ws:";
+        target.searchParams.set("ticket", ticket.ticket);
+        socket = new WebSocket(target.toString());
+
         socket.onopen = () => {
           attempts = 0;
-          setLiveStatus("Live");
-          void loadHistory();
+          setLiveState("live");
+          setLiveMessage("Receiving committed telemetry events.");
         };
         socket.onmessage = (message) => {
           try {
             const event = JSON.parse(String(message.data)) as LiveEvent;
-            if (event.type !== "telemetry.batch" || event.server_id !== server.id || !Array.isArray(event.samples)) return;
-            const samples = event.samples.filter((sample) => sample.metric_name === metric.key && Number.isFinite(sample.value));
-            if (samples.length === 0) return;
-            const value = samples.reduce((total, sample) => total + sample.value, 0) / samples.length;
-            const observedAtNanos = Math.max(...samples.map((sample) => sample.observed_at_unix_nanos));
-            const observedAt = new Date(observedAtNanos / 1_000_000);
-            if (Number.isNaN(observedAt.getTime())) return;
-            setLiveValue({ value, observedAt: observedAt.toISOString() });
-            setSeries((current) => {
-              if (!current) return current;
-              const stepMs = Math.max(1_000, Number.parseFloat(current.step) * 1000 || 1_000);
-              const bucketTime = Math.floor(observedAt.getTime() / stepMs) * stepMs;
-              const bucket = new Date(bucketTime).toISOString();
-              const point: SeriesPoint = {
-                bucket,
-                average: value,
-                minimum: value,
-                maximum: value,
-                sample_count: samples.length,
-              };
-              const points = current.points.filter((candidate) => candidate.bucket !== bucket);
-              points.push(point);
-              points.sort((left, right) => new Date(left.bucket).getTime() - new Date(right.bucket).getTime());
-              return { ...current, points: points.slice(-500) };
+            if (event.type !== "telemetry.batch" || event.server_id !== server.id) return;
+            const observed = event.samples
+              .filter((sample) => sample.metric_name === metric && Number.isFinite(sample.value))
+              .map((sample) => {
+                const time = Number(sample.observed_at_unix_nanos) / 1_000_000;
+                return {
+                  bucket: new Date(time).toISOString(),
+                  average: sample.value,
+                  minimum: sample.value,
+                  maximum: sample.value,
+                  sample_count: 1,
+                } satisfies MetricPoint;
+              });
+            if (observed.length === 0) return;
+            setLivePoints((previous) => {
+              const cutoff = Date.now() - rangeConfig.durationMs;
+              return [...previous, ...observed]
+                .filter((point) => new Date(point.bucket).getTime() >= cutoff)
+                .sort((left, right) => new Date(left.bucket).getTime() - new Date(right.bucket).getTime())
+                .slice(-500);
             });
           } catch {
-            // Ignore malformed Pub/Sub events; durable history remains authoritative.
+            setLiveMessage("A live event could not be decoded. Historical data remains available.");
           }
         };
-        socket.onerror = () => socket?.close();
         socket.onclose = () => {
-          if (!stopped) scheduleReconnect();
+          if (stopped) return;
+          setLiveState("reconnecting");
+          setLiveMessage("Live connection closed. Refreshing history before reconnecting.");
+          void catchUpAndReconnect();
         };
-      } catch {
-        if (!stopped) scheduleReconnect();
+        socket.onerror = () => {
+          socket?.close();
+        };
+      } catch (error) {
+        if (stopped) return;
+        setLiveState("reconnecting");
+        setLiveMessage(error instanceof Error ? error.message : "Live updates are temporarily unavailable.");
+        await catchUpAndReconnect();
       }
     };
 
@@ -281,62 +348,87 @@ export function ServerDetail({
     return () => {
       stopped = true;
       if (reconnectTimer) clearTimeout(reconnectTimer);
-      socket?.close(1000, "Server detail closed");
+      socket?.close();
     };
-  }, [apiPublicURL, loadHistory, metric.key, server.id]);
+  }, [apiPublicURL, loadHistory, metric, rangeConfig.durationMs, server.id]);
 
-  const currentPoint = series?.points[series.points.length - 1];
-  const currentValue = liveValue?.value ?? currentPoint?.average ?? null;
-  const currentTimestamp = liveValue?.observedAt ?? currentPoint?.bucket ?? null;
+  const points = useMemo(() => {
+    const byBucket = new Map<string, MetricPoint>();
+    for (const point of series?.points ?? []) byBucket.set(point.bucket, point);
+    for (const point of livePoints) byBucket.set(point.bucket, point);
+    return [...byBucket.values()].sort(
+      (left, right) => new Date(left.bucket).getTime() - new Date(right.bucket).getTime(),
+    );
+  }, [livePoints, series]);
+
+  const lastSeen = server.agent_last_seen_at ? new Date(server.agent_last_seen_at) : null;
+  const isStale = !lastSeen || Number.isNaN(lastSeen.getTime()) || Date.now() - lastSeen.getTime() > 60_000;
 
   return (
     <section className="server-detail">
-      <header className="server-detail-header">
+      <header className="detail-topbar">
         <div>
           <button className="detail-back-button" type="button" onClick={onBack}>← Back to servers</button>
-          <div className="eyebrow">Server monitoring</div>
-          <h1>{server.name}</h1>
-          <p className="detail-subtitle">{server.hostname || "Hostname not provided"} · Last heartbeat {server.agent_last_seen_at ? new Date(server.agent_last_seen_at).toLocaleString() : "not yet received"}</p>
+          <div className="eyebrow">Server detail</div>
+          <h2>{server.name}</h2>
+          <p>{server.hostname || "Hostname not provided"} · Added {new Date(server.created_at).toLocaleString()}</p>
         </div>
-        <div className="detail-live-state"><span className={`status-dot ${liveStatus === "Live" ? "status-dot-online" : "status-dot-pending"}`} />{liveStatus}</div>
+        <div className="detail-status">
+          <span className={`status-pill ${server.status.toLowerCase() === "online" && !isStale ? "status-pill-online" : "status-pill-pending"}`}>
+            {isStale ? "Stale / no recent heartbeat" : server.status === "online" ? "Connected" : server.status}
+          </span>
+          <span>Last heartbeat: {server.agent_last_seen_at ? new Date(server.agent_last_seen_at).toLocaleString() : "Not received"}</span>
+        </div>
       </header>
 
-      <div className="detail-summary-grid">
-        <article className="summary-card"><span>Server status</span><strong className="detail-status-value">{server.status.replaceAll("_", " ")}</strong><small>Backend-reported state</small></article>
-        <article className="summary-card"><span>{metric.label}</span><strong>{currentValue === null ? "—" : formatValue(currentValue, metric.unit)}</strong><small>{currentTimestamp ? `Observed ${new Date(currentTimestamp).toLocaleTimeString()}` : "No samples in selected window"}</small></article>
-        <article className="summary-card"><span>Samples in range</span><strong>{series?.points.length.toLocaleString() ?? "—"}</strong><small>Bounded PostgreSQL aggregation</small></article>
+      <div className="detail-toolbar">
+        <label className="metric-select-field">
+          <span>Metric</span>
+          <select value={metric} onChange={(event) => setMetric(event.target.value)}>
+            {metricDefinitions.map((definition) => (
+              <option key={definition.name} value={definition.name}>{definition.label}</option>
+            ))}
+          </select>
+        </label>
+        <div className="range-switch" role="group" aria-label="Historical time range">
+          {(["1h", "6h", "24h"] as const).map((value) => (
+            <button
+              key={value}
+              type="button"
+              className={range === value ? "range-button range-button-active" : "range-button"}
+              onClick={() => setRange(value)}
+            >
+              {value}
+            </button>
+          ))}
+        </div>
+        <button className="button button-secondary" type="button" onClick={() => void loadHistory()} disabled={loading}>
+          {loading ? "Refreshing…" : "Refresh history"}
+        </button>
       </div>
 
-      <section className="inventory-panel detail-chart-panel">
-        <div className="panel-heading detail-controls">
-          <div><h2>{metric.label}</h2><p>{metric.description}. Historical values are bucket averages; live values are latest observations.</p></div>
-          <div className="detail-selectors">
-            <label className="detail-select-label">Metric
-              <select value={metricKey} onChange={(event) => setMetricKey(event.target.value)}>
-                {METRICS.map((item) => <option key={item.key} value={item.key}>{item.label}</option>)}
-              </select>
-            </label>
-            <label className="detail-select-label">Time range
-              <select value={rangeKey} onChange={(event) => setRangeKey(event.target.value)}>
-                {RANGES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
-              </select>
-            </label>
-            <button className="button button-secondary" type="button" onClick={() => void loadHistory()} disabled={loading}>{loading ? "Loading…" : "Refresh history"}</button>
+      <div className="live-status-strip">
+        <span className={`status-dot ${liveState === "live" ? "status-dot-online" : liveState === "disabled" ? "status-dot-disabled" : "status-dot-pending"}`} />
+        <strong>{liveState === "live" ? "Live" : liveState === "disabled" ? "History only" : liveState === "connecting" ? "Connecting" : "Reconnecting"}</strong>
+        <span>{liveMessage}</span>
+      </div>
+
+      {historyError && <div className="notice notice-error" role="alert">{historyError}</div>}
+
+      <article className="metric-panel">
+        <div className="metric-panel-heading">
+          <div>
+            <h3>{selectedMetric.label}</h3>
+            <p>{selectedMetric.name} · {selectedMetric.unit} · {ranges[range].label}</p>
           </div>
+          <span className="metric-sample-count">{points.reduce((sum, point) => sum + point.sample_count, 0).toLocaleString()} points</span>
         </div>
-        {error && <div className="notice notice-error" role="alert">{error}</div>}
-        {loading && !series ? (
-          <div className="detail-chart-message">Loading metric history…</div>
-        ) : series && series.points.length > 0 ? (
-          <>
-            <MetricChart points={series.points} unit={metric.unit} />
-            <div className="chart-legend"><span>Average per bucket</span><span>{series.points.length.toLocaleString()} points · {series.step} step</span></div>
-          </>
-        ) : (
-          <div className="detail-chart-message"><strong>No historical samples in this time range.</strong><span>Wait for the agent to send telemetry, or select a wider range. Missing data is not shown as zero.</span></div>
-        )}
-      </section>
-      <p className="detail-data-note">Historical queries use the server's organization scope, a 100ms minimum aggregation step, a 30-day maximum range and a 5,000-point backend limit. The live stream is ephemeral; reconnects obtain a fresh single-use ticket and refresh this durable history.</p>
+        <ServerMetricChart points={points} range={range} unit={selectedMetric.unit} loading={loading} />
+      </article>
+
+      <div className="detail-footnote">
+        Historical values use bounded PostgreSQL aggregation. Live values are published only after the backend confirms the durable batch commit. Gaps represent missing samples and are not zero-filled.
+      </div>
     </section>
   );
 }
