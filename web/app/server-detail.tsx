@@ -344,7 +344,7 @@ export function ServerDetail({
             };
             setLivePoints((previous) => {
               const cutoff = Date.now() - rangeConfig.durationMs;
-              return [...previous, ...observed]
+              return [...previous, observed]
                 .filter((point) => new Date(point.bucket).getTime() >= cutoff)
                 .sort((left, right) => new Date(left.bucket).getTime() - new Date(right.bucket).getTime())
                 .slice(-500);
