@@ -41,7 +41,7 @@ No item may be marked Verified based only on a code stub, mock UI, or documentat
 | F-024 | Alert evaluation and recovery | P1 | Alert rule/evaluation and recovery workflows plus dashboard views are implemented; current deterministic end-to-end verification remains | In Progress |
 | F-025 | Notifications | P1 | Persisted in-app firing/recovery notifications and read-state UI are present; external provider delivery/retry is not implemented | In Progress |
 | F-026 | Secure remote restart/stop | P1 | Backend and native agent support allowlisted systemd restart/stop with owner/admin authorization, expiry and audit; operator UI added; full agent end-to-end acceptance remains | In Progress |
-| F-027 | Windows agent | P1 | OS-version-specific collector and installer test suite | Planned |
+| F-027 | Windows agent | P1 | Initial Windows collector for CPU, memory/swap, disk capacity and I/O, network throughput, uptime, host identity and process RSS; Docker-based x64 build/run helpers and Windows runtime acceptance tests added; Windows CI/runtime verification, service installation and signed installer remain | In Progress |
 | F-028 | macOS agent | P1 | OS-version-specific collector and installer test suite | Planned |
 | F-029 | Signed installers and upgrades | P1 | Signature validation, install, upgrade, rollback, and uninstall tests | Planned |
 | F-030 | Role-based access and tenant isolation | P1 | API, WebSocket, and cross-tenant denial tests | Verified |
