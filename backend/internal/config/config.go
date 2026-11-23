@@ -5,7 +5,6 @@ import (
 	"net/url"
 	"os"
 	"regexp"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -24,9 +23,9 @@ type Config struct {
 	DBMaxIdleConnections int
 	DBConnectionLifetime time.Duration
 	StartupTimeout       time.Duration
-	WebAllowedOrigins     []string
-	RemoteAllowedUnits    []string
-	DisableAuthentication bool
+	WebAllowedOrigins      []string
+	RemoteAllowedUnits     []string
+	DisableAuthentication  bool
 }
 
 // Load reads and validates environment-based configuration.
@@ -47,11 +46,11 @@ func Load() (Config, error) {
 		StartupTimeout:       10 * time.Second,
 	}
 
-	disableAuthentication, parseErr := strconv.ParseBool(getEnv("MONITOR_ME_AUTH_DISABLED", "false"))
-	if parseErr != nil {
+	disableAuthentication := getEnv("MONITOR_ME_AUTH_DISABLED", "false")
+	if disableAuthentication != "true" && disableAuthentication != "false" {
 		return Config{}, fmt.Errorf("MONITOR_ME_AUTH_DISABLED must be true or false")
 	}
-	cfg.DisableAuthentication = disableAuthentication
+	cfg.DisableAuthentication = disableAuthentication == "true"
 
 	var err error
 	cfg.WebAllowedOrigins, err = parseWebAllowedOrigins(getEnv("WEB_ALLOWED_ORIGINS", "http://localhost:3000"))
