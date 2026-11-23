@@ -16,15 +16,15 @@ import (
 )
 
 type API struct {
-	identities         *identity.Store
-	cache              *redisv9.Client
-	telemetry          *telemetry.Store
-	allowedLiveOrigins map[string]struct{}
-	allowedRemoteUnits []string
-	disableAuthentication bool
-	localPrincipalMu sync.Mutex
-	localPrincipal identity.Principal
-	localPrincipalExpiresAt time.Time
+	identities                *identity.Store
+	cache                     *redisv9.Client
+	telemetry                 *telemetry.Store
+	allowedLiveOrigins        map[string]struct{}
+	allowedRemoteUnits        []string
+	disableAuthentication     bool
+	localPrincipalMu          sync.Mutex
+	localPrincipal            identity.Principal
+	localPrincipalExpiresAt   time.Time
 }
 
 type principalContextKey struct{}
@@ -49,6 +49,7 @@ func (api *API) anonymousLocalPrincipal(ctx context.Context) (identity.Principal
 func (api *API) authenticationDisabled(writer http.ResponseWriter, request *http.Request) {
 	writeAPIError(writer, http.StatusNotFound, "authentication_disabled", "Interactive login is disabled in local anonymous mode.")
 }
+
 func (api *API) requireAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		if api.disableAuthentication {
