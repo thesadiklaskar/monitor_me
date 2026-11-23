@@ -13,18 +13,18 @@ This file is the authoritative resume point for Monitor Me. Read it before makin
 | Branch policy | All work and commits are made directly on main; do not create another branch |
 | Repository visibility | Private |
 | Completed phases | Phase 1 — Product Specification and Technical Blueprint; Phase 2 — Platform Foundation and Secure Connectivity; Phase 3 — Monitoring Agent and Telemetry Data Engine |
-| Current phase | Phase 4 acceptance and Phase 5 Linux-MVP release preparation |
+| Current phase | Phase 4 dashboard acceptance and Phase 5 Linux-MVP / Windows local-agent validation |
 | Current phase status | In Progress — implementation is present; end-to-end acceptance is pending |
 | MVP status | Dashboard workflows are implemented; owner-led local acceptance and production-host verification remain before release |
-| Implementation status | Phases 1–3 remain Completed. Phase 4 has authenticated server inventory/enrollment, historical/live charts, project/mapping administration, alerts/in-app notifications, and allowlisted remote systemd operations with audit history. Phase 5 Linux preparation adds a production Compose topology, Nginx reverse-proxy example, dry-run/additive UFW/firewalld helper, DB backup/restore, health probes and app-image rollback. No production VPS deployment or restore rehearsal has been executed. |
+| Implementation status | Phases 1–3 remain Completed. Phase 4 has authenticated server inventory/enrollment, historical/live charts, project/mapping administration, alerts/in-app notifications, and allowlisted remote systemd operations with audit history. Phase 5 Linux preparation includes production Compose/Nginx, firewall, backup/restore, health probes and rollback tooling; no production VPS deployment or restore rehearsal has been executed. An initial Windows collector, Windows-aware agent state handling, local Docker-based x64 build/run scripts, host-health snapshot UI and Windows acceptance tests are now committed; Windows runtime/build verification, service installation/signing and macOS collector remain pending. |
 | Last source commit covered by latest successful CI run | 9685e115113123d5f9f8e8a1b222804752f5a283 (Go, frontend and native-agent jobs passed in run #45203706343; Compose integration failed at the web proxy login probe; later commits are not covered) |
 | Latest CI run | [#45208235137 — quota blocked](https://github.com/WorkRCS/monitor_me/actions/runs/45208235137); jobs failed before runner assignment/steps because the repository owner reports GitHub Actions free minutes are exhausted |
-| Latest implementation commit | [20561a1822c4cd7349f64259177de480c79ce3a5](https://github.com/WorkRCS/monitor_me/commit/20561a1822c4cd7349f64259177de480c79ce3a5) — remote operations, Linux production tooling and release state |
-| Next action | Owner performs the local acceptance checklist in docs/ACCEPTANCE_TEST_CHECKLIST.md using the root docker-compose.yml and a real Linux agent/VM. Do not run deploy/production or firewall scripts for local acceptance. |
+| Latest implementation commit | Pending update after the current Windows collector and local-acceptance slice is committed |
+| Next action | Owner pulls main, rebuilds the web service, runs scripts/build-windows-agent.ps1, creates a Windows local PC server record, then runs scripts/run-windows-agent.ps1 and verifies CPU/memory/disk/network/uptime/process/System information in the dashboard. Keep Windows acceptance In Progress until the actual Windows build and runtime checks pass. Do not delete local volumes or run production/firewall scripts for this local test. |
 
 ## Next Work Session — 2026-11-23
 
-**Target:** Owner-led Phase 4 acceptance followed by Phase 5 Linux-MVP host validation. Dashboard and deployment/firewall tooling are implemented; current status is In Progress pending test evidence and a real target host.
+**Target:** Owner-led Phase 4 acceptance, local Windows-agent validation, followed by Phase 5 Linux-MVP host validation. Dashboard and deployment/firewall tooling are implemented; current status is In Progress pending runtime test evidence and a real target host.
 
 ### Ordered release plan
 
@@ -33,7 +33,7 @@ This file is the authoritative resume point for Monitor Me. Read it before makin
 3. Complete the controlled production deployment/shift, including TLS, secrets, private PostgreSQL/Redis, migrations, backups/restore, health checks, and rollback.
 4. After Phase 4 and Phase 5, the project owner performs the first local end-to-end acceptance test before wider rollout or additional expansion work.
 
-Phase 5 has two primary release deliverables for this Linux-first MVP: **(a) firewall setup** and **(b) production shift**. Windows/macOS support and fleet-scale work remain separate broader roadmap items; the Linux production cutover must not be represented as completing them.
+Phase 5 has two primary release deliverables for this Linux-first MVP: **(a) firewall setup** and **(b) production shift**. Windows support has an initial collector slice but still needs runtime verification, service lifecycle and signing; macOS support and fleet-scale work remain broader roadmap items. A Linux production cutover must not be represented as completing them.
 
 ### Phase 4 resume point
 
@@ -223,3 +223,13 @@ Do not start charts, alerts, project switching or remote actions until the authe
 ## Session History
 
 Phase 1 and Phase 2 implementation/verification history is recorded above. The final Phase 1–3 audit passed all four jobs in [GitHub Actions run #45043161542](https://github.com/WorkRCS/monitor_me/actions/runs/45043161542).
+
+
+## Windows Local-Agent Slice — 2026-11-23
+
+- Added a Windows-specific collector using gopsutil for CPU, memory/swap, mounted-volume capacity, disk/network counters, uptime, host identity and readable process RSS.
+- Added explicit Windows capabilities; Linux-only TCP/listening-port, cgroup/Systemd/container attribution and systemd remote actions are not advertised or run on Windows.
+- Added Windows-specific collector tests, Docker-based x64 cross-build and PowerShell foreground-run helpers.
+- Added a host-health snapshot and System information panel to server detail.
+- Made persisted agent session handling compatible with Windows FileMode behavior; the supported local helper stores session/WAL below the current user's LOCALAPPDATA.
+- Verification status: GitHub code and docs were inspected, but no Windows runtime or compile test has yet been executed for these new commits. GitHub Actions quota is still blocked. The owner must run the local PowerShell build and agent acceptance helper to provide actual Windows verification.
