@@ -23,7 +23,7 @@ The agreed order is:
 3. **Phase 5 — Production shift:** deploy the verified control plane and agent workflow to the selected production VPS/VM with TLS, private data services, backups/restore, health checks, and rollback.
 4. **Owner-led local acceptance:** after Phase 4 and Phase 5, the project owner performs the first end-to-end local acceptance test before wider rollout or additional expansion work.
 
-For the first Linux MVP release, Phase 5 has two primary release deliverables: firewall setup and production deployment/shift. Windows/macOS collectors and fleet-scale validation remain broader roadmap work and must not be claimed as complete by a Linux-only production cutover.
+For the first Linux MVP release, Phase 5 has two primary release deliverables: firewall setup and production deployment/shift. An initial Windows collector is now implemented for local acceptance, but Windows runtime verification, service lifecycle and signing remain in progress; macOS collectors and fleet-scale validation remain broader roadmap work and must not be claimed as complete by a Linux-only production cutover.
 
 ---
 
@@ -199,7 +199,7 @@ For the first Linux MVP release, Phase 5 has two primary release deliverables: f
 
 **5B. Production shift** — deploy the verified Linux-first control plane and agent workflow to the selected VPS/VM. Configure DNS/TLS/reverse proxy and the gRPC endpoint, secure secrets, keep PostgreSQL/Redis private, apply migrations, exercise backup/restore, health/readiness, restart/recovery, and document cutover/rollback. Do not enable broad external onboarding until the owner completes the planned local acceptance test.
 
-Windows/macOS support, signed cross-platform installers, and fleet-scale capacity work remain broader Phase 5 expansion/hardening requirements. A Linux-only cutover does not complete those items.
+Windows support has an initial local collector slice but remains in progress until Windows runtime acceptance, service lifecycle and signing are complete. macOS support, signed cross-platform installers, and fleet-scale capacity work remain broader Phase 5 expansion/hardening requirements. A Linux-only cutover does not complete those items.
 
 ### Linux MVP implementation update — 2026-11-23
 
