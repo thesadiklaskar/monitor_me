@@ -2,6 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { apiRequest } from "@/lib/client-api";
+import { ServerDetail } from "./server-detail";
 
 type User = {
   id?: string;
@@ -38,7 +39,7 @@ type IssuedServer = {
 
 type AuthResponse = { user: User; expires_at: string };
 type InventoryResponse = { servers: Server[] };
-type ConfigResponse = { agent_grpc_address: string | null };
+type ConfigResponse = { agent_grpc_address: string | null; public_api_url: string | null };
 
 type ViewState = "checking" | "signed-out" | "signed-in";
 type AuthMode = "login" | "register";
@@ -381,10 +382,12 @@ function ServerRow({
   server,
   canRotate,
   onRotate,
+  onOpen,
 }: {
   server: Server;
   canRotate: boolean;
   onRotate: (server: Server) => void;
+  onOpen: (server: Server) => void;
 }) {
   return (
     <tr>
@@ -392,7 +395,7 @@ function ServerRow({
         <div className="server-name-cell">
           <span className={`status-dot status-dot-${server.status.toLowerCase()}`} />
           <div>
-            <strong>{server.name}</strong>
+            <button className="server-open-link" type="button" onClick={() => onOpen(server)}>{server.name}</button>
             <span>{server.hostname || "Hostname not provided"}</span>
           </div>
         </div>
@@ -426,6 +429,8 @@ export default function DashboardClient() {
   const [showAdd, setShowAdd] = useState(false);
   const [issued, setIssued] = useState<IssuedServer | null>(null);
   const [grpcAddress, setGrpcAddress] = useState<string | null>(null);
+  const [publicAPIURL, setPublicAPIURL] = useState<string | null>(null);
+  const [selectedServer, setSelectedServer] = useState<Server | null>(null);
   const [logoutBusy, setLogoutBusy] = useState(false);
 
   const loadServers = useCallback(async () => {
@@ -453,6 +458,7 @@ export default function DashboardClient() {
       setUser(session.user);
       setView("signed-in");
       setGrpcAddress(config.agent_grpc_address);
+      setPublicAPIURL(config.public_api_url);
       await loadServers();
     }).catch(() => {
       if (!active) return;
@@ -541,6 +547,9 @@ export default function DashboardClient() {
       </aside>
 
       <main className="dashboard-main" id="servers">
+        {selectedServer ? (
+          <ServerDetail server={selectedServer} apiPublicURL={publicAPIURL} onBack={() => setSelectedServer(null)} />
+        ) : <>
         <header className="topbar">
           <div><span className="breadcrumbs">Workspace / Servers</span><h1>Server overview</h1></div>
           <div className="topbar-actions">
@@ -587,12 +596,13 @@ export default function DashboardClient() {
             <div className="table-wrap">
               <table>
                 <thead><tr><th>Server</th><th>Status</th><th>Last heartbeat</th><th>Added</th><th aria-label="Actions" /></tr></thead>
-                <tbody>{servers.map((server) => <ServerRow key={server.id} server={server} canRotate={canCreate} onRotate={rotateToken} />)}</tbody>
+                <tbody>{servers.map((server) => <ServerRow key={server.id} server={server} canRotate={canCreate} onRotate={rotateToken} onOpen={setSelectedServer} />)}</tbody>
               </table>
             </div>
           )}
         </section>
         <footer className="dashboard-footer"><span>Monitor Me · Custom infrastructure monitoring</span><span>Linux agent · Telemetry API · Organization-scoped access</span></footer>
+        </>}
       </main>
 
       {showAdd && <AddServerDialog onClose={() => setShowAdd(false)} onCreated={(created) => { setShowAdd(false); setIssued(created); void loadServers(); }} />}
