@@ -272,6 +272,40 @@ func TestPhase2AuthenticationAndAgentLifecycle(t *testing.T) {
 		t.Fatalf("valid heartbeat was not accepted: response=%v error=%v", heartbeat, err)
 	}
 
+	// Rotating a still-pending server credential invalidates the previous unused token.
+	pendingServer := createServer(t, ctx, baseURL, bearer, "pending-token-rotation-node")
+	pendingHash := sha256.Sum256([]byte(pendingServer.Enrollment.Token))
+	pendingRotation := requestJSON(t, ctx, http.MethodPost,
+		baseURL+"/v1/servers/"+pendingServer.Server.ID+"/enrollment-token", bearer, map[string]any{})
+	if pendingRotation.StatusCode != http.StatusCreated {
+		t.Fatalf("rotate pending server token: expected 201, got %d: %s", pendingRotation.StatusCode, pendingRotation.Body)
+	}
+	var pendingRotationResult apiResponse
+	decodeResponse(t, pendingRotation.Body, &pendingRotationResult)
+	var revokedAt sql.NullTime
+	if err := database.QueryRowContext(ctx,
+		"SELECT revoked_at FROM agent_enrollment_tokens WHERE token_hash = $1", pendingHash[:],
+	).Scan(&revokedAt); err != nil {
+		t.Fatalf("read replaced enrollment-token revocation: %v", err)
+	}
+	if !revokedAt.Valid {
+		t.Fatal("reissuing an enrollment token must revoke the previous unused credential")
+	}
+	if _, err := agentClient.Enroll(ctx, &monitorv1.EnrollRequest{
+		EnrollmentToken: pendingServer.Enrollment.Token,
+		AgentVersion: "0.1.0-test", OperatingSystem: "linux", Architecture: "amd64",
+		Hostname: "pending-token-rotation-node",
+	}); err == nil || status.Code(err) != codes.Unauthenticated {
+		t.Fatalf("replaced enrollment token must be rejected, got %v", err)
+	}
+	if _, err := agentClient.Enroll(ctx, &monitorv1.EnrollRequest{
+		EnrollmentToken: pendingRotationResult.Enrollment.Token,
+		AgentVersion: "0.1.0-test", OperatingSystem: "linux", Architecture: "amd64",
+		Hostname: "pending-token-rotation-node",
+	}); err != nil {
+		t.Fatalf("replacement enrollment token should be accepted: %v", err)
+	}
+
 	// A process restart or network reconnect must reuse the persisted session credential.
 	if err := connection.Close(); err != nil {
 		t.Fatalf("close first gRPC connection: %v", err)

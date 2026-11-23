@@ -478,6 +478,17 @@ func (s *Store) ReissueEnrollmentToken(ctx context.Context, principal Principal,
 		return IssuedServer{}, fmt.Errorf("load organization server for token rotation: %w", err)
 	}
 
+	// A rotation replaces all unused credentials so only the newly returned
+	// secret can enroll this server after the transaction commits.
+	if _, err := tx.ExecContext(ctx, `
+		UPDATE agent_enrollment_tokens
+		SET revoked_at = COALESCE(revoked_at, now())
+		WHERE organization_id = $1 AND server_id = $2
+		  AND consumed_at IS NULL AND revoked_at IS NULL
+	`, principal.OrganizationID, serverID); err != nil {
+		return IssuedServer{}, fmt.Errorf("revoke previous unused enrollment tokens: %w", err)
+	}
+
 	var tokenID string
 	err = tx.QueryRowContext(ctx, `
 		INSERT INTO agent_enrollment_tokens (organization_id, server_id, token_hash, created_by, expires_at)

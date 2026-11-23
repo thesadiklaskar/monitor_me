@@ -228,11 +228,13 @@ function EnrollmentDialog({
   grpcAddress,
   onClose,
   onRevoked,
+  canRevoke,
 }: {
   issued: IssuedServer;
   grpcAddress: string | null;
   onClose: () => void;
   onRevoked: () => void;
+  canRevoke: boolean;
 }) {
   const [copied, setCopied] = useState(false);
   const [revoking, setRevoking] = useState(false);
@@ -303,9 +305,11 @@ function EnrollmentDialog({
 
         {error && <div className="notice notice-error" role="alert">{error}</div>}
         <div className="modal-actions">
-          <button className="button button-danger" type="button" onClick={revokeToken} disabled={revoking}>
-            {revoking ? "Revoking…" : "Revoke this token"}
-          </button>
+          {canRevoke && (
+            <button className="button button-danger" type="button" onClick={revokeToken} disabled={revoking}>
+              {revoking ? "Revoking…" : "Revoke this token"}
+            </button>
+          )}
           <button className="button button-primary" type="button" onClick={onClose}>Done</button>
         </div>
       </section>
@@ -598,6 +602,7 @@ export default function DashboardClient() {
           grpcAddress={grpcAddress}
           onClose={() => setIssued(null)}
           onRevoked={() => { setIssued(null); setNotice("The one-time enrollment token was revoked."); }}
+          canRevoke={canAdminister(user.role)}
         />
       )}
     </div>
