@@ -17,13 +17,6 @@ var errSlowLiveClient = errors.New("live client exceeded its bounded output buff
 var liveUpgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
-	CheckOrigin: func(request *http.Request) bool {
-		origin, err := url.Parse(request.Header.Get("Origin"))
-		if err != nil || origin.Host == "" || origin.Host != request.Host {
-			return false
-		}
-		return origin.Scheme == "http" || origin.Scheme == "https"
-	},
 }
 
 func (api *API) createLiveTicket(writer http.ResponseWriter, request *http.Request) {
@@ -44,6 +37,20 @@ func (api *API) createLiveTicket(writer http.ResponseWriter, request *http.Reque
 	})
 }
 
+func (api *API) liveOriginAllowed(request *http.Request) bool {
+	origin, err := url.Parse(request.Header.Get("Origin"))
+	if err != nil || origin.Host == "" || origin.User != nil ||
+		origin.Path != "" || origin.RawQuery != "" || origin.Fragment != "" ||
+		(origin.Scheme != "http" && origin.Scheme != "https") {
+		return false
+	}
+	if origin.Host == request.Host {
+		return true
+	}
+	_, allowed := api.allowedLiveOrigins[origin.Scheme+"://"+origin.Host]
+	return allowed
+}
+
 func (api *API) liveStream(writer http.ResponseWriter, request *http.Request) {
 	token := request.URL.Query().Get("ticket")
 	principal, err := api.identities.ConsumeLiveTicket(request.Context(), token)
@@ -62,7 +69,9 @@ func (api *API) liveStream(writer http.ResponseWriter, request *http.Request) {
 		return
 	}
 
-	connection, err := liveUpgrader.Upgrade(writer, request, nil)
+	upgrader := liveUpgrader
+	upgrader.CheckOrigin = api.liveOriginAllowed
+	connection, err := upgrader.Upgrade(writer, request, nil)
 	if err != nil {
 		return
 	}

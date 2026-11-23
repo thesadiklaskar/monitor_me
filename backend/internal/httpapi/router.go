@@ -17,8 +17,9 @@ type Dependency struct {
 }
 
 type LiveDependencies struct {
-	Cache     *redisv9.Client
-	Telemetry *telemetry.Store
+	Cache          *redisv9.Client
+	Telemetry      *telemetry.Store
+	AllowedOrigins []string
 }
 
 // NewRouter registers health, identity, inventory, telemetry, and live routes.
@@ -33,6 +34,10 @@ func NewRouter(version string, dependencies []Dependency, identities *identity.S
 		if len(live) > 0 {
 			api.cache = live[0].Cache
 			api.telemetry = live[0].Telemetry
+			api.allowedLiveOrigins = make(map[string]struct{}, len(live[0].AllowedOrigins))
+			for _, origin := range live[0].AllowedOrigins {
+				api.allowedLiveOrigins[origin] = struct{}{}
+			}
 		}
 		mux.HandleFunc("POST /v1/auth/register", api.register)
 		mux.HandleFunc("POST /v1/auth/login", api.login)

@@ -16,7 +16,8 @@ import (
 type API struct {
 	identities *identity.Store
 	cache      *redisv9.Client
-	telemetry  *telemetry.Store
+	telemetry          *telemetry.Store
+	allowedLiveOrigins map[string]struct{}
 }
 
 type principalContextKey struct{}
