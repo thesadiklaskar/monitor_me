@@ -243,15 +243,51 @@ func (s *Service) publishCommittedBatch(ctx context.Context, organizationID, ser
 	if s.publisher == nil {
 		return
 	}
-	samples := make([]telemetry.LiveSample, 0, len(batch.GetSamples()))
-	for _, sample := range batch.GetSamples() {
-		samples = append(samples, telemetry.LiveSample{
-			MetricName: sample.GetMetricName(), Value: sample.GetValue(), Unit: sample.GetUnit(),
-			Labels: sample.GetLabels(), ObservedAtUnixNanos: sample.GetObservedAtUnixNanos(),
-		})
-	}
 	publishContext, cancel := context.WithTimeout(context.WithoutCancel(ctx), 2*time.Second)
 	defer cancel()
+
+	// Read committed rows so live events carry the exact project attribution
+	// assigned by the PostgreSQL transaction used for historical queries.
+	rows, err := s.db.QueryContext(publishContext, `
+		SELECT metric_name, value, unit, labels, COALESCE(project_id::text, ''),
+		       (EXTRACT(EPOCH FROM observed_at) * 1000000000)::bigint
+		FROM telemetry_samples
+		WHERE agent_id = $1 AND batch_id = $2
+		ORDER BY id
+	`, agentID, batch.GetBatchId())
+	if err != nil {
+		slog.Default().Warn("committed telemetry could not be loaded for live delivery",
+			"server_id", serverID, "batch_id", batch.GetBatchId(), "error", err)
+		return
+	}
+	defer rows.Close()
+
+	samples := make([]telemetry.LiveSample, 0, len(batch.GetSamples()))
+	for rows.Next() {
+		var sample telemetry.LiveSample
+		var labelsJSON []byte
+		if err := rows.Scan(
+			&sample.MetricName, &sample.Value, &sample.Unit, &labelsJSON,
+			&sample.ProjectID, &sample.ObservedAtUnixNanos,
+		); err != nil {
+			slog.Default().Warn("committed telemetry row could not be read for live delivery",
+				"server_id", serverID, "batch_id", batch.GetBatchId(), "error", err)
+			return
+		}
+		if len(labelsJSON) > 0 {
+			if err := json.Unmarshal(labelsJSON, &sample.Labels); err != nil {
+				slog.Default().Warn("committed telemetry labels could not be decoded for live delivery",
+					"server_id", serverID, "batch_id", batch.GetBatchId(), "error", err)
+				return
+			}
+		}
+		samples = append(samples, sample)
+	}
+	if err := rows.Err(); err != nil {
+		slog.Default().Warn("committed telemetry rows could not be iterated for live delivery",
+			"server_id", serverID, "batch_id", batch.GetBatchId(), "error", err)
+		return
+	}
 	if err := telemetry.PublishCommittedBatch(
 		publishContext, s.publisher, organizationID, serverID, agentID, batch.GetBatchId(), samples,
 	); err != nil {

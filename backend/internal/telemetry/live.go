@@ -34,6 +34,7 @@ type LiveSample struct {
 	Value               float64           `json:"value"`
 	Unit                string            `json:"unit"`
 	Labels              map[string]string `json:"labels,omitempty"`
+	ProjectID           string            `json:"project_id,omitempty"`
 	ObservedAtUnixNanos int64             `json:"observed_at_unix_nanos"`
 }
 
@@ -76,7 +77,7 @@ func PublishCommittedBatch(ctx context.Context, publisher EventPublisher, organi
 			return fmt.Errorf("encode live metric labels: %w", err)
 		}
 		sample.Labels = labels
-		latest[sample.MetricName+string(labelIdentity)] = sample
+		latest[sample.MetricName+sample.ProjectID+string(labelIdentity)] = sample
 	}
 	keys := make([]string, 0, len(latest))
 	for key := range latest {
