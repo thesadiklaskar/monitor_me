@@ -1122,7 +1122,6 @@ func (s *Store) MarkAlertNotificationRead(ctx context.Context, principal Princip
 	return nil
 }
 
-
 // CreateRemoteOperation queues a constrained systemd operation for a currently
 // online agent. The API allowlist is checked here and independently by the agent.
 func (s *Store) CreateRemoteOperation(
@@ -1235,9 +1234,15 @@ func (s *Store) ListRemoteOperations(ctx context.Context, principal Principal) (
 		); err != nil {
 			return nil, fmt.Errorf("scan remote operation: %w", err)
 		}
-		if result.Valid { item.Result = result.String }
-		if dispatchedAt.Valid { item.DispatchedAt = &dispatchedAt.Time }
-		if completedAt.Valid { item.CompletedAt = &completedAt.Time }
+		if result.Valid {
+			item.Result = result.String
+		}
+		if dispatchedAt.Valid {
+			item.DispatchedAt = &dispatchedAt.Time
+		}
+		if completedAt.Valid {
+			item.CompletedAt = &completedAt.Time
+		}
 		items = append(items, item)
 	}
 	if err := rows.Err(); err != nil {
