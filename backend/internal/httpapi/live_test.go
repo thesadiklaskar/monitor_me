@@ -16,7 +16,6 @@ func TestBoundedLiveQueueRejectsSlowConsumer(t *testing.T) {
 	}
 }
 
-
 func TestLiveOriginAllowlistSeparatesAllowedAndUntrustedOrigins(t *testing.T) {
 	api := &API{allowedLiveOrigins: map[string]struct{}{"http://localhost:3000": {}}}
 	tests := []struct {
