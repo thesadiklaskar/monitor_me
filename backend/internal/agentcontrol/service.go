@@ -287,12 +287,12 @@ func (s *Service) publishCommittedBatch(ctx context.Context, organizationID, ser
 	}
 	evaluateCommittedSamples(publishContext, s.db, organizationID, serverID, samples)
 	if s.publisher != nil {
-	if err := telemetry.PublishCommittedBatch(
-		publishContext, s.publisher, organizationID, serverID, agentID, batch.GetBatchId(), samples,
-	); err != nil {
-		slog.Default().Warn("durable telemetry committed but live notification failed",
-			"server_id", serverID, "batch_id", batch.GetBatchId(), "error", err)
-	}
+		if err := telemetry.PublishCommittedBatch(
+			publishContext, s.publisher, organizationID, serverID, agentID, batch.GetBatchId(), samples,
+		); err != nil {
+			slog.Default().Warn("durable telemetry committed but live notification failed",
+				"server_id", serverID, "batch_id", batch.GetBatchId(), "error", err)
+		}
 	}
 }
 

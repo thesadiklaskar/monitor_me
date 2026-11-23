@@ -224,7 +224,7 @@ func TestPhase2AuthenticationAndAgentLifecycle(t *testing.T) {
 	}
 	var createdProject struct {
 		Project struct {
-			ID string `json:"id"`
+			ID   string `json:"id"`
 			Name string `json:"name"`
 		} `json:"project"`
 	}
@@ -242,9 +242,9 @@ func TestPhase2AuthenticationAndAgentLifecycle(t *testing.T) {
 
 	mappingCreate := requestJSON(t, ctx, http.MethodPost,
 		baseURL+"/v1/servers/"+serverID+"/project-mappings", bearer, map[string]any{
-			"project_id": createdProject.Project.ID,
-			"workload_type": "systemd",
-			"workload_selector": "payments-api.service",
+			"project_id":         createdProject.Project.ID,
+			"workload_type":      "systemd",
+			"workload_selector":  "payments-api.service",
 			"attribution_method": "systemd",
 		})
 	if mappingCreate.StatusCode != http.StatusCreated {
@@ -252,8 +252,8 @@ func TestPhase2AuthenticationAndAgentLifecycle(t *testing.T) {
 	}
 	var createdMapping struct {
 		Mapping struct {
-			ID string `json:"id"`
-			ProjectID string `json:"project_id"`
+			ID               string `json:"id"`
+			ProjectID        string `json:"project_id"`
 			WorkloadSelector string `json:"workload_selector"`
 		} `json:"mapping"`
 	}
@@ -270,7 +270,7 @@ func TestPhase2AuthenticationAndAgentLifecycle(t *testing.T) {
 	}
 	var listedMappings struct {
 		Mappings []struct {
-			ID string `json:"id"`
+			ID        string `json:"id"`
 			ProjectID string `json:"project_id"`
 		} `json:"mappings"`
 	}
@@ -281,9 +281,9 @@ func TestPhase2AuthenticationAndAgentLifecycle(t *testing.T) {
 
 	viewerMappingCreate := requestJSON(t, ctx, http.MethodPost,
 		baseURL+"/v1/servers/"+serverID+"/project-mappings", viewerSession.AccessToken, map[string]any{
-			"project_id": createdProject.Project.ID,
-			"workload_type": "systemd",
-			"workload_selector": "forbidden.service",
+			"project_id":         createdProject.Project.ID,
+			"workload_type":      "systemd",
+			"workload_selector":  "forbidden.service",
 			"attribution_method": "systemd",
 		})
 	if viewerMappingCreate.StatusCode != http.StatusForbidden {

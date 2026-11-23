@@ -73,24 +73,9 @@ func (api *API) latestMetrics(writer http.ResponseWriter, request *http.Request)
 		return
 	}
 	writeJSON(writer, http.StatusOK, map[string]any{
-		"server_id": query.ServerID,
-		"project_id": query.ProjectID,
+		"server_id":      query.ServerID,
+		"project_id":     query.ProjectID,
 		"window_seconds": 900,
-		"samples": samples,
+		"samples":        samples,
 	})
-}
-
-func (api *API) latestMetrics(writer http.ResponseWriter, request *http.Request) {
-	principal := principalFromRequest(request)
-	query := telemetry.LatestQuery{
-		OrganizationID: principal.OrganizationID,
-		ServerID: request.PathValue("serverID"),
-		ProjectID: request.URL.Query().Get("project_id"),
-	}
-	samples, err := api.telemetry.QueryLatest(request.Context(), query)
-	if err != nil {
-		writeAPIError(writer, http.StatusBadRequest, "invalid_latest_query", err.Error())
-		return
-	}
-	writeJSON(writer, http.StatusOK, map[string]any{"server_id": query.ServerID, "project_id": query.ProjectID, "window_seconds": 900, "samples": samples})
 }
