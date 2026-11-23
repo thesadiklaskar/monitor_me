@@ -242,7 +242,7 @@ export function ServerDetail({
             if (event.type !== "telemetry.batch" || event.server_id !== server.id || !Array.isArray(event.samples)) return;
             const samples = event.samples.filter((sample) => sample.metric_name === metric.key && Number.isFinite(sample.value));
             if (samples.length === 0) return;
-            const value = samples.reduce((total, sample) => total + sample.value, 0);
+            const value = samples.reduce((total, sample) => total + sample.value, 0) / samples.length;
             const observedAtNanos = Math.max(...samples.map((sample) => sample.observed_at_unix_nanos));
             const observedAt = new Date(observedAtNanos / 1_000_000);
             if (Number.isNaN(observedAt.getTime())) return;
