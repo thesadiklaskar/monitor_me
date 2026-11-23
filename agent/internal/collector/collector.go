@@ -40,8 +40,8 @@ type networkCounters struct {
 	receiveBytes, transmitBytes, receivePackets, transmitPackets, receiveErrors, transmitErrors float64
 }
 
-// ProcCollector reads Linux kernel counters and retains only the previous
-// snapshot required to calculate rates over monotonic elapsed time.
+// ProcCollector reads native host counters and retains the previous snapshot
+// required to calculate rates over monotonic elapsed time.
 type ProcCollector struct {
 	root                    string
 	startedAt               time.Time
