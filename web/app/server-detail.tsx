@@ -113,16 +113,19 @@ function ServerMetricChart({
   range,
   unit,
   loading,
+  startTime,
 }: {
   points: MetricPoint[];
   range: TimeRange;
   unit: string;
   loading: boolean;
+  startTime: string | null;
 }) {
   const chart = useMemo(() => {
-    if (points.length === 0) return null;
+    if (points.length === 0 || !startTime) return null;
     const config = ranges[range];
-    const start = Date.now() - config.durationMs;
+    const start = new Date(startTime).getTime();
+    if (!Number.isFinite(start)) return null;
     const values = points
       .map((point) => ({ ...point, time: new Date(point.bucket).getTime() }))
       .filter((point) => Number.isFinite(point.time) && Number.isFinite(point.average) && point.time >= start)
@@ -163,7 +166,7 @@ function ServerMetricChart({
       count: values.reduce((sum, point) => sum + point.sample_count, 0),
       values,
     };
-  }, [points, range]);
+  }, [points, range, startTime]);
 
   if (loading && !chart) {
     return <div className="metric-chart-state">Loading historical samples…</div>;
@@ -195,7 +198,7 @@ function ServerMetricChart({
         ))}
       </svg>
       <div className="chart-axis-row">
-        <span>{formatTimestamp(new Date(Date.now() - ranges[range].durationMs).toISOString())}</span>
+        <span>{formatTimestamp(startTime)}</span>
         <span>{chart.count.toLocaleString()} stored samples · gaps remain visible</span>
         <span>Now</span>
       </div>
@@ -249,16 +252,11 @@ export default function ServerDetail({
   }, [metric, rangeConfig.durationMs, rangeConfig.step, server.id]);
 
   useEffect(() => {
-    setLivePoints([]);
     void loadHistory();
   }, [loadHistory]);
 
   useEffect(() => {
-    if (!apiPublicURL) {
-      setLiveState("disabled");
-      setLiveMessage("Live updates are not configured. Historical data remains available.");
-      return;
-    }
+    if (!apiPublicURL) return;
 
     let stopped = false;
     let socket: WebSocket | null = null;
@@ -361,8 +359,11 @@ export default function ServerDetail({
     );
   }, [livePoints, series]);
 
-  const lastSeen = server.agent_last_seen_at ? new Date(server.agent_last_seen_at) : null;
-  const isStale = !lastSeen || Number.isNaN(lastSeen.getTime()) || Date.now() - lastSeen.getTime() > 60_000;
+  const isStale = ["stale", "offline"].includes(server.status.toLowerCase());
+  const effectiveLiveState = apiPublicURL ? liveState : "disabled";
+  const effectiveLiveMessage = apiPublicURL
+    ? liveMessage
+    : "Live updates are not configured. Historical data remains available.";
 
   return (
     <section className="server-detail">
@@ -384,7 +385,7 @@ export default function ServerDetail({
       <div className="detail-toolbar">
         <label className="metric-select-field">
           <span>Metric</span>
-          <select value={metric} onChange={(event) => setMetric(event.target.value)}>
+          <select value={metric} onChange={(event) => { setLivePoints([]); setMetric(event.target.value); }}>
             {metricDefinitions.map((definition) => (
               <option key={definition.name} value={definition.name}>{definition.label}</option>
             ))}
@@ -396,7 +397,7 @@ export default function ServerDetail({
               key={value}
               type="button"
               className={range === value ? "range-button range-button-active" : "range-button"}
-              onClick={() => setRange(value)}
+              onClick={() => { setLivePoints([]); setRange(value); }}
             >
               {value}
             </button>
@@ -408,9 +409,9 @@ export default function ServerDetail({
       </div>
 
       <div className="live-status-strip">
-        <span className={`status-dot ${liveState === "live" ? "status-dot-online" : liveState === "disabled" ? "status-dot-disabled" : "status-dot-pending"}`} />
-        <strong>{liveState === "live" ? "Live" : liveState === "disabled" ? "History only" : liveState === "connecting" ? "Connecting" : "Reconnecting"}</strong>
-        <span>{liveMessage}</span>
+        <span className={`status-dot ${effectiveLiveState === "live" ? "status-dot-online" : effectiveLiveState === "disabled" ? "status-dot-disabled" : "status-dot-pending"}`} />
+        <strong>{effectiveLiveState === "live" ? "Live" : effectiveLiveState === "disabled" ? "History only" : effectiveLiveState === "connecting" ? "Connecting" : "Reconnecting"}</strong>
+        <span>{effectiveLiveMessage}</span>
       </div>
 
       {historyError && <div className="notice notice-error" role="alert">{historyError}</div>}
@@ -423,7 +424,7 @@ export default function ServerDetail({
           </div>
           <span className="metric-sample-count">{points.reduce((sum, point) => sum + point.sample_count, 0).toLocaleString()} points</span>
         </div>
-        <ServerMetricChart points={points} range={range} unit={selectedMetric.unit} loading={loading} />
+        <ServerMetricChart points={points} range={range} unit={selectedMetric.unit} loading={loading} startTime={series?.from ?? null} />
       </article>
 
       <div className="detail-footnote">
