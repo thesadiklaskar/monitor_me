@@ -11,7 +11,7 @@ import (
 func (api *API) remoteOperationConfig(writer http.ResponseWriter, request *http.Request) {
 	writeJSON(writer, http.StatusOK, map[string]any{
 		"allowed_systemd_units": api.allowedRemoteUnits,
-		"operations": []string{"restart_service", "stop_service"},
+		"operations":            []string{"restart_service", "stop_service"},
 	})
 }
 
@@ -55,4 +55,15 @@ func (api *API) listRemoteOperations(writer http.ResponseWriter, request *http.R
 		return
 	}
 	writeJSON(writer, http.StatusOK, map[string]any{"operations": operations, "audit": audit})
+}
+
+
+// listRemoteOperationAudit returns the organization-scoped audit history.
+func (api *API) listRemoteOperationAudit(writer http.ResponseWriter, request *http.Request) {
+	audit, err := api.identities.ListRemoteOperationAudit(request.Context(), principalFromRequest(request))
+	if err != nil {
+		writeAPIError(writer, http.StatusInternalServerError, "remote_audit_failed", "Remote operation audit history could not be loaded.")
+		return
+	}
+	writeJSON(writer, http.StatusOK, map[string]any{"audit": audit})
 }
