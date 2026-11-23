@@ -4,7 +4,7 @@
 
 The product is being built around its own native host agent, telemetry ingestion pipeline, metric model, project attribution, alert engine, and operator dashboard. It is intended for infrastructure engineers, platform teams, and organizations that need clear visibility into servers, workloads, and applications.
 
-> **Project setup:** **Completed** — repository structure, local development stack, database migrations, and the Phase 1–3 CI baseline are established and verified. **Product status:** Phases 1, 2 and 3 are complete. The final Phase 1–3 audit on `main` passed all four CI jobs in [GitHub Actions run #45045054465](https://github.com/WorkRCS/monitor_me/actions/runs/45045054465). The verified Linux-first implementation includes native host collection, a durable bounded agent WAL, TLS gRPC delivery, idempotent PostgreSQL history, bounded historical queries, retention, organization-scoped WebSocket delivery, and explicit cgroup/Systemd/container workload attribution. Phase 4 — Dashboard and Operational Features started on 2026-11-23. The first implementation slice adds first-owner/login/logout, an organization-scoped server inventory, Add Server, one-time enrollment-token handling, and secure server-side session cookies; the full monitoring dashboard remains in progress. Phase 5 production work, including firewall setup, is still planned. The setup baseline is complete; the operator-facing MVP is not yet released.
+> **Project setup:** **Completed** — repository structure, local development stack, database migrations, and the Phase 1–3 CI baseline are established and verified. **Product status:** Phases 1, 2 and 3 are complete. The final Phase 1–3 audit on `main` passed all four CI jobs in [GitHub Actions run #45045054465](https://github.com/WorkRCS/monitor_me/actions/runs/45045054465). The verified Linux-first implementation includes native host collection, a durable bounded agent WAL, TLS gRPC delivery, idempotent PostgreSQL history, bounded historical queries, retention, organization-scoped WebSocket delivery, and explicit cgroup/Systemd/container workload attribution. Phase 4 — Dashboard and Operational Features started on 2026-11-23. The first implementation slice adds first-owner/login/logout, an organization-scoped server inventory, Add Server, one-time enrollment-token handling, and secure server-side session cookies. These changes pass all four jobs in [Phase 4 CI run #45188259431](https://github.com/WorkRCS/monitor_me/actions/runs/45188259431); the full monitoring dashboard remains in progress. Phase 5 production work, including firewall setup, is still planned. The setup baseline is complete; the operator-facing MVP is not yet released.
 
 ---
 
@@ -51,14 +51,14 @@ The long-term objective is an enterprise-oriented product with a straightforward
 | High-level architecture | **Completed** | Component boundaries, data flow, storage responsibilities, and security boundaries documented |
 | Feature acceptance matrix | **Completed** | Planned features mapped to implementation tests and CI evidence |
 | Backend implementation | **Phases 2–3 verified** | Authentication, organization-scoped APIs, TLS gRPC enrollment, durable telemetry ingestion, history, retention, and live transport pass CI |
-| Frontend implementation | **Phase 4 in progress** | Authenticated owner/login UI, organization-scoped inventory, and Add Server/token flow are implemented; full metric dashboards, charts, projects, alerts, and operations remain |
+| Frontend implementation | **Phase 4 in progress — first slice CI verified** | Owner/login, HttpOnly-cookie session handling, organization-scoped server inventory, Add Server and one-time token controls pass frontend build and Compose integration in CI run #45188259431 |
 | Local platform stack | **Runtime verified** | PostgreSQL, Redis, migration runner, API, and web services start through Docker Compose |
 | Database and cache integration | **Runtime verified** | PostgreSQL remains durable; Redis and PostgreSQL dependency outage/readiness recovery are tested |
 | Agent protocol and ingestion | **Phase 3 verified** | TLS enrollment, persisted session, heartbeat, reconnect/backoff, streaming batches, post-commit ACK, and idempotent PostgreSQL persistence pass end-to-end CI |
 | Native Linux host agent | **Phase 3 verified** | Native Go agent with Linux host/process/TCP/cgroup collection, agent CPU and WAL/collector health samples, private session state, crash-recoverable spool, and a validated hardened systemd unit pass race-enabled CI checks |
 | Telemetry history and live transport | **Phase 3 verified** | Bounded PostgreSQL range query, 30-day raw retention, 90-day idempotency retention, one-use session-bound WebSocket tickets, cross-tenant isolation, and bounded subscriber queues pass CI |
 | Project/workload attribution | **Phase 3 verified (Linux mapping path)** | cgroup/Systemd/container selectors, exact server/project mappings, and explicit host-total/unclassified/shared attribution pass database integration tests; full Docker Engine discovery remains later work |
-| Monitoring dashboard | **In Progress** | Phase 4 began 2026-11-23; the authentication and server-inventory onboarding slice is underway |
+| Monitoring dashboard | **In Progress** | Phase 4 began 2026-11-23; authentication and server onboarding are CI-verified; server-detail metric views, project switching, charts and operations remain |
 | Production firewall setup | Planned | Phase 5 will add role-aware Linux host firewall profiles for the control plane and monitored agents |
 | Production release | Not started | Planned for Phase 5 |
 
@@ -285,7 +285,7 @@ A phase is marked Completed only after implementation, acceptance tests, relevan
 
 ## MVP Readiness
 
-Phases 1–3 are complete and their phase gates pass CI. This does **not** mean the first usable product MVP is released. The first authenticated dashboard slice now includes login/first-owner setup, server inventory, Add Server, and one-time enrollment credentials. Historical/live metric panels, project switching, charts, alerts, and remote operations remain Phase 4 work. The API, Linux agent, durable ingestion, history, and live transport are verified foundations for those workflows.
+Phases 1–3 are complete and their phase gates pass CI. This does **not** mean the first usable product MVP is released. The first authenticated dashboard slice now includes login/first-owner setup, server inventory, Add Server, and one-time enrollment credentials. Historical/live metric panels, project switching, charts, alerts, and remote operations remain Phase 4 work. The API, Linux agent, durable ingestion, history, and live transport are verified foundations for the next server-detail/history/live views.
 
 ## Documentation Map
 

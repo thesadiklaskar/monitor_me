@@ -4,7 +4,7 @@
 **Planned work session:** 2026-11-23  
 **Target:** Complete Phase 4 — Dashboard and Operational Features before starting Phase 5.
 
-Phase 4 implementation started on 2026-11-23. The first authentication, inventory, and Add Server slice is now implemented on main and awaits CI verification. Continue directly on main; do not create a branch.
+Phase 4 implementation started on 2026-11-23. The first authentication, inventory, and Add Server slice is implemented on main and passes all four jobs in [GitHub Actions run #45188259431](https://github.com/WorkRCS/monitor_me/actions/runs/45188259431). Continue directly on main; do not create a branch.
 
 ## 1. Required delivery order
 
@@ -42,7 +42,7 @@ Known backend gaps must be implemented and tested where required by the Phase 4 
 
 ### Slice 1 — Authentication and application shell
 
-**Implementation started 2026-11-23:** first-owner setup, login, logout, current-session lookup, and the authenticated application shell are in place. The bearer credential is held in a server-set HttpOnly cookie.
+**Implemented and CI-verified in run #45188259431:** first-owner setup, login, logout, current-session lookup, and the authenticated application shell are in place. The bearer credential is held in a server-set HttpOnly cookie.
 
 - Build login and initial owner setup guidance around the existing API.
 - Implement session handling without putting bearer tokens in URLs, browser logs, or persistent unencrypted storage.
@@ -51,7 +51,7 @@ Known backend gaps must be implemented and tested where required by the Phase 4 
 
 ### Slice 2 — Server inventory and Add Server
 
-**Implementation started 2026-11-23:** organization-scoped server inventory, empty/loading/error states, server creation, one-time token display/copy/expiry, token rotation and role-aware revoke controls are in place. Agent deployment remains guided/manual; a fully automated installer is not yet claimed.
+**Implemented and CI-verified in run #45188259431:** organization-scoped server inventory, empty/loading/error states, server creation, one-time token display/copy/expiry, token rotation and role-aware revoke controls are in place. Reissuing a token revokes prior unused credentials transactionally. Agent deployment remains guided/manual; a fully automated installer is not yet claimed.
 
 - Build organization-scoped inventory with empty, loading, error, connected, stale, and disconnected states based only on available backend fields.
 - Implement Add Server using the existing create-server endpoint.
@@ -60,6 +60,8 @@ Known backend gaps must be implemented and tested where required by the Phase 4 
 - Add safe reissue/revoke flows with role-aware UI feedback.
 
 ### Slice 3 — Server detail and monitoring dashboard
+
+**Next implementation slice:** use the real bounded historical-series API and one-use live tickets to add server detail, metric selection, time ranges, timestamps/units, empty/gap handling, reconnect with a fresh ticket, and historical catch-up.
 
 - Build an overall host view for supported Linux CPU, memory, swap, disk, network, uptime, process, and TCP/listening-port information.
 - Use real metric API responses only. Show units, timestamps, selected time range, empty periods, gaps, and stale/last-seen indicators.

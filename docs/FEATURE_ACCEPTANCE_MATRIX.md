@@ -105,7 +105,7 @@ No item may be marked Verified based only on a code stub, mock UI, or documentat
 **Status: In Progress — implementation began 2026-11-23.**
 
 - [x] First-owner setup, login/logout and current-session UI connected to existing authenticated APIs through HttpOnly cookie-backed same-origin route handlers.
-- [x] Organization-scoped server inventory, loading/empty/error states, Add Server, one-time token display/copy/expiry, and token rotation/revocation controls implemented; verification is pending the current Phase 4 CI run.
+- [x] Organization-scoped server inventory, loading/empty/error states, Add Server, one-time token display/copy/expiry, and token rotation/revocation controls pass all four jobs in [GitHub Actions run #45188259431](https://github.com/WorkRCS/monitor_me/actions/runs/45188259431). Full one-command install UX and stale/disconnected component tests remain.
 - [ ] Server and project views display correct scoped data.
 - [ ] Custom charts pass representative rendering tests.
 - [ ] Process, port, and application metrics show documented capabilities.

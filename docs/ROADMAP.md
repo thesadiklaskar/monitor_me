@@ -149,7 +149,7 @@ For the first Linux MVP release, Phase 5 has two primary release deliverables: f
 
 ## Phase 4 — Dashboard and Operational Features
 
-**Status: In Progress — started 2026-11-23**
+**Status: In Progress — started 2026-11-23; the authentication and server-onboarding slice is CI-verified.**
 
 ### Scope
 
@@ -171,7 +171,7 @@ For the first Linux MVP release, Phase 5 has two primary release deliverables: f
 - [x] The bearer token is stored only in an HttpOnly, SameSite=Lax cookie; browser JavaScript receives the safe user profile, not the token.
 - [x] Slice 2 implementation: organization-scoped server inventory, loading/empty/error states, Add Server, one-time token display/copy/expiry and role-aware token revoke/reissue controls.
 - [x] Server-side reissue invalidates any previous unused enrollment tokens in the same transaction; integration coverage rejects the replaced credential.
-- [ ] Complete frontend lint/typecheck/build and all backend/Compose integration checks for the Phase 4 slice before marking the individual UI acceptance rows Verified.
+- [x] Phase 4 slice verification passed all four jobs in [GitHub Actions run #45188259431](https://github.com/WorkRCS/monitor_me/actions/runs/45188259431): Next.js lint/typecheck/production build, Go backend, native agent, authenticated enrollment/token-rotation integration, telemetry benchmarks, and Redis/PostgreSQL recovery.
 
 ### Completion gate
 

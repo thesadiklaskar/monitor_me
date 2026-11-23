@@ -16,10 +16,10 @@ This file is the authoritative resume point for Monitor Me. Read it before makin
 | Current phase | Phase 4 — Dashboard and Operational Features |
 | Current phase status | In Progress — started 2026-11-23 |
 | MVP status | Not complete — authenticated dashboard, server overview, Add Server UI, and live metric views remain Phase 4 requirements |
-| Implementation status | Phases 1–3 are Completed. Phase 4 is In Progress: authenticated first-owner/login/logout, HttpOnly cookie-backed session proxy, organization-scoped inventory, Add Server and one-time token controls are implemented on main; current Phase 4 CI verification is pending. Metric charts, project switching, alerts, notifications and remote operations remain unfinished. |
-| Last source commit covered by latest successful CI run | 2670ed2cf04705638df5c86d37fc3e0699f8a7a4 |
-| Latest verified CI run | [#45045054465 — success](https://github.com/WorkRCS/monitor_me/actions/runs/45045054465); all four jobs passed, including agent-health metrics and systemd verification |
-| Next action | Verify the Phase 4 authentication/inventory/Add Server slice with frontend lint/typecheck/build and full Compose CI; then continue with real metric history/live views and charts. Keep Phase 4 In Progress until all completion-gate items pass. |
+| Implementation status | Phases 1–3 are Completed. Phase 4 is In Progress: authenticated first-owner/login/logout, HttpOnly cookie-backed session proxy, organization-scoped inventory, Add Server and one-time token controls are implemented and pass all four jobs in CI run #45188259431. Server-detail metric views, project switching, charts, alerts, notifications and remote operations remain unfinished. |
+| Last source commit covered by latest successful CI run | 64eccaacf401ff1aabd1e4026316e8f63401eada |
+| Latest verified CI run | [#45188259431 — success](https://github.com/WorkRCS/monitor_me/actions/runs/45188259431); all four jobs passed on main |
+| Next action | Continue Phase 4 Slice 3: build a server-detail view using real GET /v1/servers/{serverID}/metrics responses and one-use WebSocket tickets, including time range, units, timestamps, missing-data and reconnect/history catch-up states. |
 
 ## Next Work Session — 2026-11-23
 
@@ -44,13 +44,12 @@ The next session is Phase 4 only. Do not start Phase 5 firewall work or producti
 
 ## Phase 1–3 Audit
 
-The final Phase 1–3 audit passed all four jobs in [GitHub Actions run #45043161542 — success](https://github.com/WorkRCS/monitor_me/actions/runs/45043161542). This run includes strict lowercase batch-ID validation, telemetry integration, and a PostgreSQL outage/recovery canary. The audit also identified individual product requirements that remain In Progress or Planned; see docs/PHASE_1_TO_3_AUDIT.md.
+The final Phase 1–3 audit passed all four jobs in [GitHub Actions run #45045054465 — success](https://github.com/WorkRCS/monitor_me/actions/runs/45045054465). This run includes strict lowercase batch-ID validation, telemetry integration, and a PostgreSQL outage/recovery canary. The audit also identified individual product requirements that remain In Progress or Planned; see docs/PHASE_1_TO_3_AUDIT.md.
 
 ### Explicit unfinished product requirements
 
-- Authenticated dashboard, server inventory UI, Add Server wizard and live metric views: Phase 4.
-- OS service registration and remaining AgentHealth telemetry samples: In Progress.
-- Workload mapping administration, full Docker Engine API discovery, process lifecycle/per-process CPU and persistent downsampled rollups: In Progress/Planned.
+- Server-detail metric charts/live updates, All Projects/project switcher, mapping administration, alerts/notifications and remote actions: Phase 4 In Progress.
+- Full Docker Engine API discovery, process lifecycle/per-process CPU and persistent downsampled rollups: In Progress/Planned.
 - Role-aware Linux firewall setup and controlled production deployment/shift: Phase 5 primary Linux MVP release workstreams. Windows/macOS agents, signed installers, staged fleet-scale testing, and broader production operations remain Phase 5 expansion/hardening items.
 - Protobuf event/health/command messages are reserved; only authenticated telemetry batches are accepted by the current stream.
 
@@ -191,7 +190,7 @@ These measurements are a single CI-runner snapshot, not production capacity guar
 - [x] Bearer credentials are held in an HttpOnly, SameSite=Lax cookie; browser JavaScript only receives the safe user profile.
 - [x] Organization-scoped server inventory, loading/empty/error states, Add Server, one-time enrollment-token display/copy/expiry, and role-aware revoke/reissue controls are implemented.
 - [x] Token reissue revokes all previous unused enrollment credentials in the same PostgreSQL transaction; an integration test covers the replaced-token rejection path.
-- [ ] Frontend and full-stack verification for this slice is pending the current Phase 4 CI run.
+- [x] Frontend lint/typecheck/production build and full-stack verification passed in [GitHub Actions run #45188259431](https://github.com/WorkRCS/monitor_me/actions/runs/45188259431).
 
 ### Exact resume instructions
 
