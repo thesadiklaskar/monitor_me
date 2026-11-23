@@ -20,11 +20,7 @@ type alertRuleMatch struct {
 
 func evaluateCommittedSamples(ctx context.Context, db *sql.DB, organizationID, serverID string, samples []telemetry.LiveSample) {
 	for _, sample := range samples {
-		// Initial rules cover host and agent gauges. Per-process and per-interface
-		// samples need explicit label-scoped rule semantics before evaluation.
-		if !strings.HasPrefix(sample.MetricName, "host.") && !strings.HasPrefix(sample.MetricName, "agent.") {
-			continue
-		}
+		// The metric-name and optional project scope select the relevant sample.
 		rows, err := db.QueryContext(ctx,
 			"SELECT id::text, name, operator, threshold FROM alert_rules "+
 				"WHERE organization_id = $1 AND enabled = true AND metric_name = $2 "+

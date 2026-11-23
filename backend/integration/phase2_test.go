@@ -595,6 +595,46 @@ func TestPhase2AuthenticationAndAgentLifecycle(t *testing.T) {
 	}
 	defer foreignLiveConnection.Close()
 
+
+	// Threshold rules are organization-scoped and can only be managed by owners/admins.
+	alertRuleResponse := requestJSON(t, ctx, http.MethodPost, baseURL+"/v1/alert-rules", bearer, map[string]any{
+		"name": "High host memory",
+		"server_id": serverID,
+		"metric_name": "host.memory.used",
+		"operator": "gt",
+		"threshold": 500000,
+	})
+	if alertRuleResponse.StatusCode != http.StatusCreated {
+		t.Fatalf("owner alert rule creation: expected 201, got %d: %s", alertRuleResponse.StatusCode, alertRuleResponse.Body)
+	}
+	var createdAlertRule struct {
+		Rule struct {
+			ID string `json:"id"`
+			Name string `json:"name"`
+		} `json:"rule"`
+	}
+	decodeResponse(t, alertRuleResponse.Body, &createdAlertRule)
+	if createdAlertRule.Rule.ID == "" || createdAlertRule.Rule.Name != "High host memory" {
+		t.Fatalf("alert rule creation returned an incomplete rule: %#v", createdAlertRule.Rule)
+	}
+	viewerAlertRule := requestJSON(t, ctx, http.MethodPost, baseURL+"/v1/alert-rules", viewerSession.AccessToken, map[string]any{
+		"name": "Viewer forbidden rule", "metric_name": "host.memory.used", "operator": "gt", "threshold": 100,
+	})
+	if viewerAlertRule.StatusCode != http.StatusForbidden {
+		t.Fatalf("viewer alert rule creation: expected 403, got %d: %s", viewerAlertRule.StatusCode, viewerAlertRule.Body)
+	}
+	foreignAlertRules := requestJSON(t, ctx, http.MethodGet, baseURL+"/v1/alert-rules", otherSession.AccessToken, nil)
+	if foreignAlertRules.StatusCode != http.StatusOK {
+		t.Fatalf("second organization alert rule list: expected 200, got %d", foreignAlertRules.StatusCode)
+	}
+	var foreignRules struct {
+		Rules []json.RawMessage `json:"rules"`
+	}
+	decodeResponse(t, foreignAlertRules.Body, &foreignRules)
+	if len(foreignRules.Rules) != 0 {
+		t.Fatalf("cross-organization alert-rule leak: received %d foreign rules", len(foreignRules.Rules))
+	}
+
 	collectedAt := time.Now().UTC().UnixNano()
 	observedAt := collectedAt
 	batchID := "0123456789abcdef0123456789abcdef"
@@ -647,6 +687,21 @@ func TestPhase2AuthenticationAndAgentLifecycle(t *testing.T) {
 	firstAck, err := stream.Recv()
 	if err != nil || firstAck.GetAcknowledgement() == nil || !firstAck.GetAcknowledgement().GetAccepted() {
 		t.Fatalf("committed telemetry batch was not acknowledged: response=%v error=%v", firstAck, err)
+	}
+
+	firingAlerts := requestJSON(t, ctx, http.MethodGet, baseURL+"/v1/alerts", bearer, nil)
+	if firingAlerts.StatusCode != http.StatusOK {
+		t.Fatalf("firing alert list: expected 200, got %d: %s", firingAlerts.StatusCode, firingAlerts.Body)
+	}
+	var firingAlertList struct {
+		Events []struct {
+			RuleID string `json:"rule_id"`
+			Status string `json:"status"`
+		} `json:"events"`
+	}
+	decodeResponse(t, firingAlerts.Body, &firingAlertList)
+	if len(firingAlertList.Events) != 1 || firingAlertList.Events[0].RuleID != createdAlertRule.Rule.ID || firingAlertList.Events[0].Status != "firing" {
+		t.Fatalf("threshold breach did not create one firing alert event: %#v", firingAlertList.Events)
 	}
 	if err := liveConnection.SetReadDeadline(time.Now().Add(5 * time.Second)); err != nil {
 		t.Fatal(err)
@@ -788,6 +843,82 @@ func TestPhase2AuthenticationAndAgentLifecycle(t *testing.T) {
 	}
 	if reconnectedEvent.Type != "telemetry.batch" || reconnectedEvent.BatchID != secondBatchID {
 		t.Fatalf("unexpected event after reconnect: %+v", reconnectedEvent)
+	}
+
+	// A fresh below-threshold committed sample must resolve the firing alert
+	// and create one recovery notification for each organization member.
+	recoveryObservedAt := time.Now().UTC().UnixNano()
+	recoveryMessage := &monitorv1.AgentToServerMessage{
+		AgentId: enrolled.GetAgentId(), SessionToken: enrolled.GetSessionToken(),
+		Payload: &monitorv1.AgentToServerMessage_TelemetryBatch{
+			TelemetryBatch: &monitorv1.TelemetryBatch{
+				BatchId: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+				CollectedAtUnixNanos: recoveryObservedAt,
+				SchemaVersion: 1,
+				Samples: []*monitorv1.MetricSample{{
+					MetricName: "host.memory.used", Value: 1024, Unit: "bytes",
+					Labels: map[string]string{"source": "alert-recovery-integration"},
+					ObservedAtUnixNanos: recoveryObservedAt,
+				}},
+			},
+		},
+	}
+	if err := stream.Send(recoveryMessage); err != nil {
+		t.Fatalf("send recovery telemetry batch: %v", err)
+	}
+	recoveryAck, err := stream.Recv()
+	if err != nil || recoveryAck.GetAcknowledgement() == nil || !recoveryAck.GetAcknowledgement().GetAccepted() {
+		t.Fatalf("recovery telemetry batch was not acknowledged: response=%v error=%v", recoveryAck, err)
+	}
+	resolvedAlerts := requestJSON(t, ctx, http.MethodGet, baseURL+"/v1/alerts", bearer, nil)
+	if resolvedAlerts.StatusCode != http.StatusOK {
+		t.Fatalf("resolved alert list: expected 200, got %d: %s", resolvedAlerts.StatusCode, resolvedAlerts.Body)
+	}
+	var resolvedAlertList struct {
+		Events []struct {
+			RuleID string `json:"rule_id"`
+			Status string `json:"status"`
+		} `json:"events"`
+	}
+	decodeResponse(t, resolvedAlerts.Body, &resolvedAlertList)
+	if len(resolvedAlertList.Events) != 1 || resolvedAlertList.Events[0].RuleID != createdAlertRule.Rule.ID || resolvedAlertList.Events[0].Status != "resolved" {
+		t.Fatalf("below-threshold telemetry did not resolve the alert: %#v", resolvedAlertList.Events)
+	}
+	notificationResponse := requestJSON(t, ctx, http.MethodGet, baseURL+"/v1/notifications", bearer, nil)
+	if notificationResponse.StatusCode != http.StatusOK {
+		t.Fatalf("owner notification list: expected 200, got %d: %s", notificationResponse.StatusCode, notificationResponse.Body)
+	}
+	var notificationList struct {
+		Notifications []struct {
+			ID string `json:"id"`
+			Kind string `json:"kind"`
+		} `json:"notifications"`
+	}
+	decodeResponse(t, notificationResponse.Body, &notificationList)
+	if len(notificationList.Notifications) != 2 {
+		t.Fatalf("expected firing and recovery notifications, got %#v", notificationList.Notifications)
+	}
+	var firingNotificationID string
+	seenKinds := map[string]bool{}
+	for _, notification := range notificationList.Notifications {
+		seenKinds[notification.Kind] = true
+		if notification.Kind == "firing" { firingNotificationID = notification.ID }
+	}
+	if !seenKinds["firing"] || !seenKinds["recovered"] || firingNotificationID == "" {
+		t.Fatalf("firing and recovery notifications were not both persisted: %#v", notificationList.Notifications)
+	}
+	markRead := requestJSON(t, ctx, http.MethodPost, baseURL+"/v1/notifications/"+firingNotificationID+"/read", bearer, map[string]any{})
+	if markRead.StatusCode != http.StatusNoContent {
+		t.Fatalf("mark notification as read: expected 204, got %d: %s", markRead.StatusCode, markRead.Body)
+	}
+	viewerNotifications := requestJSON(t, ctx, http.MethodGet, baseURL+"/v1/notifications", viewerSession.AccessToken, nil)
+	if viewerNotifications.StatusCode != http.StatusOK {
+		t.Fatalf("viewer notification list: expected 200, got %d", viewerNotifications.StatusCode)
+	}
+	var viewerNotificationList struct { Notifications []json.RawMessage `json:"notifications"` }
+	decodeResponse(t, viewerNotifications.Body, &viewerNotificationList)
+	if len(viewerNotificationList.Notifications) != 2 {
+		t.Fatalf("alert notifications should be delivered to each organization member, got %d", len(viewerNotificationList.Notifications))
 	}
 
 	// The history endpoint is organization-scoped and uses bounded aggregation.
