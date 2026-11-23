@@ -24,7 +24,7 @@ This checklist is for the owner to test Monitor Me locally on their own computer
 
 ## 3. Enroll a real Linux agent
 
-Use a disposable Linux host or Linux VM. Docker Desktop on Windows/macOS can run the control-plane containers, but the host collector is Linux-only. Follow docs/DEVELOPMENT.md and use the generated one-time server token plus the local development CA.
+Use a disposable Linux host or Linux VM for the complete Linux capability set. Docker Desktop on Windows/macOS can run the control-plane containers. An initial Windows-native collector is also available for local host acceptance; it does not yet include TCP/listening-port inventory, cgroup/Systemd workload attribution, or Windows service installation. Follow docs/DEVELOPMENT.md and use the generated one-time server token plus the local development CA.
 
 Confirm:
 - Agent enrollment succeeds and the server receives an agent identity.
@@ -33,6 +33,18 @@ Confirm:
 - If the API or network is briefly unavailable, the local WAL retains batches and delivers them after connectivity returns.
 
 Do not grant broad Docker socket access just to run the agent. Docker is not required on a monitored Linux host.
+
+
+## 3A. Enroll the local Windows host
+
+1. From the repository root, run `.\scripts\build-windows-agent.ps1` in PowerShell. The script uses the Docker Go builder and writes the x64 executable under the ignored `.data/windows-agent/` directory.
+2. In the dashboard, choose **Add Server**, name the record `Windows local PC`, and copy its one-time enrollment token.
+3. Open a second PowerShell window at the repository root and run `.\scripts\run-windows-agent.ps1`. Paste the one-time token when prompted.
+4. Keep the window open for local acceptance. The agent collects every five seconds and stores its session/WAL below `%LOCALAPPDATA%\MonitorMe`. Press Ctrl+C to stop it.
+5. Open the Windows server record in the dashboard and verify CPU, memory, mounted-volume capacity/I/O, network throughput, uptime, process inventory and System information.
+6. Run the helper again later; it should reuse the persisted agent session without asking for another enrollment token.
+
+The local Windows agent is a foreground process in this first slice, not a Windows service. Run it under an account with sufficient process-inspection permissions for the process inventory you expect to see. Do not paste the enrollment token into a committed file or shell command.
 
 ## 4. Dashboard telemetry
 
