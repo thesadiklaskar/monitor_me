@@ -312,6 +312,7 @@ func (s *Store) CreateLocalPrincipal(ctx context.Context) (Principal, time.Time,
 	}
 	return principal, expiresAt, nil
 }
+
 // Login verifies a password and creates a 24-hour opaque bearer session.
 // Only the SHA-256 digest of the bearer secret is persisted.
 func (s *Store) Login(ctx context.Context, email, password string) (AuthSession, error) {
