@@ -595,21 +595,20 @@ func TestPhase2AuthenticationAndAgentLifecycle(t *testing.T) {
 	}
 	defer foreignLiveConnection.Close()
 
-
 	// Threshold rules are organization-scoped and can only be managed by owners/admins.
 	alertRuleResponse := requestJSON(t, ctx, http.MethodPost, baseURL+"/v1/alert-rules", bearer, map[string]any{
-		"name": "High host memory",
-		"server_id": serverID,
+		"name":        "High host memory",
+		"server_id":   serverID,
 		"metric_name": "host.memory.used",
-		"operator": "gt",
-		"threshold": 500000,
+		"operator":    "gt",
+		"threshold":   500000,
 	})
 	if alertRuleResponse.StatusCode != http.StatusCreated {
 		t.Fatalf("owner alert rule creation: expected 201, got %d: %s", alertRuleResponse.StatusCode, alertRuleResponse.Body)
 	}
 	var createdAlertRule struct {
 		Rule struct {
-			ID string `json:"id"`
+			ID   string `json:"id"`
 			Name string `json:"name"`
 		} `json:"rule"`
 	}
@@ -852,12 +851,12 @@ func TestPhase2AuthenticationAndAgentLifecycle(t *testing.T) {
 		AgentId: enrolled.GetAgentId(), SessionToken: enrolled.GetSessionToken(),
 		Payload: &monitorv1.AgentToServerMessage_TelemetryBatch{
 			TelemetryBatch: &monitorv1.TelemetryBatch{
-				BatchId: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+				BatchId:              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 				CollectedAtUnixNanos: recoveryObservedAt,
-				SchemaVersion: 1,
+				SchemaVersion:        1,
 				Samples: []*monitorv1.MetricSample{{
 					MetricName: "host.memory.used", Value: 1024, Unit: "bytes",
-					Labels: map[string]string{"source": "alert-recovery-integration"},
+					Labels:              map[string]string{"source": "alert-recovery-integration"},
 					ObservedAtUnixNanos: recoveryObservedAt,
 				}},
 			},
@@ -890,7 +889,7 @@ func TestPhase2AuthenticationAndAgentLifecycle(t *testing.T) {
 	}
 	var notificationList struct {
 		Notifications []struct {
-			ID string `json:"id"`
+			ID   string `json:"id"`
 			Kind string `json:"kind"`
 		} `json:"notifications"`
 	}
@@ -902,7 +901,9 @@ func TestPhase2AuthenticationAndAgentLifecycle(t *testing.T) {
 	seenKinds := map[string]bool{}
 	for _, notification := range notificationList.Notifications {
 		seenKinds[notification.Kind] = true
-		if notification.Kind == "firing" { firingNotificationID = notification.ID }
+		if notification.Kind == "firing" {
+			firingNotificationID = notification.ID
+		}
 	}
 	if !seenKinds["firing"] || !seenKinds["recovered"] || firingNotificationID == "" {
 		t.Fatalf("firing and recovery notifications were not both persisted: %#v", notificationList.Notifications)
@@ -915,7 +916,9 @@ func TestPhase2AuthenticationAndAgentLifecycle(t *testing.T) {
 	if viewerNotifications.StatusCode != http.StatusOK {
 		t.Fatalf("viewer notification list: expected 200, got %d", viewerNotifications.StatusCode)
 	}
-	var viewerNotificationList struct { Notifications []json.RawMessage `json:"notifications"` }
+	var viewerNotificationList struct {
+		Notifications []json.RawMessage `json:"notifications"`
+	}
 	decodeResponse(t, viewerNotifications.Body, &viewerNotificationList)
 	if len(viewerNotificationList.Notifications) != 2 {
 		t.Fatalf("alert notifications should be delivered to each organization member, got %d", len(viewerNotificationList.Notifications))
