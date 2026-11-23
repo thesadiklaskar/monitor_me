@@ -17,9 +17,9 @@ type Dependency struct {
 }
 
 type LiveDependencies struct {
-	Cache            *redisv9.Client
-	Telemetry        *telemetry.Store
-	AllowedOrigins   []string
+	Cache              *redisv9.Client
+	Telemetry          *telemetry.Store
+	AllowedOrigins     []string
 	RemoteAllowedUnits []string
 }
 
@@ -31,8 +31,9 @@ func NewRouter(version string, dependencies []Dependency, identities *identity.S
 	mux.HandleFunc("GET /health/ready", healthHandler("ready", version, dependencies))
 
 	if identities != nil {
-		api := &API{identities: identities, allowedRemoteUnits: append([]string(nil), live[0].RemoteAllowedUnits...)}
+		api := &API{identities: identities}
 		if len(live) > 0 {
+			api.allowedRemoteUnits = append([]string(nil), live[0].RemoteAllowedUnits...)
 			api.cache = live[0].Cache
 			api.telemetry = live[0].Telemetry
 			api.allowedLiveOrigins = make(map[string]struct{}, len(live[0].AllowedOrigins))
@@ -45,8 +46,6 @@ func NewRouter(version string, dependencies []Dependency, identities *identity.S
 		mux.Handle("GET /v1/auth/me", api.requireAuth(http.HandlerFunc(api.me)))
 		mux.Handle("POST /v1/auth/logout", api.requireAuth(http.HandlerFunc(api.logout)))
 		mux.Handle("GET /v1/remote-operations/config", api.requireAuth(http.HandlerFunc(api.remoteOperationConfig)))
-		mux.Handle("GET /v1/remote-operations", api.requireAuth(http.HandlerFunc(api.listRemoteOperations)))
-		mux.Handle("POST /v1/servers/{serverID}/remote-operations", api.requireAuth(http.HandlerFunc(api.createRemoteOperation)))
 		mux.Handle("GET /v1/remote-operations", api.requireAuth(http.HandlerFunc(api.listRemoteOperations)))
 		mux.Handle("POST /v1/servers/{serverID}/remote-operations", api.requireAuth(http.HandlerFunc(api.createRemoteOperation)))
 		mux.Handle("GET /v1/remote-operation-audit", api.requireAuth(http.HandlerFunc(api.listRemoteOperationAudit)))
