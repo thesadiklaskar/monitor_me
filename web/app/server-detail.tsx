@@ -82,12 +82,19 @@ const metricDefinitions: MetricDefinition[] = [
   { name: "host.cpu.utilization", label: "CPU utilization", unit: "percent" },
   { name: "host.memory.used", label: "Memory used", unit: "bytes" },
   { name: "host.memory.available", label: "Memory available", unit: "bytes" },
+  { name: "host.memory.total", label: "Memory total", unit: "bytes" },
   { name: "host.memory.cache", label: "Memory cache", unit: "bytes" },
   { name: "host.memory.swap.used", label: "Swap used", unit: "bytes" },
+  { name: "host.disk.used.bytes", label: "Disk space used", unit: "bytes" },
+  { name: "host.disk.available.bytes", label: "Disk space available", unit: "bytes" },
+  { name: "host.disk.total.bytes", label: "Disk capacity", unit: "bytes" },
+  { name: "host.disk.used.percent", label: "Disk usage", unit: "percent" },
   { name: "host.disk.read.bytes_per_second", label: "Disk read throughput", unit: "bytes/second" },
   { name: "host.disk.write.bytes_per_second", label: "Disk write throughput", unit: "bytes/second" },
   { name: "host.network.receive.bytes_per_second", label: "Network receive throughput", unit: "bytes/second" },
   { name: "host.network.transmit.bytes_per_second", label: "Network transmit throughput", unit: "bytes/second" },
+  { name: "host.network.receive.packets_per_second", label: "Network receive packets", unit: "packets/second" },
+  { name: "host.network.transmit.packets_per_second", label: "Network transmit packets", unit: "packets/second" },
   { name: "agent.cpu.utilization", label: "Agent CPU utilization", unit: "percent" },
 ];
 
@@ -419,6 +426,7 @@ export function ServerDetail({
     [latestSamples],
   );
   const processCount = latestSamples.find((sample) => sample.metric_name === "host.process.count");
+  const hostInfo = latestSamples.find((sample) => sample.metric_name === "host.info");
 
   const points = useMemo(() => {
     const byBucket = new Map<string, MetricPoint>();
@@ -497,6 +505,34 @@ export function ServerDetail({
         <ServerMetricChart points={points} range={range} unit={selectedMetric.unit} loading={loading} startTime={series?.from ?? null} />
       </article>
 
+
+      {hostInfo && (
+        <section className="inventory-panel detail-inventory-panel">
+          <div className="panel-heading">
+            <div>
+              <h2>System information</h2>
+              <p>Operating system details reported by the host agent.</p>
+            </div>
+          </div>
+          <div className="summary-grid">
+            <article className="summary-card">
+              <span>Hostname</span>
+              <strong>{hostInfo.labels?.hostname ?? "Unavailable"}</strong>
+              <small>Machine name</small>
+            </article>
+            <article className="summary-card">
+              <span>Operating system</span>
+              <strong>{hostInfo.labels?.platform ?? hostInfo.labels?.os ?? "Unavailable"}</strong>
+              <small>{hostInfo.labels?.platform_version ?? "Version unavailable"}</small>
+            </article>
+            <article className="summary-card">
+              <span>Kernel</span>
+              <strong>{hostInfo.labels?.kernel_version ?? "Unavailable"}</strong>
+              <small>{hostInfo.labels?.architecture ?? "Architecture unavailable"}</small>
+            </article>
+          </div>
+        </section>
+      )}
 
       <section className="inventory-panel detail-inventory-panel">
         <div className="panel-heading">
