@@ -13,16 +13,16 @@ import (
 // Config contains bounded runtime settings for collection, local durability,
 // and optional authenticated delivery to the control plane.
 type Config struct {
-	Version            string
-	CollectionInterval time.Duration
-	ProcRoot           string
-	SpoolDirectory     string
-	SpoolMaxBytes      int64
-	LogLevel           string
-	GRPCAddress        string
-	TLSCAFile          string
-	EnrollmentToken    string
-	StateFile          string
+	Version             string
+	CollectionInterval  time.Duration
+	ProcRoot            string
+	SpoolDirectory      string
+	SpoolMaxBytes       int64
+	LogLevel            string
+	GRPCAddress         string
+	TLSCAFile           string
+	EnrollmentToken     string
+	StateFile           string
 	AllowedSystemdUnits []string
 }
 
@@ -89,7 +89,6 @@ func env(key, fallback string) string {
 	}
 	return fallback
 }
-
 
 var allowedSystemdUnitPattern = regexp.MustCompile("^[A-Za-z0-9_.:@-]{1,180}\\.service$")
 
