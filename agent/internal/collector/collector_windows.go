@@ -59,40 +59,50 @@ func (c *ProcCollector) collectWindows(ctx context.Context) ([]Sample, error) {
 		c.hasPreviousAgentCPU = true
 	}
 
-	cpuTimes, err := cpu.TimesWithContext(ctx, true)
-	if err != nil {
-		collectionErrors = append(collectionErrors, fmt.Errorf("read Windows CPU counters: %w", err))
-	} else {
-		current := make(map[string]cpuCounters, len(cpuTimes))
-		for _, item := range cpuTimes {
-			current[item.CPU] = cpuCounters{
-				user: item.User, nice: item.Nice, system: item.System,
-				idle: item.Idle, iowait: item.Iowait, irq: item.Irq,
-				softirq: item.Softirq, steal: item.Steal,
-			}
-		}
-		if !c.previousAt.IsZero() {
-			for name, counters := range current {
-				previous, exists := c.previousCPU[name]
-				if !exists {
-					continue
-				}
-				busy, user, system, wait, valid := cpuPercent(previous, counters)
-				if !valid {
-					continue
-				}
-				metricName := "host.cpu.core.utilization"
-				if name == "cpu-total" || name == "cpu" {
-					metricName = "host.cpu.utilization"
-					add("host.cpu.user", user, "percent", nil)
-					add("host.cpu.system", system, "percent", nil)
-					add("host.cpu.iowait", wait, "percent", nil)
-				}
-				add(metricName, busy, "percent", map[string]string{"cpu": name})
-			}
-		}
-		c.previousCPU = current
+	aggregateTimes, aggregateErr := cpu.TimesWithContext(ctx, false)
+	perCPUTimes, perCPUErr := cpu.TimesWithContext(ctx, true)
+	if aggregateErr != nil {
+		collectionErrors = append(collectionErrors, fmt.Errorf("read Windows aggregate CPU counters: %w", aggregateErr))
 	}
+	if perCPUErr != nil {
+		collectionErrors = append(collectionErrors, fmt.Errorf("read Windows per-CPU counters: %w", perCPUErr))
+	}
+	current := make(map[string]cpuCounters, len(aggregateTimes)+len(perCPUTimes))
+	for _, item := range aggregateTimes {
+		current["cpu-total"] = cpuCounters{
+			user: item.User, nice: item.Nice, system: item.System,
+			idle: item.Idle, iowait: item.Iowait, irq: item.Irq,
+			softirq: item.Softirq, steal: item.Steal,
+		}
+	}
+	for _, item := range perCPUTimes {
+		current[item.CPU] = cpuCounters{
+			user: item.User, nice: item.Nice, system: item.System,
+			idle: item.Idle, iowait: item.Iowait, irq: item.Irq,
+			softirq: item.Softirq, steal: item.Steal,
+		}
+	}
+	if !c.previousAt.IsZero() {
+		for name, counters := range current {
+			previous, exists := c.previousCPU[name]
+			if !exists {
+				continue
+			}
+			busy, user, system, wait, valid := cpuPercent(previous, counters)
+			if !valid {
+				continue
+			}
+			metricName := "host.cpu.core.utilization"
+			if name == "cpu-total" || name == "cpu" {
+				metricName = "host.cpu.utilization"
+				add("host.cpu.user", user, "percent", nil)
+				add("host.cpu.system", system, "percent", nil)
+				add("host.cpu.iowait", wait, "percent", nil)
+			}
+			add(metricName, busy, "percent", map[string]string{"cpu": name})
+		}
+	}
+	c.previousCPU = current
 
 	virtualMemory, err := mem.VirtualMemoryWithContext(ctx)
 	if err != nil {
