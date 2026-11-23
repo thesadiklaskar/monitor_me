@@ -94,7 +94,6 @@ type Server struct {
 	CreatedAt time.Time  `json:"created_at"`
 }
 
-
 // Project is a project owned by the authenticated organization.
 type Project struct {
 	ID        string    `json:"id"`
