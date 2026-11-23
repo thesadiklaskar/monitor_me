@@ -6,6 +6,7 @@ export type APIError = {
 };
 
 export async function readAPIResponse<T>(response: Response): Promise<T> {
+  if (response.status === 204) return undefined as T;
   const payload = (await response.json().catch(() => null)) as (T & APIError) | null;
   if (!response.ok) {
     const message = payload?.error?.message || "The request could not be completed.";
