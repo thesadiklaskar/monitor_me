@@ -121,7 +121,6 @@ func parseWebAllowedOrigins(raw string) ([]string, error) {
 	return origins, nil
 }
 
-
 var remoteSystemdUnitPattern = regexp.MustCompile("^[A-Za-z0-9_.:@-]{1,180}\\.service$")
 
 func parseRemoteAllowedUnits(raw string) ([]string, error) {
