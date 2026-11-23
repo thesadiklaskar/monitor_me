@@ -20,4 +20,3 @@ func (store *Store) QueryRange(ctx context.Context, query RangeQuery) ([]SeriesP
 func (store *Store) QueryLatest(ctx context.Context, query LatestQuery) ([]LatestSample, error) {
 	return QueryLatest(ctx, store.db, query)
 }
-\nfunc (store *Store) QueryLatest(ctx context.Context, query LatestQuery) ([]LatestSample, error) {\n\treturn QueryLatest(ctx, store.db, query)\n}\n
