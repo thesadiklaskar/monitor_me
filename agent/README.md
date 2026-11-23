@@ -1,12 +1,13 @@
 # Native Monitoring Agent
 
-The native Go agent runs directly on a monitored Linux host. Docker is not required on the monitored machine.
+The native Go agent runs directly on a monitored host. Linux collection is verified; an initial Windows host collector is now available for local acceptance. Docker is not required on the monitored machine.
 
 ## Current implementation
 
 - Foreground process with JSON structured logs, environment validation, and signal-aware shutdown.
 - Configurable 100ms–1m collection interval (500ms default).
 - Linux procfs aggregate/per-core CPU, memory, swap, disk throughput/IOPS, network throughput/packets/errors, uptime, process count, and up to 128 readable processes by RSS.
+- Initial Windows collector using native operating-system counters through gopsutil: aggregate/per-core CPU, memory and swap, mounted-volume capacity and usage, disk throughput/IOPS, network throughput/packets/errors, uptime, host identity/version, process count, and up to 128 readable processes by RSS.
 - TCP connection state counts and listening-port inventory from `/proc/net/tcp` and `/proc/net/tcp6`.
 - Process cgroup selectors, Systemd unit identification, and Docker/container cgroup IDs where those paths are exposed by the host.
 - Counter-derived rates use actual monotonic elapsed time; counter resets and invalid intervals produce missing rates, not negative values.
@@ -15,11 +16,11 @@ The native Go agent runs directly on a monitored Linux host. Docker is not requi
 - Agent-health telemetry includes process CPU utilization, collector errors per interval, persistent WAL byte size and unacknowledged batch depth. Last successful send is omitted until a matching durable ACK has been received.
 - A hardened Linux systemd unit is provided at `agent/deploy/systemd/monitor-me-agent.service`; the monitored machine needs systemd but does not need Docker.
 
-Unsupported operating systems report only agent health/spool capabilities. Linux procfs collectors are not claimed on Windows or macOS.
+macOS and other unsupported operating systems currently report only agent health/spool capabilities. Windows does not currently expose Linux TCP-state/listening-port inventory, cgroup/Systemd workload attribution, or per-process CPU through this collector. Windows service installation and signed installers are not included in this first local-test slice.
 
 ## Build and test
 
-From the repository root:
+From the repository root on Linux:
 
 ```sh
 cd agent
@@ -28,6 +29,14 @@ go test -race ./...
 go vet ./...
 go build -trimpath ./cmd/monitor-agent
 ```
+
+To cross-build the Windows x64 agent from Windows PowerShell using the Docker Go builder:
+
+```powershell
+.\\scripts\\build-windows-agent.ps1
+```
+
+The generated executable is written to the ignored `.data/windows-agent/` directory. The script generates the versioned protobuf sources, resolves Go module dependencies, and builds with `CGO_ENABLED=0`.
 
 Run local benchmarks:
 
@@ -76,7 +85,9 @@ The returned session is written once to the local state file. The parent directo
 - Network byte, packet, and error rates use `/proc/net/dev` counters and the measured elapsed interval.
 - Process RSS is resident memory per process, not unique physical memory. At most 128 readable processes are emitted per collection; the process count is independent of RSS visibility.
 - Cgroup selectors are descriptive metadata. A project is assigned only when a server/project workload mapping matches; otherwise the sample remains explicitly unclassified or host-total.
-- TCP state and listening-port inventory does not provide HTTP request counts, latency, or status codes.
+- TCP state and listening-port inventory is currently Linux-only and does not provide HTTP request counts, latency, or status codes.
+- Windows disk capacity is reported per mounted volume. Disk and network rates use the operating-system counters and measured elapsed interval. Protected or inaccessible Windows processes may be omitted when the agent runs without elevation.
+- Windows process RSS is not unique physical memory; shared pages can be present in multiple process working sets.
 
 ## Backpressure and delivery
 
@@ -104,3 +115,20 @@ sudo systemctl status monitor-me-agent
 Edit `/etc/monitor-me/agent.env` with the organization's gRPC address and trusted CA path. Put a one-use enrollment token there only for initial enrollment, then remove that line after the private agent state file has been created. The unit runs as root because host-wide process inventory and RSS collection require access to process metadata across users; filesystem writes are confined to `/var/lib/monitor-me`. The WAL and session state inherit restrictive directory/file permissions.
 
 Follow logs with `journalctl -u monitor-me-agent -f`. Use `systemctl restart monitor-me-agent` to restart and `systemctl disable --now monitor-me-agent` to disable and stop the service.
+
+
+## Windows local acceptance
+
+1. Start the local Docker Compose control plane from the repository root and sign in at `http://localhost:3000`.
+2. Choose **Add Server**, create a record such as `Windows local PC`, and copy its one-time enrollment token.
+3. In a second PowerShell window at the repository root, run:
+
+   ```powershell
+   .\\scripts\\build-windows-agent.ps1
+   .\\scripts\\run-windows-agent.ps1
+   ```
+
+4. Paste the one-time token when prompted. The agent connects to `localhost:8443`, validates the development CA, and stores its session/WAL under `%LOCALAPPDATA%\\MonitorMe`.
+5. Open the new server in the dashboard. After the next collection interval, inspect CPU, memory, disk capacity/I/O, network throughput, uptime, process inventory, and System information.
+
+Keep the PowerShell window open during local acceptance. Press Ctrl+C to stop the foreground agent. On later runs, the persisted session is reused and no new enrollment token is required. This helper does not install a Windows service or configure automatic startup.
