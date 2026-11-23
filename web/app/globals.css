@@ -185,3 +185,44 @@ tbody tr:hover { background:rgba(127,224,193,.025); }
 .server-open-link { border:0; padding:0; background:transparent; color:#e5edf6; cursor:pointer; font:inherit; font-size:11px; font-weight:750; text-align:left; }
 .server-open-link:hover { color:var(--accent); }
 @media(max-width:680px) { .detail-summary-grid { grid-template-columns:1fr; } .detail-controls { align-items:flex-start; } .detail-selectors { width:100%; } .detail-select-label { flex:1 1 130px; } }
+
+
+/* Server detail: bounded history chart and one-use live stream status. */
+.server-detail { display:flex; min-width:0; flex-direction:column; gap:17px; }
+.detail-topbar { display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space-between; gap:18px; padding-bottom:18px; border-bottom:1px solid var(--border); }
+.detail-topbar h2 { margin:7px 0 0; font-size:24px; letter-spacing:-.035em; }
+.detail-topbar p { margin:7px 0 0; color:var(--muted); font-size:11px; }
+.detail-back-button { display:block; margin:0 0 17px; border:0; padding:0; background:transparent; color:var(--accent); font-size:11px; font-weight:750; cursor:pointer; }
+.detail-status { display:flex; flex-direction:column; align-items:flex-end; gap:8px; color:var(--muted); font-size:10px; }
+.status-pill-online { border-color:rgba(99,216,164,.25); background:rgba(99,216,164,.1); color:#8ce6b9; }
+.status-pill-pending { border-color:rgba(231,181,91,.25); background:rgba(231,181,91,.1); color:#f0cd8c; }
+.detail-toolbar { display:flex; flex-wrap:wrap; align-items:flex-end; gap:12px; }
+.metric-select-field { display:flex; min-width:235px; flex:1 1 260px; flex-direction:column; gap:7px; color:#aebdd0; font-size:10px; font-weight:750; }
+.metric-select-field select { width:100%; min-height:38px; border:1px solid #34445c; border-radius:9px; background:#0b1421; color:var(--foreground); padding:8px 10px; font-size:12px; }
+.range-switch { display:flex; min-height:38px; align-items:center; gap:3px; padding:3px; border:1px solid var(--border); border-radius:9px; background:#0c1522; }
+.range-button { min-width:44px; min-height:30px; border:0; border-radius:6px; background:transparent; color:var(--muted); font-size:11px; font-weight:750; }
+.range-button-active { background:rgba(127,224,193,.15); color:var(--accent); }
+.live-status-strip { display:flex; min-height:39px; flex-wrap:wrap; align-items:center; gap:9px; padding:9px 12px; border:1px solid var(--border); border-radius:9px; background:rgba(13,21,34,.75); color:var(--muted); font-size:10px; }
+.live-status-strip strong { color:#dce6f2; font-size:10px; }
+.live-status-strip > span:last-child { min-width:0; }
+.metric-panel { overflow:hidden; min-width:0; border:1px solid var(--border); border-radius:14px; background:rgba(16,26,40,.9); }
+.metric-panel-heading { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; padding:17px 19px; border-bottom:1px solid var(--border); }
+.metric-panel-heading h3 { margin:0; font-size:13px; }
+.metric-panel-heading p { margin:6px 0 0; color:var(--muted); font-size:10px; }
+.metric-sample-count { color:#8193aa; font-size:10px; }
+.metric-chart-state { display:flex; min-height:190px; flex-direction:column; align-items:center; justify-content:center; gap:9px; padding:25px; color:var(--muted); font-size:11px; text-align:center; }
+.metric-chart-state strong { color:#e2ebf5; font-size:13px; }
+.metric-chart-state span { max-width:440px; line-height:1.65; }
+.metric-summary-row { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; padding:0 4px 13px; }
+.metric-summary-row > div { display:flex; min-width:0; flex-direction:column; gap:6px; }
+.metric-summary-row span { color:#7f91a8; font-size:9px; }
+.metric-summary-row strong { overflow:hidden; color:#dff4ec; font-size:13px; font-weight:750; text-overflow:ellipsis; white-space:nowrap; }
+.chart-series-line { fill:none; stroke:#7fe0c1; stroke-width:2.4; stroke-linecap:round; stroke-linejoin:round; }
+.chart-axis-row { display:flex; flex-wrap:wrap; justify-content:space-between; gap:7px; padding:8px 2px 14px; color:#8193aa; font-size:9px; }
+.detail-footnote { color:#71839a; font-size:10px; line-height:1.7; }
+@media(max-width:680px) {
+  .detail-status { align-items:flex-start; }
+  .metric-summary-row { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .detail-toolbar > .button { flex:1 1 100%; }
+  .chart-axis-row span:nth-child(2) { flex-basis:100%; order:3; }
+}

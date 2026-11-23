@@ -206,7 +206,7 @@ function ServerMetricChart({
   );
 }
 
-export default function ServerDetail({
+export function ServerDetail({
   server,
   apiPublicURL,
   onBack,
@@ -433,3 +433,5 @@ export default function ServerDetail({
     </section>
   );
 }
+
+export default ServerDetail;
