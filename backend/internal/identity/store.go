@@ -256,6 +256,62 @@ func (s *Store) RegisterFirst(ctx context.Context, input RegisterInput) (User, e
 	}, nil
 }
 
+// CreateLocalPrincipal resolves the first workspace owner and creates an internal
+// short-lived session used only to bind live-stream tickets in local anonymous mode.
+// It never returns or exposes a bearer credential to the browser.
+func (s *Store) CreateLocalPrincipal(ctx context.Context) (Principal, time.Time, error) {
+	loadPrincipal := func() (Principal, error) {
+		var principal Principal
+		err := s.db.QueryRowContext(ctx, `
+			SELECT u.id::text, o.id::text, u.email, u.display_name, o.name, m.role
+			FROM users u
+			JOIN organization_memberships m ON m.user_id = u.id
+			JOIN organizations o ON o.id = m.organization_id
+			ORDER BY m.created_at
+			LIMIT 1
+		`).Scan(
+			&principal.UserID, &principal.OrganizationID, &principal.Email,
+			&principal.DisplayName, &principal.Organization, &principal.Role,
+		)
+		return principal, err
+	}
+
+	principal, err := loadPrincipal()
+	if errors.Is(err, sql.ErrNoRows) {
+		password, tokenErr := newOpaqueToken()
+		if tokenErr != nil {
+			return Principal{}, time.Time{}, fmt.Errorf("generate local owner password: %w", tokenErr)
+		}
+		_, registerErr := s.RegisterFirst(ctx, RegisterInput{
+			Email: "local@monitor.me", DisplayName: "Local Administrator",
+			Password: password, OrganizationName: "Local Workspace",
+			OrganizationSlug: "local-workspace",
+		})
+		if registerErr != nil && !errors.Is(registerErr, ErrBootstrapComplete) {
+			return Principal{}, time.Time{}, fmt.Errorf("bootstrap local workspace: %w", registerErr)
+		}
+		principal, err = loadPrincipal()
+	}
+	if err != nil {
+		return Principal{}, time.Time{}, fmt.Errorf("load local workspace owner: %w", err)
+	}
+
+	internalToken, err := newOpaqueToken()
+	if err != nil {
+		return Principal{}, time.Time{}, fmt.Errorf("create local live session secret: %w", err)
+	}
+	hash := sha256.Sum256([]byte(internalToken))
+	expiresAt := time.Now().UTC().Add(userSessionTTL)
+	err = s.db.QueryRowContext(ctx, `
+		INSERT INTO user_sessions (user_id, organization_id, token_hash, expires_at)
+		VALUES ($1, $2, $3, $4)
+		RETURNING id::text
+	`, principal.UserID, principal.OrganizationID, hash[:], expiresAt).Scan(&principal.SessionID)
+	if err != nil {
+		return Principal{}, time.Time{}, fmt.Errorf("persist local live session: %w", err)
+	}
+	return principal, expiresAt, nil
+}
 // Login verifies a password and creates a 24-hour opaque bearer session.
 // Only the SHA-256 digest of the bearer secret is persisted.
 func (s *Store) Login(ctx context.Context, email, password string) (AuthSession, error) {
