@@ -47,7 +47,9 @@ certs:
 	openssl req -x509 -newkey rsa:2048 -nodes -keyout .data/certs/server.key -out .data/certs/server.crt -days 365 -subj "/CN=localhost" -addext "subjectAltName=DNS:localhost,IP:127.0.0.1"
 	chmod 750 .data/certs
 	chmod 644 .data/certs/server.crt
-	chmod 640 .data/certs/server.key
+	# Local self-signed development key only: readable by the non-root API container.
+	# Never reuse this certificate/key on a public or production host.
+	chmod 644 .data/certs/server.key
 
 agent-test:
 	cd $(AGENT_DIR) && go test -race ./...

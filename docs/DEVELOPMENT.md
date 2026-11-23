@@ -23,17 +23,18 @@ This guide covers the Phase 1–3 backend/agent foundations and the current Phas
 - Protocol Buffers compiler (`protoc`) for local generation
 - OpenSSL for a local development certificate
 
-From the repository root:
+From the repository root on Linux, macOS, or Windows with WSL2 + Docker Desktop:
 
 ```sh
+git pull origin main
 cp .env.example .env
-# Replace local-only PostgreSQL and Redis passwords before exposing services.
+# Change the local PostgreSQL and Redis passwords if this machine is shared.
 make certs
 docker compose up --build -d
 docker compose ps --all
 ```
 
-Compose starts PostgreSQL and Redis, runs all embedded SQL migrations in the one-shot migration container, then starts the API and Next.js shell.
+The first build downloads the container images and compiles the API/web images. Compose starts PostgreSQL and Redis, runs the one-shot migration container, then starts the API and Next.js dashboard. Wait until all long-running services report healthy before opening the browser. The generated self-signed key is deliberately readable by the local non-root API container; it is for localhost development only and must never be reused on a public host.
 
 ## Local endpoints
 
@@ -44,7 +45,7 @@ Compose starts PostgreSQL and Redis, runs all embedded SQL migrations in the one
 - PostgreSQL: localhost:5432
 - Redis: localhost:6379
 
-The API readiness endpoint requires PostgreSQL and Redis. Liveness is independent of these dependencies. Compose CI stops each dependency separately, verifies readiness becomes unhealthy, restarts the dependency, and verifies readiness recovers. The dashboard includes authenticated server views, historical/live charts, project/mapping administration, alerts/in-app notifications, and allowlisted remote operations. Owner acceptance remains required.
+The API readiness endpoint requires PostgreSQL and Redis. Liveness is independent of these dependencies. Compose CI stops each dependency separately, verifies readiness becomes unhealthy, restarts the dependency, and verifies readiness recovers. The dashboard includes authenticated server views, historical/live charts, project/mapping administration, alerts/in-app notifications, and allowlisted remote operations. Owner acceptance remains required. The local stack binds published ports to 127.0.0.1; access it through localhost on the same machine.
 
 ## First owner and server enrollment
 
@@ -83,9 +84,11 @@ go vet ./...
 go build -trimpath ./cmd/monitor-agent
 ```
 
-To enroll against the local control plane, use the one-time token and the development CA:
+To enroll against the local control plane, build the native binary and use the one-time token and development CA. Run this from the repository root in a second terminal; set ENROLLMENT_TOKEN to the one-time value shown when you add the test server:
 
 ```sh
+cd agent
+go build -trimpath -o ./monitor-agent ./cmd/monitor-agent
 MONITOR_GRPC_ADDRESS=localhost:8443 \
 MONITOR_TLS_CA_FILE=../.data/certs/server.crt \
 MONITOR_ENROLLMENT_TOKEN="$ENROLLMENT_TOKEN" \
@@ -94,7 +97,20 @@ MONITOR_AGENT_STATE_FILE=./.monitor-me/agent-state.json \
 ./monitor-agent
 ```
 
+Keep this terminal running while testing dashboard telemetry. The Linux collector runs on a Linux host. On Windows, the web/database/API stack can run with Docker Desktop, but real host metrics require a separate Linux VM or WSL2 environment with procfs support and network access to the host's `localhost:8443` gRPC port.
+
 The agent writes its session credential into a mode-0600 state file within a mode-0700 directory. On restarts it reuses the stored session and does not need the original enrollment token until that session expires or is revoked. If the agent has no valid local session, supply a fresh enrollment token.
+
+Check local service readiness and logs:
+
+```sh
+curl -fsS http://localhost:8080/health/live
+curl -fsS http://localhost:8080/health/ready
+# When troubleshooting:
+docker compose logs --tail=150 postgres redis migrate api web
+```
+
+Stop the stack without deleting data using `docker compose down`. To remove all local test data and start over, use `docker compose down -v` (this permanently deletes the local PostgreSQL and Redis volumes).
 
 ## Current Linux collector contract
 

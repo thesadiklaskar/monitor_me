@@ -19,8 +19,8 @@ This file is the authoritative resume point for Monitor Me. Read it before makin
 | Implementation status | Phases 1–3 remain Completed. Phase 4 has authenticated server inventory/enrollment, historical/live charts, project/mapping administration, alerts/in-app notifications, and allowlisted remote systemd operations with audit history. Phase 5 Linux preparation adds a production Compose topology, Nginx reverse-proxy example, dry-run/additive UFW/firewalld helper, DB backup/restore, health probes and app-image rollback. No production VPS deployment or restore rehearsal has been executed. |
 | Last source commit covered by latest successful CI run | 9685e115113123d5f9f8e8a1b222804752f5a283 (Go, frontend and native-agent jobs passed in run #45203706343; Compose integration failed at the web proxy login probe; later commits are not covered) |
 | Latest CI run | [#45208235137 — quota blocked](https://github.com/WorkRCS/monitor_me/actions/runs/45208235137); jobs failed before runner assignment/steps because the repository owner reports GitHub Actions free minutes are exhausted |
-| Latest implementation commit | [36fa84fa53245085f8badec78434a6fddc1a3662](https://github.com/WorkRCS/monitor_me/commit/36fa84fa53245085f8badec78434a6fddc1a3662) — dashboard remote operations and Linux production tooling |
-| Next action | Owner performs the local dashboard acceptance checklist; before production deployment, configure a real VPS hostname, TLS certificate directory, unique secrets, and administrator IPv4/IPv6 CIDRs in an uncommitted .env.production file. |
+| Latest implementation commit | [20561a1822c4cd7349f64259177de480c79ce3a5](https://github.com/WorkRCS/monitor_me/commit/20561a1822c4cd7349f64259177de480c79ce3a5) — remote operations, Linux production tooling and release state |
+| Next action | Owner performs the local acceptance checklist in docs/ACCEPTANCE_TEST_CHECKLIST.md using the root docker-compose.yml and a real Linux agent/VM. Do not run deploy/production or firewall scripts for local acceptance. |
 
 ## Next Work Session — 2026-11-23
 

@@ -159,7 +159,7 @@ docker compose up --build -d
 docker compose ps
 ```
 
-The API exposes `/health/live` and `/health/ready`. Liveness reports process health independently; readiness checks PostgreSQL and Redis and returns HTTP 503 when either dependency is unavailable. Docker Compose runs a one-shot migration service before the API starts. The frontend remains a foundation preview and does not yet render the telemetry stream.
+The API exposes `/health/live` and `/health/ready`. Liveness reports process health independently; readiness checks PostgreSQL and Redis and returns HTTP 503 when either dependency is unavailable. Docker Compose runs a one-shot migration service before the API starts. The local Next.js dashboard includes authenticated server/project views, historical/live charts, alert and notification workflows, and allowlisted remote operations. Use a real Linux agent for live telemetry acceptance; the host collector is Linux-only.
 
 Build the native agent and its tests:
 

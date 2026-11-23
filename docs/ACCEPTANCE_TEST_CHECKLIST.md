@@ -1,6 +1,6 @@
 # Monitor Me — Owner Acceptance Checklist
 
-This checklist is for the first owner-run local/staging acceptance pass. A green build alone is not product acceptance. Do not run remote stop/restart against critical services or a production host during this first pass.
+This checklist is for the owner to test Monitor Me locally on their own computer. No VPS, public DNS, public certificate, or production firewall change is required. A green build alone is not product acceptance. Do not run remote stop/restart against critical services.
 
 ## 1. Prepare the local stack
 
@@ -24,7 +24,7 @@ This checklist is for the first owner-run local/staging acceptance pass. A green
 
 ## 3. Enroll a real Linux agent
 
-Use a disposable Linux VM or a non-production test host. Follow the native agent instructions in docs/DEVELOPMENT.md and use the generated server token plus the local development CA.
+Use a disposable Linux host or Linux VM. Docker Desktop on Windows/macOS can run the control-plane containers, but the host collector is Linux-only. Follow docs/DEVELOPMENT.md and use the generated one-time server token plus the local development CA.
 
 Confirm:
 - Agent enrollment succeeds and the server receives an agent identity.
@@ -79,13 +79,32 @@ Never use system-critical units such as ssh, networking, database, container run
 - Restart the Linux agent and confirm its persisted session/WAL recover.
 - Confirm alert/operation history survives API restart.
 
-## 8. Production-readiness preflight (do not apply blindly)
+## 8. Local health checks and reset
 
-Before a real VPS deployment, fill in the uncommitted .env.production using deploy/production/.env.production.example. Confirm DNS, TLS, dedicated certificate group, admin IPv4/IPv6 CIDRs, cloud security-group policy and the actual host SSH port.
+From the repository root, verify the local services:
 
-Run firewall.sh in dry-run mode first. Review active firewall rules and Docker forwarding. Do not use --apply until a second SSH session/provider console is available. Verify that only intended HTTPS/gRPC and administrator SSH paths are exposed; PostgreSQL, Redis, API HTTP and Next.js ports remain private.
+    curl -fsS http://localhost:8080/health/live
+    curl -fsS http://localhost:8080/health/ready
+    docker compose ps --all
 
-Perform a production deployment, backup, restore and application-image rollback rehearsal on a disposable staging database/host before accepting real monitoring data. The production deployment is not considered verified until external IPv4/IPv6 reachability, public gRPC agent enrollment, TLS renewal, backup restore and rollback are observed successfully.
+For troubleshooting:
+
+    docker compose logs --tail=150 postgres redis migrate api web
+
+Stop the stack and keep test data:
+
+    docker compose down
+
+To erase all local test data and recreate the owner/server records from scratch:
+
+    docker compose down -v
+    docker compose up --build -d
+
+The second command sequence permanently deletes the local PostgreSQL and Redis volumes. Do not use it when you need to keep your test records.
+
+Remote Operations stays read-only/disabled for command execution by default because REMOTE_ALLOWED_SYSTEMD_UNITS is empty in .env.example. To test it, use only a disposable Linux VM with a harmless test systemd service, set that exact unit in .env, restart the API container, and follow section 6. Do not enable service stop/restart for ssh, networking, Docker, PostgreSQL, Redis, or the Monitor Me API.
+
+No command in this local checklist applies the production firewall helper or touches your computer's host firewall.
 
 ## 9. Record results
 
