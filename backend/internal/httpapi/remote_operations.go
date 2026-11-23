@@ -57,7 +57,6 @@ func (api *API) listRemoteOperations(writer http.ResponseWriter, request *http.R
 	writeJSON(writer, http.StatusOK, map[string]any{"operations": operations, "audit": audit})
 }
 
-
 // listRemoteOperationAudit returns the organization-scoped audit history.
 func (api *API) listRemoteOperationAudit(writer http.ResponseWriter, request *http.Request) {
 	audit, err := api.identities.ListRemoteOperationAudit(request.Context(), principalFromRequest(request))
