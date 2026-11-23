@@ -15,7 +15,7 @@ No item may be marked Verified based only on a code stub, mock UI, or documentat
 
 | ID | Feature | Priority | Acceptance evidence | Current status |
 | --- | --- | --- | --- | --- |
-| F-001 | Add Server and scoped enrollment token | P0 | Server/token API and invalid/expired/revoked enrollment tests pass; dashboard wizard and installation instructions remain | In Progress |
+| F-001 | Add Server and scoped enrollment token | P0 | Server creation UI, one-time token display/copy/expiry, token revoke and reissue UI implemented; full reproducible one-command install workflow remains | In Progress |
 | F-002 | Native Go host agent lifecycle | P0 | Native foreground process, validated configuration, JSON logs, signal shutdown, process CPU/collector/WAL health telemetry, and Linux systemd unit validation pass race-enabled CI checks | Verified |
 | F-003 | Host CPU and per-core metrics | P0 | Linux /proc/stat counter fixtures, reset tests, and documented source semantics | Verified |
 | F-004 | Host memory, swap, cache metrics | P0 | Unit and OS-specific semantics tests | Verified |
@@ -25,8 +25,8 @@ No item may be marked Verified based only on a code stub, mock UI, or documentat
 | F-008 | Durable local telemetry spool | P0 | Disconnect, process restart, recovery, quota, and acknowledgement tests | Verified |
 | F-009 | PostgreSQL historical persistence | P0 | Migration, batch-write, duplicate-delivery, and query tests | Verified |
 | F-010 | Redis live cache/state | P0 | Cache outage does not corrupt durable records; bounded reconnect tests | Verified |
-| F-011 | Server inventory and agent status | P0 | Organization-scoped inventory API and agent online/last-seen state are verified; UI and stale/disconnected views remain | In Progress |
-| F-012 | Overall server dashboard | P0 | Metric correctness, timestamp, units, and empty-state UI tests | Planned |
+| F-011 | Server inventory and agent status | P0 | Organization-scoped inventory UI, loading/empty/error states and backend-reported status/last-seen display implemented; stale/disconnected component tests remain | In Progress |
+| F-012 | Overall server dashboard | P0 | Authenticated dashboard shell and live server inventory summary started; supported metric panels, timestamp/unit/gap states and chart tests remain | In Progress |
 | F-013 | Authorized live WebSocket updates | P0 | Scope authorization, reconnect, slow-client, and bounded-buffer tests | Verified |
 | F-014 | Docker Compose local stack | P0 | Clean-start, health-check, restart, and documented local setup tests | Verified |
 | F-015 | All Projects / project switcher | P1 | No-reload switch; all panels and subscriptions change scope | Planned |
@@ -102,6 +102,10 @@ No item may be marked Verified based only on a code stub, mock UI, or documentat
 
 ### Phase 4 — Dashboard and Operational Features
 
+**Status: In Progress — implementation began 2026-11-23.**
+
+- [x] First-owner setup, login/logout and current-session UI connected to existing authenticated APIs through HttpOnly cookie-backed same-origin route handlers.
+- [x] Organization-scoped server inventory, loading/empty/error states, Add Server, one-time token display/copy/expiry, and token rotation/revocation controls implemented; verification is pending the current Phase 4 CI run.
 - [ ] Server and project views display correct scoped data.
 - [ ] Custom charts pass representative rendering tests.
 - [ ] Process, port, and application metrics show documented capabilities.

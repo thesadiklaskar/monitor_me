@@ -14,16 +14,16 @@ This file is the authoritative resume point for Monitor Me. Read it before makin
 | Repository visibility | Private |
 | Completed phases | Phase 1 — Product Specification and Technical Blueprint; Phase 2 — Platform Foundation and Secure Connectivity; Phase 3 — Monitoring Agent and Telemetry Data Engine |
 | Current phase | Phase 4 — Dashboard and Operational Features |
-| Current phase status | Not Started |
+| Current phase status | In Progress — started 2026-11-23 |
 | MVP status | Not complete — authenticated dashboard, server overview, Add Server UI, and live metric views remain Phase 4 requirements |
-| Implementation status | Phases 1–3 phase gates are complete and CI-verified. The Linux agent, durable WAL, TLS gRPC ingestion, PostgreSQL history/retention, authorized live delivery, workload attribution, and benchmarks are verified. The overall MVP is not complete because dashboard/login/Add Server and browser-facing views remain Phase 4 work. Several non-UI feature requirements remain In Progress/Planned in the acceptance matrix. |
+| Implementation status | Phases 1–3 are Completed. Phase 4 is In Progress: authenticated first-owner/login/logout, HttpOnly cookie-backed session proxy, organization-scoped inventory, Add Server and one-time token controls are implemented on main; current Phase 4 CI verification is pending. Metric charts, project switching, alerts, notifications and remote operations remain unfinished. |
 | Last source commit covered by latest successful CI run | 2670ed2cf04705638df5c86d37fc3e0699f8a7a4 |
 | Latest verified CI run | [#45045054465 — success](https://github.com/WorkRCS/monitor_me/actions/runs/45045054465); all four jobs passed, including agent-health metrics and systemd verification |
-| Next action | On 2026-11-23, start Phase 4 from docs/PHASE_4_EXECUTION_PLAN.md: implement the authenticated dashboard, server inventory/Add Server flow, real Linux metric views, live/history charts, and remaining Phase 4 operator workflows; verify each slice before changing status. |
+| Next action | Verify the Phase 4 authentication/inventory/Add Server slice with frontend lint/typecheck/build and full Compose CI; then continue with real metric history/live views and charts. Keep Phase 4 In Progress until all completion-gate items pass. |
 
 ## Next Work Session — 2026-11-23
 
-**Target:** Phase 4 — Dashboard and Operational Features. No Phase 4 implementation is claimed yet; its current status remains Not Started.
+**Target:** Phase 4 — Dashboard and Operational Features. Started on 2026-11-23; current status is In Progress.
 
 ### Ordered release plan
 
@@ -172,7 +172,7 @@ These measurements are a single CI-runner snapshot, not production capacity guar
 
 ## Current Phase 4 — Dashboard and Operational Features
 
-**Status: Not Started**
+**Status: In Progress — started 2026-11-23**
 
 ### Phase 4 scope
 
@@ -185,11 +185,19 @@ These measurements are a single CI-runner snapshot, not production capacity guar
 - [ ] Add alert rules, deduplication, recovery events and notifications.
 - [ ] Add allowlisted, authorized and audited remote restart/stop operations through the agent control channel.
 
+### Delivered slice — 2026-11-23
+
+- [x] First-owner setup, login, current-session lookup and logout use same-origin Next.js route handlers.
+- [x] Bearer credentials are held in an HttpOnly, SameSite=Lax cookie; browser JavaScript only receives the safe user profile.
+- [x] Organization-scoped server inventory, loading/empty/error states, Add Server, one-time enrollment-token display/copy/expiry, and role-aware revoke/reissue controls are implemented.
+- [x] Token reissue revokes all previous unused enrollment credentials in the same PostgreSQL transaction; an integration test covers the replaced-token rejection path.
+- [ ] Frontend and full-stack verification for this slice is pending the current Phase 4 CI run.
+
 ### Exact resume instructions
 
 Continue directly on `main`. Do not create a new branch.
 
-**Next implementation slice:** build the authenticated server inventory experience in the Next.js frontend.
+**Next implementation slice:** finish the Phase 4 server-detail experience using the verified historical-series and live-ticket APIs.
 
 1. Add a typed API client for login, current-user, logout and server inventory endpoints.
 2. Implement login and session handling without exposing bearer tokens in logs or URLs.

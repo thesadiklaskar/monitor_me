@@ -4,7 +4,7 @@
 **Planned work session:** 2026-11-23  
 **Target:** Complete Phase 4 — Dashboard and Operational Features before starting Phase 5.
 
-This is a preparation and resume document. No Phase 4 implementation is claimed by this document. Work must continue directly on main, and Phase 4 must remain Not Started until implementation begins.
+Phase 4 implementation started on 2026-11-23. The first authentication, inventory, and Add Server slice is now implemented on main and awaits CI verification. Continue directly on main; do not create a branch.
 
 ## 1. Required delivery order
 
@@ -22,7 +22,7 @@ The existing Windows/macOS and fleet-scale roadmap items remain documented as br
 
 ## 2. Current implementation baseline
 
-The current frontend is a foundation preview in web/app/page.tsx; it is not a monitoring dashboard. The backend provides the following verified API foundations:
+The initial frontend has moved beyond the foundation preview: web/app/page.tsx now enters the authenticated dashboard shell. It currently provides login/first-owner setup, server inventory, Add Server and one-time token management; full monitoring charts and operational workflows are still in progress. The backend provides the following verified API foundations:
 
 | Capability | Existing endpoint | UI work required |
 | --- | --- | --- |
@@ -42,12 +42,16 @@ Known backend gaps must be implemented and tested where required by the Phase 4 
 
 ### Slice 1 — Authentication and application shell
 
+**Implementation started 2026-11-23:** first-owner setup, login, logout, current-session lookup, and the authenticated application shell are in place. The bearer credential is held in a server-set HttpOnly cookie.
+
 - Build login and initial owner setup guidance around the existing API.
 - Implement session handling without putting bearer tokens in URLs, browser logs, or persistent unencrypted storage.
 - Add authenticated route handling, logout, expired-session redirects, and loading/error states.
 - Keep API errors understandable without exposing secrets or internal details.
 
 ### Slice 2 — Server inventory and Add Server
+
+**Implementation started 2026-11-23:** organization-scoped server inventory, empty/loading/error states, server creation, one-time token display/copy/expiry, token rotation and role-aware revoke controls are in place. Agent deployment remains guided/manual; a fully automated installer is not yet claimed.
 
 - Build organization-scoped inventory with empty, loading, error, connected, stale, and disconnected states based only on available backend fields.
 - Implement Add Server using the existing create-server endpoint.

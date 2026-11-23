@@ -9,7 +9,7 @@ Monitor Me is delivered in **five major phases**. Each phase contains smaller in
 | 1 | Product Specification and Technical Blueprint | **Completed** |
 | 2 | Platform Foundation and Secure Connectivity | **Completed** |
 | 3 | Monitoring Agent and Telemetry Data Engine | **Completed** |
-| 4 | Dashboard and Operational Features | Not Started |
+| 4 | Dashboard and Operational Features | **In Progress** |
 | 5 | Cross-Platform Production and Scale | Not Started |
 
 A feature can be implemented before its phase is complete, but its status must remain honest. "Completed" requires implementation and verification evidence, not just a specification.
@@ -149,7 +149,7 @@ For the first Linux MVP release, Phase 5 has two primary release deliverables: f
 
 ## Phase 4 — Dashboard and Operational Features
 
-**Status: Not Started**
+**Status: In Progress — started 2026-11-23**
 
 ### Scope
 
@@ -164,6 +164,14 @@ For the first Linux MVP release, Phase 5 has two primary release deliverables: f
 9. Add authorized, allowlisted, audited restart/stop actions through the agent control channel.
 10. Complete the guided one-command installation workflow and user-facing operational guidance.
 11. Add user/role/project administration and audit views as required for the first production release.
+
+### Progress log — 2026-11-23
+
+- [x] Slice 1 implementation: first-owner setup, login, current-session lookup and logout use same-origin Next.js route handlers.
+- [x] The bearer token is stored only in an HttpOnly, SameSite=Lax cookie; browser JavaScript receives the safe user profile, not the token.
+- [x] Slice 2 implementation: organization-scoped server inventory, loading/empty/error states, Add Server, one-time token display/copy/expiry and role-aware token revoke/reissue controls.
+- [x] Server-side reissue invalidates any previous unused enrollment tokens in the same transaction; integration coverage rejects the replaced credential.
+- [ ] Complete frontend lint/typecheck/build and all backend/Compose integration checks for the Phase 4 slice before marking the individual UI acceptance rows Verified.
 
 ### Completion gate
 
