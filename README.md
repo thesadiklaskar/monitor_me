@@ -280,7 +280,7 @@ The production firewall policy is defined for two roles: a control-plane VPS/VM 
 | 2 | Platform Foundation and Secure Connectivity | **Completed** | Go/Next.js foundation, PostgreSQL/Redis, migrations, owner authentication, organization authorization, TLS gRPC enrollment, heartbeat, reconnect, and revocation pass CI |
 | 3 | Monitoring Agent and Telemetry Data Engine | **Completed** | Linux host collection, durable spool, TLS gRPC ingestion, PostgreSQL history/retention, authorized live delivery, workload attribution, and CI benchmarks all verified |
 | 4 | Dashboard and Operational Features | **In Progress** | Server/project dashboards, custom charts, application visibility, alerts, notifications, one-click installation workflow, and secure remote actions |
-| 5 | Cross-Platform Production and Scale | Not started | Windows/macOS agents, signed lifecycle tooling, role-aware Linux firewall setup, security hardening, benchmarks, production operations, and final as-built design |
+| 5 | Cross-Platform Production and Scale | In Progress | Linux production tooling is prepared; an initial Windows host collector and local build/run helpers are implemented. Windows runtime acceptance, Windows service/signing, macOS collection, fleet tests, and production host verification remain |
 
 A phase is marked Completed only after implementation, acceptance tests, relevant security/failure checks, documentation, and Git commit requirements pass.
 
