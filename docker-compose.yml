@@ -60,6 +60,7 @@ services:
       DATABASE_URL: "postgres://${POSTGRES_USER:-monitor_me}:${POSTGRES_PASSWORD:-local_only_change_me}@postgres:5432/${POSTGRES_DB:-monitor_me}?sslmode=disable"
       REDIS_ADDR: "redis:6379"
       REDIS_PASSWORD: "${REDIS_PASSWORD:-local_only_change_me}"
+      WEB_ALLOWED_ORIGINS: "${WEB_ALLOWED_ORIGINS:-http://localhost:3000}"
       AGENT_GRPC_ADDR: ":8443"
       AGENT_TLS_CERT_FILE: "/run/certs/server.crt"
       AGENT_TLS_KEY_FILE: "/run/certs/server.key"
@@ -93,6 +94,7 @@ services:
       HOSTNAME: "0.0.0.0"
       MONITOR_ME_API_BASE_URL: "http://api:8080"
       MONITOR_ME_AGENT_GRPC_ADDRESS: "${AGENT_GRPC_PUBLIC_ADDRESS:-}"
+      MONITOR_ME_PUBLIC_API_URL: "${MONITOR_ME_PUBLIC_API_URL:-http://localhost:8080}"
     ports:
       - "127.0.0.1:${WEB_PORT:-3000}:3000"
     depends_on:

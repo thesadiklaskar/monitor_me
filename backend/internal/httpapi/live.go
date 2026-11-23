@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/WorkRCS/monitor_me/backend/internal/identity"
@@ -44,10 +45,22 @@ func (api *API) liveOriginAllowed(request *http.Request) bool {
 		(origin.Scheme != "http" && origin.Scheme != "https") {
 		return false
 	}
-	if origin.Host == request.Host {
+	originValue := origin.Scheme + "://" + strings.ToLower(origin.Host)
+
+	// Reverse proxies must set X-Forwarded-Proto to the scheme they terminate.
+	// The API port is private in production, so this header is trusted only
+	// from the configured reverse-proxy/network boundary.
+	scheme := strings.TrimSpace(strings.Split(request.Header.Get("X-Forwarded-Proto"), ",")[0])
+	if scheme == "" {
+		scheme = "http"
+		if request.TLS != nil {
+			scheme = "https"
+		}
+	}
+	if originValue == scheme+"://"+strings.ToLower(request.Host) {
 		return true
 	}
-	_, allowed := api.allowedLiveOrigins[origin.Scheme+"://"+origin.Host]
+	_, allowed := api.allowedLiveOrigins[originValue]
 	return allowed
 }
 
