@@ -17,11 +17,11 @@ type Dependency struct {
 }
 
 type LiveDependencies struct {
-	Cache              *redisv9.Client
-	Telemetry          *telemetry.Store
-	AllowedOrigins     []string
-	RemoteAllowedUnits    []string
-	DisableAuthentication bool
+	Cache                  *redisv9.Client
+	Telemetry              *telemetry.Store
+	AllowedOrigins         []string
+	RemoteAllowedUnits     []string
+	DisableAuthentication  bool
 }
 
 // NewRouter registers health, identity, inventory, telemetry, and live routes.
