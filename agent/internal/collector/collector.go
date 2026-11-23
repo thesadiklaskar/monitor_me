@@ -67,6 +67,13 @@ func NewProcCollector(root string) *ProcCollector {
 
 // Capabilities reports only metrics supported by this collector.
 func (c *ProcCollector) Capabilities() []string {
+	if runtime.GOOS == "windows" {
+		return []string{
+			"host.cpu", "host.memory", "host.swap", "host.disk", "host.network",
+			"host.uptime", "host.process_inventory", "host.system_info",
+			"agent.health", "agent.spool",
+		}
+	}
 	if runtime.GOOS != "linux" {
 		return []string{"agent.health", "agent.spool"}
 	}
@@ -79,8 +86,11 @@ func (c *ProcCollector) Capabilities() []string {
 }
 
 func (c *ProcCollector) Collect(ctx context.Context) ([]Sample, error) {
+	if runtime.GOOS == "windows" {
+		return c.collectWindows(ctx)
+	}
 	if runtime.GOOS != "linux" {
-		return nil, errors.New("procfs collection is supported only on Linux")
+		return nil, errors.New("host collection is currently supported on Linux and Windows")
 	}
 	select {
 	case <-ctx.Done():
