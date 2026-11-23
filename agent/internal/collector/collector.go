@@ -69,7 +69,7 @@ func NewProcCollector(root string) *ProcCollector {
 func (c *ProcCollector) Capabilities() []string {
 	if runtime.GOOS == "windows" {
 		return []string{
-			"host.cpu", "host.memory", "host.swap", "host.disk", "host.network",
+			"host.cpu", "host.cpu.per_core", "host.memory", "host.swap", "host.disk", "host.network",
 			"host.uptime", "host.process_inventory", "host.system_info",
 			"agent.health", "agent.spool",
 		}
