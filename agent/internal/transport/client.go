@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -12,6 +13,7 @@ import (
 
 	monitorv1 "github.com/WorkRCS/monitor_me/agent/gen/monitor/v1"
 	"github.com/WorkRCS/monitor_me/agent/internal/config"
+	"github.com/WorkRCS/monitor_me/agent/internal/operations"
 	"github.com/WorkRCS/monitor_me/agent/internal/spool"
 	"github.com/WorkRCS/monitor_me/agent/internal/state"
 	"google.golang.org/grpc"
@@ -117,10 +119,17 @@ func (c *Client) ReportHeartbeat(
 
 // SendPending acknowledges a local WAL batch only after the control plane
 // confirms its PostgreSQL transaction has committed.
-func (c *Client) SendPending(ctx context.Context, session state.Credentials, store *spool.Store) (int, error) {
+func (c *Client) SendPending(ctx context.Context, session state.Credentials, store *spool.Store, allowlists ...[]string) (int, error) {
 	batches, err := store.Peek(16)
-	if err != nil || len(batches) == 0 {
+	if err != nil {
 		return 0, err
+	}
+	var allowedUnits []string
+	if len(allowlists) > 0 {
+		allowedUnits = allowlists[0]
+	}
+	if len(batches) == 0 && len(allowedUnits) == 0 {
+		return 0, nil
 	}
 	stream, err := c.rpc.Stream(ctx)
 	if err != nil {
@@ -164,10 +173,82 @@ func (c *Client) SendPending(ctx context.Context, session state.Credentials, sto
 		}
 		sent++
 	}
+
+	if len(allowedUnits) > 0 {
+		if err := c.pollRemoteOperation(ctx, stream, session, allowedUnits); err != nil {
+			return sent, err
+		}
+	}
 	if err := stream.CloseSend(); err != nil {
 		return sent, fmt.Errorf("close telemetry stream: %w", err)
 	}
 	return sent, nil
+}
+
+func (c *Client) pollRemoteOperation(
+	ctx context.Context,
+	stream monitorv1.AgentControl_StreamClient,
+	session state.Credentials,
+	allowedUnits []string,
+) error {
+	poll := &monitorv1.AgentToServerMessage{
+		AgentId: session.AgentID,
+		SessionToken: session.SessionToken,
+		Payload: &monitorv1.AgentToServerMessage_Event{Event: &monitorv1.AgentEvent{
+			EventId: "command-poll", EventType: "command_poll", OccurredAtUnixNanos: time.Now().UTC().UnixNano(),
+		}},
+	}
+	if err := stream.Send(poll); err != nil {
+		return fmt.Errorf("request remote operation: %w", err)
+	}
+	response, err := stream.Recv()
+	if err != nil {
+		return fmt.Errorf("receive remote operation: %w", err)
+	}
+	command := response.GetCommand()
+	if command == nil {
+		ack := response.GetAcknowledgement()
+		if ack == nil || ack.GetBatchId() != "command-poll" || !ack.GetAccepted() {
+			return errors.New("control plane returned an invalid remote operation poll response")
+		}
+		return nil
+	}
+
+	var payload struct {
+		Unit string `json:"unit"`
+	}
+	result := operations.Result{Status: "failed", Output: "Remote operation command was malformed."}
+	if err := json.Unmarshal(command.GetPayload(), &payload); err == nil {
+		if command.GetExpiresAtUnixMillis() > time.Now().UTC().UnixMilli() {
+			result = operations.Execute(ctx, command.GetCommandType(), payload.Unit, allowedUnits)
+		} else {
+			result.Output = "Remote operation expired before agent execution."
+		}
+	}
+	encoded, err := json.Marshal(result)
+	if err != nil {
+		return fmt.Errorf("encode remote operation result: %w", err)
+	}
+	resultMessage := &monitorv1.AgentToServerMessage{
+		AgentId: session.AgentID,
+		SessionToken: session.SessionToken,
+		Payload: &monitorv1.AgentToServerMessage_Event{Event: &monitorv1.AgentEvent{
+			EventId: command.GetCommandId(), EventType: "command_result",
+			Message: string(encoded), OccurredAtUnixNanos: time.Now().UTC().UnixNano(),
+		}},
+	}
+	if err := stream.Send(resultMessage); err != nil {
+		return fmt.Errorf("send remote operation result: %w", err)
+	}
+	acknowledgement, err := stream.Recv()
+	if err != nil {
+		return fmt.Errorf("receive remote operation acknowledgement: %w", err)
+	}
+	ack := acknowledgement.GetAcknowledgement()
+	if ack == nil || ack.GetBatchId() != command.GetCommandId() || !ack.GetAccepted() {
+		return fmt.Errorf("control plane rejected remote operation result: %s", ack.GetMessage())
+	}
+	return nil
 }
 
 func (c *Client) Close() error {

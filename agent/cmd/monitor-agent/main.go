@@ -156,7 +156,7 @@ func runRemote(ctx context.Context, cfg config.Config, capabilities []string, st
 			heartbeatInterval = 15 * time.Second
 		}
 		heartbeatTicker := time.NewTicker(heartbeatInterval)
-		deliveryTicker := time.NewTicker(250 * time.Millisecond)
+		deliveryTicker := time.NewTicker(5 * time.Second)
 		logger.Info("agent session active", "agent_id", session.AgentID, "server_id", session.ServerID)
 
 		connected := true
@@ -178,8 +178,8 @@ func runRemote(ctx context.Context, cfg config.Config, capabilities []string, st
 					connected = false
 				}
 			case <-deliveryTicker.C:
-				callContext, cancel := context.WithTimeout(ctx, 8*time.Second)
-				sent, sendErr := client.SendPending(callContext, session, store)
+				callContext, cancel := context.WithTimeout(ctx, 30*time.Second)
+				sent, sendErr := client.SendPending(callContext, session, store, cfg.AllowedSystemdUnits)
 				cancel()
 				if sent > 0 {
 					healthState.MarkSuccessfulSend(time.Now().UTC())

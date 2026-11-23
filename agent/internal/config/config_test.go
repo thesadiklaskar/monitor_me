@@ -73,3 +73,28 @@ func TestLoadRejectsUnsafeBounds(t *testing.T) {
 		t.Fatal("expected too-small spool quota to be rejected")
 	}
 }
+
+
+func TestParseAllowedSystemdUnits(t *testing.T) {
+	units, err := parseAllowedSystemdUnits(" monitor-me-worker.service, sshd.service,monitor-me-worker.service ")
+	if err != nil {
+		t.Fatalf("parse allowlist: %v", err)
+	}
+	if len(units) != 2 || units[0] != "monitor-me-worker.service" || units[1] != "sshd.service" {
+		t.Fatalf("unexpected normalized allowlist: %#v", units)
+	}
+}
+
+func TestParseAllowedSystemdUnitsRejectsUnsafeTargets(t *testing.T) {
+	for _, input := range []string{
+		"/etc/passwd",
+		"foo.service; id",
+		"foo.service && reboot",
+		"foo.target",
+		"foo.service/../bar",
+	} {
+		if _, err := parseAllowedSystemdUnits(input); err == nil {
+			t.Errorf("unsafe target %q was accepted", input)
+		}
+	}
+}
