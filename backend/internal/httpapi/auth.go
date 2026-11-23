@@ -7,6 +7,8 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/WorkRCS/monitor_me/backend/internal/identity"
 	"github.com/WorkRCS/monitor_me/backend/internal/telemetry"
@@ -19,12 +21,46 @@ type API struct {
 	telemetry          *telemetry.Store
 	allowedLiveOrigins map[string]struct{}
 	allowedRemoteUnits []string
+	disableAuthentication bool
+	localPrincipalMu sync.Mutex
+	localPrincipal identity.Principal
+	localPrincipalExpiresAt time.Time
 }
 
 type principalContextKey struct{}
 
+func (api *API) anonymousLocalPrincipal(ctx context.Context) (identity.Principal, error) {
+	api.localPrincipalMu.Lock()
+	defer api.localPrincipalMu.Unlock()
+
+	if api.localPrincipal.SessionID != "" && time.Until(api.localPrincipalExpiresAt) > time.Minute {
+		return api.localPrincipal, nil
+	}
+
+	principal, expiresAt, err := api.identities.CreateLocalPrincipal(ctx)
+	if err != nil {
+		return identity.Principal{}, err
+	}
+	api.localPrincipal = principal
+	api.localPrincipalExpiresAt = expiresAt
+	return principal, nil
+}
+
+func (api *API) authenticationDisabled(writer http.ResponseWriter, request *http.Request) {
+	writeAPIError(writer, http.StatusNotFound, "authentication_disabled", "Interactive login is disabled in local anonymous mode.")
+}
 func (api *API) requireAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if api.disableAuthentication {
+			principal, err := api.anonymousLocalPrincipal(request.Context())
+			if err != nil {
+				writeAPIError(writer, http.StatusServiceUnavailable, "local_workspace_unavailable", "The local workspace could not be initialized.")
+				return
+			}
+			ctx := context.WithValue(request.Context(), principalContextKey{}, principal)
+			next.ServeHTTP(writer, request.WithContext(ctx))
+			return
+		}
 		header := request.Header.Get("Authorization")
 		scheme, token, ok := strings.Cut(header, " ")
 		if !ok || scheme != "Bearer" || token == "" || strings.ContainsAny(token, " \t\r\n") {
@@ -108,6 +144,10 @@ func (api *API) me(writer http.ResponseWriter, request *http.Request) {
 }
 
 func (api *API) logout(writer http.ResponseWriter, request *http.Request) {
+	if api.disableAuthentication {
+		writer.WriteHeader(http.StatusNoContent)
+		return
+	}
 	if err := api.identities.Logout(request.Context(), principalFromRequest(request)); err != nil {
 		writeAPIError(writer, http.StatusInternalServerError, "logout_failed", "The session could not be revoked.")
 		return
