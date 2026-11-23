@@ -74,7 +74,6 @@ func TestLoadRejectsUnsafeBounds(t *testing.T) {
 	}
 }
 
-
 func TestParseAllowedSystemdUnits(t *testing.T) {
 	units, err := parseAllowedSystemdUnits(" monitor-me-worker.service, sshd.service,monitor-me-worker.service ")
 	if err != nil {
