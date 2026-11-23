@@ -8,6 +8,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"math"
 	"net/mail"
 	"regexp"
 	"strings"
@@ -34,6 +35,7 @@ const (
 var (
 	slugPattern = regexp.MustCompile("^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$")
 	uuidPattern = regexp.MustCompile("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$")
+	alertMetricPattern = regexp.MustCompile("^[a-zA-Z][a-zA-Z0-9_.-]{0,127}$")
 )
 
 // Store contains the durable identity and authorization operations.
@@ -113,6 +115,44 @@ type ServerProjectMapping struct {
 	WorkloadSelector  string    `json:"workload_selector"`
 	AttributionMethod string    `json:"attribution_method"`
 	CreatedAt         time.Time `json:"created_at"`
+}
+
+
+type AlertRule struct {
+	ID             string    `json:"id"`
+	Name           string    `json:"name"`
+	ServerID       *string   `json:"server_id,omitempty"`
+	ProjectID      *string   `json:"project_id,omitempty"`
+	MetricName     string    `json:"metric_name"`
+	Operator       string    `json:"operator"`
+	Threshold      float64   `json:"threshold"`
+	Enabled        bool      `json:"enabled"`
+	CreatedAt      time.Time `json:"created_at"`
+}
+
+type AlertEvent struct {
+	ID            string     `json:"id"`
+	RuleID        string     `json:"rule_id"`
+	RuleName      string     `json:"rule_name"`
+	ServerID      string     `json:"server_id"`
+	ServerName    string     `json:"server_name"`
+	ProjectID     *string    `json:"project_id,omitempty"`
+	MetricName    string     `json:"metric_name"`
+	Status        string     `json:"status"`
+	LastValue     float64    `json:"last_value"`
+	TriggeredAt   time.Time  `json:"triggered_at"`
+	LastObserved  time.Time  `json:"last_observed_at"`
+	ResolvedAt    *time.Time `json:"resolved_at,omitempty"`
+}
+
+type AlertNotification struct {
+	ID          string    `json:"id"`
+	EventID     string    `json:"event_id"`
+	Kind        string    `json:"kind"`
+	Title       string    `json:"title"`
+	Message     string    `json:"message"`
+	ReadAt      *time.Time `json:"read_at,omitempty"`
+	CreatedAt   time.Time `json:"created_at"`
 }
 
 // IssuedServer returns a server and a one-time enrollment credential.
@@ -846,4 +886,151 @@ func newOpaqueToken() (string, error) {
 		return "", err
 	}
 	return base64.RawURLEncoding.EncodeToString(buffer), nil
+}
+
+
+func (s *Store) ListAlertRules(ctx context.Context, principal Principal) ([]AlertRule, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT id::text, name, server_id::text, project_id::text, metric_name,
+		       operator, threshold, enabled, created_at
+		FROM alert_rules
+		WHERE organization_id = $1
+		ORDER BY created_at DESC
+		LIMIT 200
+	`, principal.OrganizationID)
+	if err != nil { return nil, fmt.Errorf("list alert rules: %w", err) }
+	defer rows.Close()
+	items := make([]AlertRule, 0)
+	for rows.Next() {
+		var item AlertRule
+		var serverID, projectID sql.NullString
+		if err := rows.Scan(&item.ID, &item.Name, &serverID, &projectID, &item.MetricName, &item.Operator, &item.Threshold, &item.Enabled, &item.CreatedAt); err != nil {
+			return nil, fmt.Errorf("scan alert rule: %w", err)
+		}
+		if serverID.Valid { item.ServerID = &serverID.String }
+		if projectID.Valid { item.ProjectID = &projectID.String }
+		items = append(items, item)
+	}
+	if err := rows.Err(); err != nil { return nil, fmt.Errorf("iterate alert rules: %w", err) }
+	return items, nil
+}
+
+func (s *Store) CreateAlertRule(ctx context.Context, principal Principal, input AlertRule) (AlertRule, error) {
+	if !canAdminister(principal.Role) { return AlertRule{}, ErrForbidden }
+	input.Name = strings.TrimSpace(input.Name)
+	if len(input.Name) < 2 || len(input.Name) > 120 || !alertMetricPattern.MatchString(input.MetricName) ||
+		(input.Operator != "gt" && input.Operator != "gte" && input.Operator != "lt" && input.Operator != "lte") ||
+		math.IsNaN(input.Threshold) || math.IsInf(input.Threshold, 0) {
+		return AlertRule{}, ErrInvalidInput
+	}
+	if input.ServerID != nil && !validUUID(*input.ServerID) { return AlertRule{}, ErrInvalidInput }
+	if input.ProjectID != nil && !validUUID(*input.ProjectID) { return AlertRule{}, ErrInvalidInput }
+	if input.ServerID != nil || input.ProjectID != nil {
+		var allowed bool
+		err := s.db.QueryRowContext(ctx, `
+			SELECT
+				($2::uuid IS NULL OR EXISTS (SELECT 1 FROM servers WHERE id = $2::uuid AND organization_id = $1))
+				AND ($3::uuid IS NULL OR EXISTS (SELECT 1 FROM projects WHERE id = $3::uuid AND organization_id = $1))
+		`, principal.OrganizationID, nullableUUID(input.ServerID), nullableUUID(input.ProjectID)).Scan(&allowed)
+		if err != nil { return AlertRule{}, fmt.Errorf("validate alert rule scope: %w", err) }
+		if !allowed { return AlertRule{}, ErrNotFound }
+	}
+	var serverID, projectID sql.NullString
+	var result AlertRule
+	err := s.db.QueryRowContext(ctx, `
+		INSERT INTO alert_rules (organization_id, name, server_id, project_id, metric_name, operator, threshold, enabled, created_by)
+		VALUES ($1, $2, $3::uuid, $4::uuid, $5, $6, $7, true, $8)
+		RETURNING id::text, name, server_id::text, project_id::text, metric_name, operator, threshold, enabled, created_at
+	`, principal.OrganizationID, input.Name, nullableUUID(input.ServerID), nullableUUID(input.ProjectID),
+		input.MetricName, input.Operator, input.Threshold, principal.UserID).Scan(
+		&result.ID, &result.Name, &serverID, &projectID, &result.MetricName,
+		&result.Operator, &result.Threshold, &result.Enabled, &result.CreatedAt)
+	if err != nil { return AlertRule{}, fmt.Errorf("create alert rule: %w", err) }
+	if serverID.Valid { result.ServerID = &serverID.String }
+	if projectID.Valid { result.ProjectID = &projectID.String }
+	return result, nil
+}
+
+func nullableUUID(value *string) any {
+	if value == nil || *value == "" { return nil }
+	return *value
+}
+
+func (s *Store) DeleteAlertRule(ctx context.Context, principal Principal, ruleID string) error {
+	if !canAdminister(principal.Role) { return ErrForbidden }
+	if !validUUID(ruleID) { return ErrNotFound }
+	result, err := s.db.ExecContext(ctx, `DELETE FROM alert_rules WHERE id = $1 AND organization_id = $2`, ruleID, principal.OrganizationID)
+	if err != nil { return fmt.Errorf("delete alert rule: %w", err) }
+	count, err := result.RowsAffected()
+	if err != nil { return fmt.Errorf("inspect alert rule deletion: %w", err) }
+	if count == 0 { return ErrNotFound }
+	return nil
+}
+
+func (s *Store) ListAlertEvents(ctx context.Context, principal Principal) ([]AlertEvent, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT event.id::text, event.rule_id::text, rule.name, event.server_id::text,
+		       server.name, event.project_id::text, event.metric_name, event.status,
+		       event.last_value, event.triggered_at, event.last_observed_at, event.resolved_at
+		FROM alert_events event
+		JOIN alert_rules rule ON rule.id = event.rule_id AND rule.organization_id = event.organization_id
+		JOIN servers server ON server.id = event.server_id AND server.organization_id = event.organization_id
+		WHERE event.organization_id = $1
+		ORDER BY event.triggered_at DESC
+		LIMIT 200
+	`, principal.OrganizationID)
+	if err != nil { return nil, fmt.Errorf("list alert events: %w", err) }
+	defer rows.Close()
+	items := make([]AlertEvent, 0)
+	for rows.Next() {
+		var item AlertEvent
+		var projectID sql.NullString
+		var resolvedAt sql.NullTime
+		if err := rows.Scan(&item.ID, &item.RuleID, &item.RuleName, &item.ServerID, &item.ServerName,
+			&projectID, &item.MetricName, &item.Status, &item.LastValue, &item.TriggeredAt, &item.LastObserved, &resolvedAt); err != nil {
+			return nil, fmt.Errorf("scan alert event: %w", err)
+		}
+		if projectID.Valid { item.ProjectID = &projectID.String }
+		if resolvedAt.Valid { item.ResolvedAt = &resolvedAt.Time }
+		items = append(items, item)
+	}
+	if err := rows.Err(); err != nil { return nil, fmt.Errorf("iterate alert events: %w", err) }
+	return items, nil
+}
+
+func (s *Store) ListAlertNotifications(ctx context.Context, principal Principal) ([]AlertNotification, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT id::text, event_id::text, kind, title, message, read_at, created_at
+		FROM alert_notifications
+		WHERE organization_id = $1 AND user_id = $2
+		ORDER BY read_at NULLS FIRST, created_at DESC
+		LIMIT 100
+	`, principal.OrganizationID, principal.UserID)
+	if err != nil { return nil, fmt.Errorf("list alert notifications: %w", err) }
+	defer rows.Close()
+	items := make([]AlertNotification, 0)
+	for rows.Next() {
+		var item AlertNotification
+		var readAt sql.NullTime
+		if err := rows.Scan(&item.ID, &item.EventID, &item.Kind, &item.Title, &item.Message, &readAt, &item.CreatedAt); err != nil {
+			return nil, fmt.Errorf("scan alert notification: %w", err)
+		}
+		if readAt.Valid { item.ReadAt = &readAt.Time }
+		items = append(items, item)
+	}
+	if err := rows.Err(); err != nil { return nil, fmt.Errorf("iterate alert notifications: %w", err) }
+	return items, nil
+}
+
+func (s *Store) MarkAlertNotificationRead(ctx context.Context, principal Principal, notificationID string) error {
+	if !validUUID(notificationID) { return ErrNotFound }
+	result, err := s.db.ExecContext(ctx, `
+		UPDATE alert_notifications SET read_at = COALESCE(read_at, now())
+		WHERE id = $1 AND organization_id = $2 AND user_id = $3
+	`, notificationID, principal.OrganizationID, principal.UserID)
+	if err != nil { return fmt.Errorf("mark alert notification read: %w", err) }
+	count, err := result.RowsAffected()
+	if err != nil { return fmt.Errorf("inspect notification update: %w", err) }
+	if count == 0 { return ErrNotFound }
+	return nil
 }
