@@ -10,7 +10,7 @@ Monitor Me is delivered in **five major phases**. Each phase contains smaller in
 | 2 | Platform Foundation and Secure Connectivity | **Completed** |
 | 3 | Monitoring Agent and Telemetry Data Engine | **Completed** |
 | 4 | Dashboard and Operational Features | **In Progress** |
-| 5 | Cross-Platform Production and Scale | Not Started |
+| 5 | Cross-Platform Production and Scale | **In Progress — Linux MVP tooling prepared; host acceptance pending** |
 
 A feature can be implemented before its phase is complete, but its status must remain honest. "Completed" requires implementation and verification evidence, not just a specification.
 
@@ -149,7 +149,7 @@ For the first Linux MVP release, Phase 5 has two primary release deliverables: f
 
 ## Phase 4 — Dashboard and Operational Features
 
-**Status: In Progress — started 2026-11-23; the authentication and server-onboarding slice is CI-verified.**
+**Status: In Progress — dashboard workflows implemented; owner acceptance and current automated verification remain.**
 
 ### Scope
 
@@ -171,7 +171,9 @@ For the first Linux MVP release, Phase 5 has two primary release deliverables: f
 - [x] The bearer token is stored only in an HttpOnly, SameSite=Lax cookie; browser JavaScript receives the safe user profile, not the token.
 - [x] Slice 2 implementation: organization-scoped server inventory, loading/empty/error states, Add Server, one-time token display/copy/expiry and role-aware token revoke/reissue controls.
 - [x] Server-side reissue invalidates any previous unused enrollment tokens in the same transaction; integration coverage rejects the replaced credential.
-- [x] Phase 4 slice verification passed all four jobs in [GitHub Actions run #45188259431](https://github.com/WorkRCS/monitor_me/actions/runs/45188259431): Next.js lint/typecheck/production build, Go backend, native agent, authenticated enrollment/token-rotation integration, telemetry benchmarks, and Redis/PostgreSQL recovery.
+- [x] The current dashboard includes server history/live telemetry views, All Projects/project scope, workload mapping administration, alert rules/in-app notifications, and an allowlisted remote-operations workspace with audit history.
+- [x] Remote operations are exposed through same-origin authenticated Next.js handlers; the UI limits targets to the API-provided Systemd allowlist and confirms owner/admin actions before queueing.
+- [ ] Re-run current frontend/backend/agent/Compose checks and owner acceptance. The repository owner reports the GitHub Actions free-minute quota is exhausted; the latest run stops before any job steps.
 
 ### Completion gate
 
@@ -189,7 +191,7 @@ For the first Linux MVP release, Phase 5 has two primary release deliverables: f
 
 ## Phase 5 — Cross-Platform Production and Scale
 
-**Status: Not Started**
+**Status: In Progress — Linux MVP deployment/firewall tooling prepared; real host verification and cross-platform/scale expansion remain.**
 
 ### Primary Linux MVP release deliverables
 
@@ -198,6 +200,15 @@ For the first Linux MVP release, Phase 5 has two primary release deliverables: f
 **5B. Production shift** — deploy the verified Linux-first control plane and agent workflow to the selected VPS/VM. Configure DNS/TLS/reverse proxy and the gRPC endpoint, secure secrets, keep PostgreSQL/Redis private, apply migrations, exercise backup/restore, health/readiness, restart/recovery, and document cutover/rollback. Do not enable broad external onboarding until the owner completes the planned local acceptance test.
 
 Windows/macOS support, signed cross-platform installers, and fleet-scale capacity work remain broader Phase 5 expansion/hardening requirements. A Linux-only cutover does not complete those items.
+
+### Linux MVP implementation update — 2026-11-23
+
+- [x] Added a version-tagged production Compose topology with PostgreSQL/Redis private to the Compose network, loopback-only API HTTP and web listeners, and a configurable TLS gRPC host binding.
+- [x] Added a host Nginx example for HTTPS termination, HTTP-01 challenge path and WebSocket proxying.
+- [x] Added PostgreSQL custom-format backup, explicit-confirmation restore with a pre-restore snapshot, application image rollback, and readiness probes.
+- [x] Added a dry-run-first UFW/firewalld helper for additive control-plane allow rules and an agent-only no-inbound profile, with a rollback ledger.
+- [ ] Apply/review firewall policy on a selected VPS, verify SSH/Docker/IPv4/IPv6 exposure, enroll an agent over public gRPC, deploy, restore, and rollback on a real environment.
+- [ ] Complete Windows/macOS agents, signed lifecycle tooling, and demonstrated fleet-scale benchmarks; these remain broader Phase 5 scope.
 
 ### Scope
 

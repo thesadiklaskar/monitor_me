@@ -1,0 +1,17 @@
+# Temporary HTTP-only vhost used to obtain the initial Let's Encrypt certificate.
+# Replace the hostname, enable this vhost, then run certbot with --webroot.
+server {
+    listen 80;
+    listen [::]:80;
+    server_name monitor.example.com;
+
+    location ^~ /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+        default_type "text/plain";
+        try_files $uri =404;
+    }
+
+    location / {
+        return 404;
+    }
+}

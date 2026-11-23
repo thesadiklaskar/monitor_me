@@ -1,6 +1,6 @@
 # Local Development
 
-This guide describes the Phase 1–3 implementation verified on main: the Phase 2 control plane and Phase 3 Linux telemetry path. Phase 4 dashboard work has not started. It is for local development, not production deployment.
+This guide covers the Phase 1–3 backend/agent foundations and the current Phase 4 dashboard implementation. It also points to the separate Linux production deployment runbook; the default Compose stack remains a local development topology.
 
 ## Toolchain Baseline
 
@@ -44,7 +44,7 @@ Compose starts PostgreSQL and Redis, runs all embedded SQL migrations in the one
 - PostgreSQL: localhost:5432
 - Redis: localhost:6379
 
-The API readiness endpoint requires PostgreSQL and Redis. Liveness is independent of these dependencies. Compose CI stops each dependency separately, verifies readiness becomes unhealthy, restarts the dependency, and verifies readiness recovers. The frontend is still a foundation shell and does not yet render monitoring dashboards.
+The API readiness endpoint requires PostgreSQL and Redis. Liveness is independent of these dependencies. Compose CI stops each dependency separately, verifies readiness becomes unhealthy, restarts the dependency, and verifies readiness recovers. The dashboard includes authenticated server views, historical/live charts, project/mapping administration, alerts/in-app notifications, and allowlisted remote operations. Owner acceptance remains required.
 
 ## First owner and server enrollment
 
@@ -189,5 +189,9 @@ npm run build
 - Application HTTP request rate, latency, and status metrics require application instrumentation, a supported reverse-proxy integration, or tracing; they are not inferred from open ports.
 - eBPF and kernel-level event tracing are not yet implemented.
 - Historical queries aggregate raw samples; persistent materialized downsampling/rollups remain future work.
-- The frontend is still a foundation shell. Authentication UI, server dashboards, project switching, graph rendering, alert workflows, and operational actions are Phase 4.
-- The current Compose deployment is a local development topology, not a production architecture.
+- Windows/macOS collectors, full Docker Engine discovery, per-process CPU/lifecycle data, application request instrumentation, persistent rollups, signed installers and fleet-scale testing remain unfinished.
+- The local Compose deployment is a development topology. Production Compose and operator scripts are in deploy/production/README.md, but no VPS deployment/restore rehearsal is claimed.
+
+## Production deployment preparation
+
+See [deploy/production/README.md](../deploy/production/README.md) for the version-tagged production Compose file, Nginx reverse-proxy example, firewall helper, backup/restore, health verification and application-image rollback procedure. Do not commit the production environment file.

@@ -4,7 +4,7 @@
 **Planned work session:** 2026-11-23  
 **Target:** Complete Phase 4 — Dashboard and Operational Features before starting Phase 5.
 
-Phase 4 implementation started on 2026-11-23. The first authentication, inventory, and Add Server slice is implemented on main and passes all four jobs in [GitHub Actions run #45188259431](https://github.com/WorkRCS/monitor_me/actions/runs/45188259431). Continue directly on main; do not create a branch.
+Phase 4 implementation started on 2026-11-23. Authentication and Add Server have historical CI evidence; the current dashboard now also includes server history/live metrics, project/mapping administration, alert/notification workflows, and allowlisted remote operations. Current acceptance and CI re-verification remain pending because the repository owner reports the Actions free-minute quota is exhausted. Continue directly on main; do not create a branch.
 
 ## 1. Required delivery order
 
@@ -22,7 +22,7 @@ The existing Windows/macOS and fleet-scale roadmap items remain documented as br
 
 ## 2. Current implementation baseline
 
-The initial frontend has moved beyond the foundation preview: web/app/page.tsx now enters the authenticated dashboard shell. It currently provides login/first-owner setup, server inventory, Add Server and one-time token management; full monitoring charts and operational workflows are still in progress. The backend provides the following verified API foundations:
+The frontend now includes login/first-owner setup, server inventory/enrollment, server-detail historical charts and live WebSocket updates, project/mapping administration, alert rules and in-app notifications, and a remote-operations workspace. The backend provides these API foundations:
 
 | Capability | Existing endpoint | UI work required |
 | --- | --- | --- |
@@ -33,10 +33,13 @@ The initial frontend has moved beyond the foundation preview: web/app/page.tsx n
 | Reissue/revoke credentials | POST /v1/servers/{serverID}/enrollment-token, POST /v1/enrollment-tokens/{tokenID}/revoke | Authorized credential lifecycle controls and clear expiry/revocation feedback |
 | Historical metric series | GET /v1/servers/{serverID}/metrics | Server detail charts, metric selection, time range, units, gaps and stale states |
 | Live updates | POST /v1/live/ticket, GET /v1/live/ws | Ticket-based live connection, reconnect handling, and history catch-up |
+| Projects and workload mappings | GET/POST/DELETE /v1/projects and project-server mapping routes | Project workspace, mapping administration, and project scope selection |
+| Alerts and notifications | /v1/alert-rules, /v1/alerts, /v1/notifications | Rule management, firing/recovery events, in-app notifications/read state |
+| Remote operations | /v1/remote-operations and POST /v1/servers/{serverID}/remote-operations | Allowlisted operation selection, explicit confirmation, status and audit history |
 
 The existing historical query is bounded: 100ms minimum aggregation step, 30-day raw range, and at most 5,000 output points. The live ticket is single-use and expires after 30 seconds. The UI must request a fresh ticket after reconnect; it must not store or reuse a consumed ticket.
 
-Known backend gaps must be implemented and tested where required by the Phase 4 acceptance criteria. In particular, user-facing project-mapping administration, alert/notification APIs, and remote-action execution are not currently available as complete product workflows. The current gRPC stream accepts telemetry batches only; event, health, and command message variants are reserved. Do not simulate these features with hard-coded dashboard values.
+Project mapping administration, alert evaluation/in-app notifications, and constrained remote systemd operations now have backend/UI paths. Remote execution still requires owner/admin authorization, a configured REMOTE_ALLOWED_SYSTEMD_UNITS allowlist, a recent online agent, and an end-to-end result/audit acceptance test. External notification-provider delivery, application HTTP request metrics, and one-command agent installation are not complete. The current gRPC stream carries telemetry batches; remote systemd operations use the existing authenticated agent-control command path. Do not simulate these features with hard-coded dashboard values.
 
 ## 3. Phase 4 implementation order
 
@@ -61,7 +64,7 @@ Known backend gaps must be implemented and tested where required by the Phase 4 
 
 ### Slice 3 — Server detail and monitoring dashboard
 
-**Next implementation slice:** use the real bounded historical-series API and one-use live tickets to add server detail, metric selection, time ranges, timestamps/units, empty/gap handling, reconnect with a fresh ticket, and historical catch-up.
+**Implemented; owner acceptance pending:** server detail uses bounded historical-series queries and one-use live tickets, with metric selection/time ranges, timestamps/units, stale/gap states, reconnect using fresh tickets, and history catch-up. Verify these states against an enrolled agent before treating the slice as accepted.
 
 - Build an overall host view for supported Linux CPU, memory, swap, disk, network, uptime, process, and TCP/listening-port information.
 - Use real metric API responses only. Show units, timestamps, selected time range, empty periods, gaps, and stale/last-seen indicators.
@@ -71,16 +74,15 @@ Known backend gaps must be implemented and tested where required by the Phase 4 
 
 ### Slice 4 — Project and workload views
 
-- Add the All Projects/project selector and consistent scope changes across the page.
-- Implement the required project/mapping administration path before presenting project views as configurable.
+- Project scope selectors and project/workload mapping administration are implemented in the dashboard. Verify that every affected panel/query changes scope without a full-page reload and that host-total/shared/unclassified attribution remains distinct.
 - Clearly identify cgroup/Systemd/container-derived attribution and its limitations. Do not claim full Docker Engine discovery.
 
 ### Slice 5 — Operational features
 
 - Add supported process/port/connection/workload views.
-- Implement alert rules, deduplication, recovery transitions, and notification delivery with backend persistence and tests.
-- Implement remote restart/stop only through explicit allowlists, authorization, audit records, timeouts, and safe failure behavior. No arbitrary remote shell.
-- Complete the guided one-command Linux installation workflow and user/role/audit workflows required by the release scope.
+- Alert rules, recovery events and persisted in-app notifications are implemented; external provider delivery and its retries remain open.
+- The remote-operations UI and same-origin proxy routes are implemented over the API/agent allowlist and audit path. Verify queue, dispatch, completion, expiry, failure, and role-denial behavior end to end. No arbitrary remote shell is provided.
+- The guided one-command Linux agent installation workflow and broader user/role administration remain open.
 
 ### Slice 6 — Phase 4 verification and documentation
 
@@ -111,6 +113,6 @@ Record actual outcomes and defects before wider release activity. A successful b
 - Read README.md, AGENTS.md, docs/PROJECT_STATE.md, and this document before editing.
 - Continue on main; do not create a branch.
 - Keep all repository content in English.
-- Work on Phase 4 only. Do not begin firewall implementation or production deployment during the Phase 4 session.
+- Keep Phase 4 In Progress until owner acceptance is recorded. Linux Phase 5 tooling is now prepared; apply it only after a real target host, DNS/TLS paths, SSH administrator CIDRs and cloud-network policy are identified.
 - Inspect and reuse the existing APIs and tests before adding new abstractions or dependencies.
 - Do not mark individual features or Phase 4 complete without their acceptance evidence.

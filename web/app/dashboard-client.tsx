@@ -5,6 +5,7 @@ import { apiRequest } from "@/lib/client-api";
 import { ServerDetail } from "./server-detail";
 import ProjectWorkspace from "./project-workspace";
 import AlertsWorkspace from "./alerts-workspace";
+import RemoteOperationsWorkspace from "./remote-operations-workspace";
 
 type User = {
   id?: string;
@@ -439,6 +440,7 @@ export default function DashboardClient() {
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [showProjects, setShowProjects] = useState(false);
   const [showAlerts, setShowAlerts] = useState(false);
+  const [showOperations, setShowOperations] = useState(false);
   const [logoutBusy, setLogoutBusy] = useState(false);
 
   const loadServers = useCallback(async () => {
@@ -545,10 +547,11 @@ export default function DashboardClient() {
         </div>
         <nav className="side-nav" aria-label="Main navigation">
           <span className="nav-section-label">Workspace</span>
-          <button className={!showProjects && !showAlerts ? "nav-item nav-item-active" : "nav-item"} type="button" onClick={() => { setShowProjects(false); setShowAlerts(false); setSelectedServer(null); }}><span>▦</span>Servers</button>
-          <button className={showProjects ? "nav-item nav-item-active" : "nav-item"} type="button" onClick={() => { setShowAlerts(false); setSelectedServer(null); setShowProjects(true); }}><span>◫</span>Projects</button>
+          <button className={!showProjects && !showAlerts && !showOperations ? "nav-item nav-item-active" : "nav-item"} type="button" onClick={() => { setShowProjects(false); setShowAlerts(false); setShowOperations(false); setSelectedServer(null); }}><span>▦</span>Servers</button>
+          <button className={showProjects ? "nav-item nav-item-active" : "nav-item"} type="button" onClick={() => { setShowAlerts(false); setShowOperations(false); setSelectedServer(null); setShowProjects(true); }}><span>◫</span>Projects</button>
           <span className="nav-section-label nav-section-spaced">Manage</span>
-          <button className={showAlerts ? "nav-item nav-item-active" : "nav-item"} type="button" onClick={() => { setShowProjects(false); setSelectedServer(null); setShowAlerts(true); }}><span>◉</span>Alerts</button>
+          <button className={showAlerts ? "nav-item nav-item-active" : "nav-item"} type="button" onClick={() => { setShowProjects(false); setShowOperations(false); setSelectedServer(null); setShowAlerts(true); }}><span>◉</span>Alerts</button>
+          <button className={showOperations ? "nav-item nav-item-active" : "nav-item"} type="button" onClick={() => { setShowProjects(false); setShowAlerts(false); setSelectedServer(null); setShowOperations(true); }}><span>↻</span>Operations</button>
           <span className="nav-item nav-item-disabled" aria-disabled="true"><span>⚙</span>Settings <small>Later</small></span>
         </nav>
         <div className="sidebar-bottom">
@@ -562,7 +565,9 @@ export default function DashboardClient() {
       </aside>
 
       <main className="dashboard-main" id="servers">
-        {showAlerts ? (
+        {showOperations ? (
+          <RemoteOperationsWorkspace servers={servers} role={user.role} onBack={() => setShowOperations(false)} />
+        ) : showAlerts ? (
           <AlertsWorkspace servers={servers} projects={projects} role={user.role} onBack={() => setShowAlerts(false)} />
         ) : showProjects ? (
           <ProjectWorkspace servers={servers} projects={projects} role={user.role} onProjectsChanged={updateProjects} onBack={() => setShowProjects(false)} />

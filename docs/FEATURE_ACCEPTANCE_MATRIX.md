@@ -26,21 +26,21 @@ No item may be marked Verified based only on a code stub, mock UI, or documentat
 | F-009 | PostgreSQL historical persistence | P0 | Migration, batch-write, duplicate-delivery, and query tests | Verified |
 | F-010 | Redis live cache/state | P0 | Cache outage does not corrupt durable records; bounded reconnect tests | Verified |
 | F-011 | Server inventory and agent status | P0 | Organization-scoped inventory UI, loading/empty/error states and backend-reported status/last-seen display implemented; stale/disconnected component tests remain | In Progress |
-| F-012 | Overall server dashboard | P0 | Authenticated dashboard shell and live server inventory summary started; supported metric panels, timestamp/unit/gap states and chart tests remain | In Progress |
+| F-012 | Overall server dashboard | P0 | Server-detail history/live metrics, time ranges, units, gaps and stale-data states are implemented; dashboard acceptance/component evidence remains | In Progress |
 | F-013 | Authorized live WebSocket updates | P0 | Scope authorization, reconnect, slow-client, and bounded-buffer tests | Verified |
 | F-014 | Docker Compose local stack | P0 | Clean-start, health-check, restart, and documented local setup tests | Verified |
-| F-015 | All Projects / project switcher | P1 | No-reload switch; all panels and subscriptions change scope | Planned |
+| F-015 | All Projects / project switcher | P1 | Project scope selectors are present for server overview/detail and API queries; complete owner acceptance of every scoped panel remains | In Progress |
 | F-016 | Docker and Systemd discovery | P1 | cgroup/Systemd/container selector fixtures; full Docker Engine API discovery and least-privilege runtime integration remain | In Progress |
-| F-017 | cgroups-based project attribution | P1 | Ingestion resolves database-backed Systemd/cgroup mappings and preserves host-total, unclassified, and shared labels; mapping administration API/UI remains | In Progress |
+| F-017 | cgroups-based project attribution | P1 | Database-backed mappings and mapping administration API/UI are implemented; end-to-end attribution acceptance and full Docker Engine discovery remain | In Progress |
 | F-018 | Process and port monitoring | P1 | Top-128 process RSS and listening-port inventory verified; per-process CPU and lifecycle views remain | In Progress |
 | F-019 | Connection monitoring | P1 | TCP state/count fixtures and platform capability tests | Verified |
 | F-020 | Application request latency and HTTP errors | P1 | Controlled application/proxy test with known response distribution | Planned |
 | F-021 | Historical query and retention | P1 | Bounded time-range/aggregation queries and 30-day raw plus 90-day idempotency retention tests; partitioning is deferred until scale data justifies it | Verified |
 | F-022 | Downsampling | P1 | Query-time date_bin aggregation and raw-retention tests pass; persistent downsampled rollup tables have not been implemented | In Progress |
 | F-023 | Custom live visualization | P1 | Rendering benchmark on reference hardware and representative point counts | Planned |
-| F-024 | Alert evaluation and recovery | P1 | Deterministic rule tests, deduplication, recovery, and delay measurement | Planned |
-| F-025 | Notifications | P1 | Provider success/failure, retry, and delivery-state tests | Planned |
-| F-026 | Secure remote restart/stop | P1 | Authorization, allowlist, audit, timeout, and replay tests | Planned |
+| F-024 | Alert evaluation and recovery | P1 | Alert rule/evaluation and recovery workflows plus dashboard views are implemented; current deterministic end-to-end verification remains | In Progress |
+| F-025 | Notifications | P1 | Persisted in-app firing/recovery notifications and read-state UI are present; external provider delivery/retry is not implemented | In Progress |
+| F-026 | Secure remote restart/stop | P1 | Backend and native agent support allowlisted systemd restart/stop with owner/admin authorization, expiry and audit; operator UI added; full agent end-to-end acceptance remains | In Progress |
 | F-027 | Windows agent | P1 | OS-version-specific collector and installer test suite | Planned |
 | F-028 | macOS agent | P1 | OS-version-specific collector and installer test suite | Planned |
 | F-029 | Signed installers and upgrades | P1 | Signature validation, install, upgrade, rollback, and uninstall tests | Planned |
@@ -48,9 +48,9 @@ No item may be marked Verified based only on a code stub, mock UI, or documentat
 | F-031 | Performance benchmark suite | P2 | Collector, WAL, live-event and TLS gRPC/PostgreSQL benchmarks run with documented runner/toolchain/workload; staged fleet-scale capacity reports remain | In Progress |
 | F-032 | Failure and recovery testing | P2 | WAL reopen/torn-tail, unavailable-ACK, reconnect, Redis and PostgreSQL readiness/outage recovery are tested; broader API/agent crash and storage fault injection remains | In Progress |
 | F-033 | Horizontal scale validation | P2 | Staged multi-agent load reports and identified capacity limits | Planned |
-| F-034 | Production operations and backup | P1 | Clean deployment, backup, restore, and rollback exercise | Planned |
+| F-034 | Production operations and backup | P1 | Production Compose/Nginx, readiness, PostgreSQL backup/restore and app-image rollback scripts are prepared; real VPS/restore/rollback exercise remains | In Progress |
 | F-035 | Final as-built Excalidraw design | P1 | Diagram reviewed against actual source, data flows, and deployment | Planned |
-| F-036 | Production Linux host firewall setup | P1 | Role-aware UFW/firewalld profiles, least-privilege ingress/egress, IPv4/IPv6, Docker port isolation, idempotency, SSH preservation, and rollback are tested; agent-only hosts have no inbound Monitor Me rules | Planned |
+| F-036 | Production Linux host firewall setup | P1 | Dry-run/additive UFW/firewalld helper supports control-plane allow rules and agent-only no-inbound mode with recorded rollback; default-policy convergence, IPv4/IPv6, Docker, SSH and external host tests remain | In Progress |
 
 ## Phase-Level Verification
 

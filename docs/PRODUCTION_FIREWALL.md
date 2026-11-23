@@ -1,6 +1,6 @@
 # Production Linux Firewall Requirements
 
-**Status:** Planned for Phase 5. This document defines the target production policy; the repository does not yet contain a production installer or automatic firewall configurator.
+**Status:** Phase 5 Linux-MVP helper implemented; production validation pending. The repository includes a dry-run-first UFW/firewalld helper for additive control-plane rules and an agent-only no-inbound profile. It does not enforce the complete least-privilege policy or replace host/cloud review.
 
 ## 1. Deployment roles
 
@@ -42,6 +42,12 @@ Apply both layers when available:
 2. The Linux host firewall.
 
 Keep the rules consistent. For a typical Internet-facing deployment, expose TCP 443 and TCP 8443. Expose TCP 80 only for HTTP-01 certificate validation. Permit SSH only from an administrator CIDR, VPN, or bastion. Database, cache, API, and web application ports remain private.
+
+### Conservative automation helper
+
+Run deploy/production/firewall.sh first without --apply to review its dry-run plan. Control-plane mode requires one or more explicit --admin-cidr values; optional --zone must identify the zone attached to the public interface. The helper adds only source-restricted SSH, HTTPS, gRPC, and optional HTTP-01 allow rules. It detects active UFW/firewalld, refuses to enable an inactive firewall, and records rules it added for --rollback. Agent-only mode deliberately makes no inbound changes.
+
+This implementation is additive by design: it does not set default policies or remove broad existing SSH/port rules. Therefore a dry-run/apply does not prove the host is least-privilege. Review existing rules, default policies, IPv6, Docker forwarding and cloud security groups separately; keep a second SSH session/provider console open. A real-host verification and rollback rehearsal is still required.
 
 ### Ubuntu/Debian with UFW
 
@@ -120,9 +126,9 @@ The current Compose configuration binds published service ports to loopback. Pre
 
 Docker installs its own packet-filtering/NAT rules for bridge networking. Published container ports can bypass the normal UFW input path, so a UFW allow/deny rule alone is not a sufficient control if a container port is published on a public address. Do not disable Docker's firewall management. If direct external container publishing is unavoidable, add and test restrictions through the firewall backend supported by that Docker installation (for the iptables backend, Docker documents the `DOCKER-USER` chain; native nftables uses a different integration). Prefer loopback-bound containers plus a deliberately exposed reverse proxy.
 
-## 7. One-click installer requirements (Phase 5)
+## 7. Remaining firewall automation and verification requirements
 
-The eventual installer/firewall integration must:
+The full production firewall workflow must eventually:
 
 - Detect the active firewall manager and its active interface/zone before proposing changes.
 - Support the documented UFW and firewalld profiles without running competing firewall managers.

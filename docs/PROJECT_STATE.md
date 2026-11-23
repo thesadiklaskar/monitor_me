@@ -13,17 +13,17 @@ This file is the authoritative resume point for Monitor Me. Read it before makin
 | Branch policy | All work and commits are made directly on main; do not create another branch |
 | Repository visibility | Private |
 | Completed phases | Phase 1 — Product Specification and Technical Blueprint; Phase 2 — Platform Foundation and Secure Connectivity; Phase 3 — Monitoring Agent and Telemetry Data Engine |
-| Current phase | Phase 4 — Dashboard and Operational Features |
-| Current phase status | In Progress — started 2026-11-23 |
-| MVP status | Not complete — authenticated dashboard, server overview, Add Server UI, and live metric views remain Phase 4 requirements |
-| Implementation status | Phases 1–3 are Completed. Phase 4 is In Progress: authenticated first-owner/login/logout, HttpOnly cookie-backed session proxy, organization-scoped inventory, Add Server and one-time token controls are implemented and pass all four jobs in CI run #45188259431. Server-detail metric views, project switching, charts, alerts, notifications and remote operations remain unfinished. |
-| Last source commit covered by latest successful CI run | 64eccaacf401ff1aabd1e4026316e8f63401eada |
-| Latest verified CI run | [#45188259431 — success](https://github.com/WorkRCS/monitor_me/actions/runs/45188259431); all four jobs passed on main |
-| Next action | Continue Phase 4 Slice 3: build a server-detail view using real GET /v1/servers/{serverID}/metrics responses and one-use WebSocket tickets, including time range, units, timestamps, missing-data and reconnect/history catch-up states. |
+| Current phase | Phase 4 acceptance and Phase 5 Linux-MVP release preparation |
+| Current phase status | In Progress — implementation is present; end-to-end acceptance is pending |
+| MVP status | Dashboard workflows are implemented; owner-led local acceptance and production-host verification remain before release |
+| Implementation status | Phases 1–3 remain Completed. Phase 4 has authenticated server inventory/enrollment, historical/live charts, project/mapping administration, alerts/in-app notifications, and allowlisted remote systemd operations with audit history. Phase 5 Linux preparation adds a production Compose topology, Nginx reverse-proxy example, dry-run/additive UFW/firewalld helper, DB backup/restore, health probes and app-image rollback. No production VPS deployment or restore rehearsal has been executed. |
+| Last source commit covered by latest successful CI run | 9685e115113123d5f9f8e8a1b222804752f5a283 (Go, frontend and native-agent jobs passed in run #45203706343; Compose integration failed at the web proxy login probe; later commits are not covered) |
+| Latest CI run | [#45208235137 — quota blocked](https://github.com/WorkRCS/monitor_me/actions/runs/45208235137); jobs failed before runner assignment/steps because the repository owner reports GitHub Actions free minutes are exhausted |
+| Next action | Owner performs the local dashboard acceptance checklist; before production deployment, configure a real VPS hostname, TLS certificate directory, unique secrets, and administrator IPv4/IPv6 CIDRs in an uncommitted .env.production file. |
 
 ## Next Work Session — 2026-11-23
 
-**Target:** Phase 4 — Dashboard and Operational Features. Started on 2026-11-23; current status is In Progress.
+**Target:** Owner-led Phase 4 acceptance followed by Phase 5 Linux-MVP host validation. Dashboard and deployment/firewall tooling are implemented; current status is In Progress pending test evidence and a real target host.
 
 ### Ordered release plan
 
@@ -36,11 +36,11 @@ Phase 5 has two primary release deliverables for this Linux-first MVP: **(a) fir
 
 ### Phase 4 resume point
 
-Read docs/PHASE_4_EXECUTION_PLAN.md. The current frontend is still a foundation preview. Reuse the verified auth, server inventory, historical metric, and live-ticket APIs. Known gaps include project mapping administration, alert/notification workflows, and remote-action execution; implement and test these where required instead of presenting mock data.
+Read docs/PHASE_4_EXECUTION_PLAN.md. The dashboard now uses real authenticated inventory, history/live telemetry, project mapping, alert/notification and remote-operation APIs. Remote actions are restricted to the API allowlist and require owner/admin authorization plus a browser confirmation. Verify these flows against a live enrolled Linux agent; do not substitute mock data.
 
 ### Session boundary
 
-The next session is Phase 4 only. Do not start Phase 5 firewall work or production deployment until Phase 4 acceptance gates pass. Mark Phase 4 Completed only with full test and documentation evidence.
+Phase 5 Linux deployment and firewall tooling is prepared, but do not mark it complete until a selected host passes external network, gRPC enrollment, firewall, backup/restore and rollback checks. Keep Phase 4 In Progress until the owner completes the local dashboard/agent acceptance gate.
 
 ## Phase 1–3 Audit
 
@@ -48,9 +48,9 @@ The final Phase 1–3 audit passed all four jobs in [GitHub Actions run #4504505
 
 ### Explicit unfinished product requirements
 
-- Server-detail metric charts/live updates, All Projects/project switcher, mapping administration, alerts/notifications and remote actions: Phase 4 In Progress.
+- Server-detail metric charts/live updates, project scope/mapping administration, alert rules/in-app notifications and remote systemd actions are implemented in the dashboard; end-to-end owner acceptance remains pending.
 - Full Docker Engine API discovery, process lifecycle/per-process CPU and persistent downsampled rollups: In Progress/Planned.
-- Role-aware Linux firewall setup and controlled production deployment/shift: Phase 5 primary Linux MVP release workstreams. Windows/macOS agents, signed installers, staged fleet-scale testing, and broader production operations remain Phase 5 expansion/hardening items.
+- Linux firewall/deployment helpers and production Compose/Nginx/backup/restore/rollback scripts are prepared; real host application and verification remain outstanding. Windows/macOS agents, signed installers and fleet-scale validation remain expansion work.
 - Protobuf event/health/command messages are reserved; only authenticated telemetry batches are accepted by the current stream.
 
 ## Completed Phase 1 — Product Specification and Technical Blueprint
