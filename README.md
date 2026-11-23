@@ -336,3 +336,19 @@ The final diagram must describe the system that was actually built, not an aspir
 ---
 
 **Current resume point:** Phases 1–3 are complete on `main`; Phase 4 and Phase 5 have not started. The final audit passed all four CI jobs in [GitHub Actions run #45043161542](https://github.com/WorkRCS/monitor_me/actions/runs/45045054465). No Phase 4 or Phase 5 implementation was started during this audit. Read [docs/PROJECT_STATE.md](docs/PROJECT_STATE.md) for the exact next action.
+
+## Local no-login mode
+
+The default Docker Compose stack enables anonymous local dashboard access so the
+web UI opens directly without an owner login. Existing workspace data is retained;
+on a fresh database, Monitor Me creates a local workspace automatically.
+
+The web and API host ports are bound to `127.0.0.1` by default. **Do not expose
+this anonymous mode to a LAN, reverse proxy, or the public internet.** Anyone
+who can reach the dashboard can manage monitored hosts, enrollment tokens,
+alerts, projects, and any enabled remote operations.
+
+To restore password authentication, set `MONITOR_ME_AUTH_DISABLED=false` in
+the environment used by Docker Compose and recreate the `api` and `web`
+services. Backend authentication remains enabled by default outside this
+local Compose configuration.
