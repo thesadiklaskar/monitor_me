@@ -348,7 +348,10 @@ this anonymous mode to a LAN, reverse proxy, or the public internet.** Anyone
 who can reach the dashboard can manage monitored hosts, enrollment tokens,
 alerts, projects, and any enabled remote operations.
 
-To restore password authentication, set `MONITOR_ME_AUTH_DISABLED=false` in
-the environment used by Docker Compose and recreate the `api` and `web`
-services. Backend authentication remains enabled by default outside this
+To restore password authentication on an installation with an already-provisioned
+owner password, set `MONITOR_ME_AUTH_DISABLED=false` in the environment used by
+Docker Compose and recreate the `api` and `web` services. A fresh anonymous
+installation creates a local owner with a random password that is never shown;
+provision a known owner credential before switching that fresh installation to
+password mode. Backend authentication remains enabled by default outside this
 local Compose configuration.
