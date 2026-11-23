@@ -134,7 +134,7 @@ export default function AlertsWorkspace({ servers, projects, role, onBack }: {
               <label className="field"><span>Server scope</span><select value={serverId} onChange={(event) => setServerId(event.target.value)}><option value="">All servers</option>{servers.map((server) => <option key={server.id} value={server.id}>{server.name}</option>)}</select></label>
               <label className="field"><span>Project scope</span><select value={projectId} onChange={(event) => setProjectId(event.target.value)}><option value="">All projects</option>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label>
             </div>
-            <div className="alerts-form-footer"><span>Project rules match samples carrying that project's attribution.</span><button className="button button-primary" type="submit" disabled={busy}>{busy ? "Saving…" : "Create rule"}</button></div>
+            <div className="alerts-form-footer"><span>Project rules match samples carrying that project&apos;s attribution.</span><button className="button button-primary" type="submit" disabled={busy}>{busy ? "Saving…" : "Create rule"}</button></div>
           </form>
         </section>
       )}
