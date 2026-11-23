@@ -14,10 +14,11 @@ import (
 )
 
 type API struct {
-	identities         *identity.Store
-	cache              *redisv9.Client
-	telemetry          *telemetry.Store
-	allowedLiveOrigins map[string]struct{}
+	identities           *identity.Store
+	cache                *redisv9.Client
+	telemetry            *telemetry.Store
+	allowedLiveOrigins   map[string]struct{}
+	allowedRemoteUnits   []string
 }
 
 type principalContextKey struct{}

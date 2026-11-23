@@ -89,6 +89,7 @@ func run(logger *slog.Logger) error {
 		Addr: cfg.APIAddress,
 		Handler: httpapi.NewRouter(cfg.ServiceVersion, dependencies, identity.NewStore(database), httpapi.LiveDependencies{
 			Cache: cache, Telemetry: telemetry.NewStore(database), AllowedOrigins: cfg.WebAllowedOrigins,
+			RemoteAllowedUnits: cfg.RemoteAllowedUnits,
 		}),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,

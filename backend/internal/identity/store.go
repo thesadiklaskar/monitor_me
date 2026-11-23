@@ -154,6 +154,31 @@ type AlertNotification struct {
 	CreatedAt time.Time  `json:"created_at"`
 }
 
+type RemoteOperation struct {
+	ID           string     `json:"id"`
+	ServerID     string     `json:"server_id"`
+	ServerName   string     `json:"server_name"`
+	Operation    string     `json:"operation"`
+	Target       string     `json:"target"`
+	Status       string     `json:"status"`
+	Result       string     `json:"result,omitempty"`
+	CreatedAt    time.Time  `json:"created_at"`
+	ExpiresAt    time.Time  `json:"expires_at"`
+	DispatchedAt *time.Time `json:"dispatched_at,omitempty"`
+	CompletedAt  *time.Time `json:"completed_at,omitempty"`
+}
+
+type RemoteOperationAudit struct {
+	ID          string    `json:"id"`
+	OperationID string    `json:"operation_id"`
+	Action      string    `json:"action"`
+	Actor       string    `json:"actor"`
+	Details     string    `json:"details"`
+	CreatedAt   time.Time `json:"created_at"`
+}
+
+var systemdServicePattern = regexp.MustCompile("^[A-Za-z0-9_.:@-]{1,180}\\.service$")
+
 // IssuedServer returns a server and a one-time enrollment credential.
 type IssuedServer struct {
 	Server
@@ -1095,4 +1120,158 @@ func (s *Store) MarkAlertNotificationRead(ctx context.Context, principal Princip
 		return ErrNotFound
 	}
 	return nil
+}
+
+
+// CreateRemoteOperation queues a constrained systemd operation for a currently
+// online agent. The API allowlist is checked here and independently by the agent.
+func (s *Store) CreateRemoteOperation(
+	ctx context.Context,
+	principal Principal,
+	serverID, operation, target string,
+	allowedUnits []string,
+) (RemoteOperation, error) {
+	if !canAdminister(principal.Role) {
+		return RemoteOperation{}, ErrForbidden
+	}
+	if !validUUID(serverID) || (operation != "restart_service" && operation != "stop_service") ||
+		!systemdServicePattern.MatchString(target) {
+		return RemoteOperation{}, ErrInvalidInput
+	}
+	allowed := false
+	for _, unit := range allowedUnits {
+		if unit == target {
+			allowed = true
+			break
+		}
+	}
+	if !allowed {
+		return RemoteOperation{}, ErrInvalidInput
+	}
+
+	var result RemoteOperation
+	err := s.db.QueryRowContext(ctx, `
+		INSERT INTO remote_operations (
+			organization_id, server_id, agent_id, created_by, operation, target,
+			status, expires_at
+		)
+		SELECT server.organization_id, server.id, agent.id, $2, $3, $4,
+		       'queued', now() + interval '60 seconds'
+		FROM servers server
+		JOIN agents agent ON agent.server_id = server.id
+		WHERE server.id = $1
+		  AND server.organization_id = $5
+		  AND server.status = 'online'
+		  AND agent.status = 'online'
+		  AND agent.last_seen_at > now() - interval '90 seconds'
+		RETURNING id::text, server_id::text, operation, target, status,
+		          created_at, expires_at
+	`, serverID, principal.UserID, operation, target, principal.OrganizationID).Scan(
+		&result.ID, &result.ServerID, &result.Operation, &result.Target, &result.Status,
+		&result.CreatedAt, &result.ExpiresAt,
+	)
+	if errors.Is(err, sql.ErrNoRows) {
+		return RemoteOperation{}, ErrNotFound
+	}
+	if err != nil {
+		return RemoteOperation{}, fmt.Errorf("queue remote operation: %w", err)
+	}
+	if _, err := s.db.ExecContext(ctx, `
+		INSERT INTO remote_operation_audit (
+			organization_id, remote_operation_id, actor_user_id, action, details
+		)
+		VALUES ($1, $2, $3, 'queued', jsonb_build_object('operation', $4, 'target', $5))
+	`, principal.OrganizationID, result.ID, principal.UserID, operation, target); err != nil {
+		return RemoteOperation{}, fmt.Errorf("audit remote operation queue: %w", err)
+	}
+	result.ServerName = ""
+	return result, nil
+}
+
+// ListRemoteOperations returns the latest organization-scoped command history.
+func (s *Store) ListRemoteOperations(ctx context.Context, principal Principal) ([]RemoteOperation, error) {
+	_, err := s.db.ExecContext(ctx, `
+		WITH expired AS (
+			UPDATE remote_operations
+			SET status = 'expired', completed_at = now(), result = 'Command expired before dispatch.'
+			WHERE organization_id = $1 AND status = 'queued' AND expires_at <= now()
+			RETURNING id, organization_id, created_by, operation, target
+		)
+		INSERT INTO remote_operation_audit (
+			organization_id, remote_operation_id, actor_user_id, action, details
+		)
+		SELECT organization_id, id, created_by, 'expired',
+		       jsonb_build_object('operation', operation, 'target', target)
+		FROM expired
+	`, principal.OrganizationID)
+	if err != nil {
+		return nil, fmt.Errorf("expire queued remote operations: %w", err)
+	}
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT operation.id::text, operation.server_id::text, server.name,
+		       operation.operation, operation.target, operation.status,
+		       operation.result, operation.created_at, operation.expires_at,
+		       operation.dispatched_at, operation.completed_at
+		FROM remote_operations operation
+		JOIN servers server
+		  ON server.id = operation.server_id
+		 AND server.organization_id = operation.organization_id
+		WHERE operation.organization_id = $1
+		ORDER BY operation.created_at DESC
+		LIMIT 100
+	`, principal.OrganizationID)
+	if err != nil {
+		return nil, fmt.Errorf("list remote operations: %w", err)
+	}
+	defer rows.Close()
+	items := make([]RemoteOperation, 0)
+	for rows.Next() {
+		var item RemoteOperation
+		var result sql.NullString
+		var dispatchedAt, completedAt sql.NullTime
+		if err := rows.Scan(
+			&item.ID, &item.ServerID, &item.ServerName, &item.Operation, &item.Target,
+			&item.Status, &result, &item.CreatedAt, &item.ExpiresAt, &dispatchedAt, &completedAt,
+		); err != nil {
+			return nil, fmt.Errorf("scan remote operation: %w", err)
+		}
+		if result.Valid { item.Result = result.String }
+		if dispatchedAt.Valid { item.DispatchedAt = &dispatchedAt.Time }
+		if completedAt.Valid { item.CompletedAt = &completedAt.Time }
+		items = append(items, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate remote operations: %w", err)
+	}
+	return items, nil
+}
+
+// ListRemoteOperationAudit returns organization-scoped audit records for remote operations.
+func (s *Store) ListRemoteOperationAudit(ctx context.Context, principal Principal) ([]RemoteOperationAudit, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT audit.id::text, audit.remote_operation_id::text, audit.action,
+		       COALESCE(user_account.display_name, user_account.email, 'agent'),
+		       audit.details::text, audit.created_at
+		FROM remote_operation_audit audit
+		LEFT JOIN users user_account ON user_account.id = audit.actor_user_id
+		WHERE audit.organization_id = $1
+		ORDER BY audit.created_at DESC
+		LIMIT 200
+	`, principal.OrganizationID)
+	if err != nil {
+		return nil, fmt.Errorf("list remote operation audit: %w", err)
+	}
+	defer rows.Close()
+	items := make([]RemoteOperationAudit, 0)
+	for rows.Next() {
+		var item RemoteOperationAudit
+		if err := rows.Scan(&item.ID, &item.OperationID, &item.Action, &item.Actor, &item.Details, &item.CreatedAt); err != nil {
+			return nil, fmt.Errorf("scan remote operation audit: %w", err)
+		}
+		items = append(items, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate remote operation audit: %w", err)
+	}
+	return items, nil
 }

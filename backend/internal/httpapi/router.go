@@ -17,9 +17,10 @@ type Dependency struct {
 }
 
 type LiveDependencies struct {
-	Cache          *redisv9.Client
-	Telemetry      *telemetry.Store
-	AllowedOrigins []string
+	Cache            *redisv9.Client
+	Telemetry        *telemetry.Store
+	AllowedOrigins   []string
+	RemoteAllowedUnits []string
 }
 
 // NewRouter registers health, identity, inventory, telemetry, and live routes.
@@ -30,7 +31,7 @@ func NewRouter(version string, dependencies []Dependency, identities *identity.S
 	mux.HandleFunc("GET /health/ready", healthHandler("ready", version, dependencies))
 
 	if identities != nil {
-		api := &API{identities: identities}
+		api := &API{identities: identities, allowedRemoteUnits: append([]string(nil), live[0].RemoteAllowedUnits...)}
 		if len(live) > 0 {
 			api.cache = live[0].Cache
 			api.telemetry = live[0].Telemetry
@@ -43,6 +44,10 @@ func NewRouter(version string, dependencies []Dependency, identities *identity.S
 		mux.HandleFunc("POST /v1/auth/login", api.login)
 		mux.Handle("GET /v1/auth/me", api.requireAuth(http.HandlerFunc(api.me)))
 		mux.Handle("POST /v1/auth/logout", api.requireAuth(http.HandlerFunc(api.logout)))
+		mux.Handle("GET /v1/remote-operations/config", api.requireAuth(http.HandlerFunc(api.remoteOperationConfig)))
+		mux.Handle("GET /v1/remote-operations", api.requireAuth(http.HandlerFunc(api.listRemoteOperations)))
+		mux.Handle("POST /v1/servers/{serverID}/remote-operations", api.requireAuth(http.HandlerFunc(api.createRemoteOperation)))
+		mux.Handle("GET /v1/remote-operation-audit", api.requireAuth(http.HandlerFunc(api.listRemoteOperationAudit)))
 		mux.Handle("GET /v1/alert-rules", api.requireAuth(http.HandlerFunc(api.listAlertRules)))
 		mux.Handle("POST /v1/alert-rules", api.requireAuth(http.HandlerFunc(api.createAlertRule)))
 		mux.Handle("DELETE /v1/alert-rules/{ruleID}", api.requireAuth(http.HandlerFunc(api.deleteAlertRule)))
