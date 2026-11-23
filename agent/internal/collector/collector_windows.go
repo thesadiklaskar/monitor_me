@@ -64,9 +64,8 @@ func (c *ProcCollector) collectWindows(ctx context.Context) ([]Sample, error) {
 	if aggregateErr != nil {
 		collectionErrors = append(collectionErrors, fmt.Errorf("read Windows aggregate CPU counters: %w", aggregateErr))
 	}
-	if perCPUErr != nil {
-		collectionErrors = append(collectionErrors, fmt.Errorf("read Windows per-CPU counters: %w", perCPUErr))
-	}
+	// Per-core counters are an optional capability; keep valid aggregate
+	// telemetry flowing when the OS cannot enumerate individual cores.
 	current := make(map[string]cpuCounters, len(aggregateTimes)+len(perCPUTimes))
 	for _, item := range aggregateTimes {
 		current["cpu-total"] = cpuCounters{
@@ -97,7 +96,6 @@ func (c *ProcCollector) collectWindows(ctx context.Context) ([]Sample, error) {
 				metricName = "host.cpu.utilization"
 				add("host.cpu.user", user, "percent", nil)
 				add("host.cpu.system", system, "percent", nil)
-				add("host.cpu.iowait", wait, "percent", nil)
 			}
 			add(metricName, busy, "percent", map[string]string{"cpu": name})
 		}
