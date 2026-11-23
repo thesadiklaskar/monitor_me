@@ -93,7 +93,6 @@ func TestSeriesBucketCountUsesEpochAlignedBoundaries(t *testing.T) {
 	}
 }
 
-
 func TestValidateRangeQueryProjectScope(t *testing.T) {
 	now := time.Now().UTC()
 	query := RangeQuery{

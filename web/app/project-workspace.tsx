@@ -66,7 +66,10 @@ export default function ProjectWorkspace({
     }
   }, [servers]);
 
-  useEffect(() => { void loadMappings(); }, [loadMappings]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => { void loadMappings(); }, 0);
+    return () => window.clearTimeout(timer);
+  }, [loadMappings]);
 
   async function refreshProjects() {
     const response = await apiRequest<{ projects: Project[] }>("/api/projects");

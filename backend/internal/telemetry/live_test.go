@@ -75,7 +75,6 @@ func BenchmarkPublishCommittedBatch(b *testing.B) {
 	}
 }
 
-
 func TestPublishCommittedBatchKeepsProjectScopesDistinct(t *testing.T) {
 	publisher := &capturedPublisher{}
 	samples := []LiveSample{

@@ -124,7 +124,6 @@ func QueryRange(ctx context.Context, db *sql.DB, query RangeQuery) ([]SeriesPoin
 	return points, nil
 }
 
-
 func nullableProjectID(value string) any {
 	if value == "" {
 		return nil
