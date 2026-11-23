@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -21,6 +22,7 @@ type Config struct {
 	DBMaxIdleConnections int
 	DBConnectionLifetime time.Duration
 	StartupTimeout       time.Duration
+	WebAllowedOrigins    []string
 }
 
 // Load reads and validates environment-based configuration.
@@ -41,6 +43,11 @@ func Load() (Config, error) {
 		StartupTimeout:       10 * time.Second,
 	}
 
+	var err error
+	cfg.WebAllowedOrigins, err = parseWebAllowedOrigins(getEnv("WEB_ALLOWED_ORIGINS", "http://localhost:3000"))
+	if err != nil {
+		return Config{}, err
+	}
 	if err := validateDatabaseURL(cfg.DatabaseURL); err != nil {
 		return Config{}, err
 	}
@@ -79,4 +86,31 @@ func getEnv(key, fallback string) string {
 		return value
 	}
 	return fallback
+}
+
+func parseWebAllowedOrigins(raw string) ([]string, error) {
+	seen := make(map[string]struct{})
+	origins := make([]string, 0)
+	for _, item := range strings.Split(raw, ",") {
+		value := strings.TrimSpace(item)
+		if value == "" {
+			continue
+		}
+		parsed, err := url.Parse(value)
+		if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") ||
+			parsed.Host == "" || parsed.User != nil || parsed.Path != "" ||
+			parsed.RawQuery != "" || parsed.Fragment != "" {
+			return nil, fmt.Errorf("WEB_ALLOWED_ORIGINS must contain comma-separated HTTP(S) origins without paths or credentials")
+		}
+		origin := parsed.Scheme + "://" + parsed.Host
+		if _, exists := seen[origin]; exists {
+			continue
+		}
+		seen[origin] = struct{}{}
+		origins = append(origins, origin)
+	}
+	if len(origins) == 0 {
+		return nil, fmt.Errorf("WEB_ALLOWED_ORIGINS must contain at least one HTTP(S) origin")
+	}
+	return origins, nil
 }
