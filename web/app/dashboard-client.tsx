@@ -44,7 +44,7 @@ type AuthResponse = { user: User; expires_at: string };
 type InventoryResponse = { servers: Server[] };
 type Project = { id: string; name: string; slug: string; created_at: string };
 type ProjectListResponse = { projects: Project[] };
-type ConfigResponse = { agent_grpc_address: string | null; public_api_url: string | null };
+type ConfigResponse = { agent_grpc_address: string | null; public_api_url: string | null; auth_disabled: boolean };
 
 type ViewState = "checking" | "signed-out" | "signed-in";
 type AuthMode = "login" | "register";
@@ -435,6 +435,7 @@ export default function DashboardClient() {
   const [issued, setIssued] = useState<IssuedServer | null>(null);
   const [grpcAddress, setGrpcAddress] = useState<string | null>(null);
   const [publicAPIURL, setPublicAPIURL] = useState<string | null>(null);
+  const [authDisabled, setAuthDisabled] = useState(false);
   const [selectedServer, setSelectedServer] = useState<Server | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState("");
@@ -467,6 +468,7 @@ export default function DashboardClient() {
     if (configResult.status === "fulfilled") {
       setGrpcAddress(configResult.value.agent_grpc_address);
       setPublicAPIURL(configResult.value.public_api_url);
+      setAuthDisabled(configResult.value.auth_disabled === true);
     } else {
       setNotice(displayError(configResult.reason));
     }
@@ -579,11 +581,11 @@ export default function DashboardClient() {
           <span className="nav-item nav-item-disabled" aria-disabled="true"><span>⚙</span>Settings <small>Later</small></span>
         </nav>
         <div className="sidebar-bottom">
-          <div className="sidebar-status"><span className="status-dot status-dot-online" /> API session active</div>
+          <div className="sidebar-status"><span className="status-dot status-dot-online" /> {authDisabled ? "Local access · No login" : "API session active"}</div>
           <div className="user-card">
             <div className="avatar">{(user.display_name || user.email).charAt(0).toUpperCase()}</div>
             <div className="user-meta"><strong>{user.display_name}</strong><span>{user.role}</span></div>
-            <button className="icon-button logout-button" type="button" onClick={logout} disabled={logoutBusy} aria-label="Sign out">↗</button>
+            {!authDisabled && <button className="icon-button logout-button" type="button" onClick={logout} disabled={logoutBusy} aria-label="Sign out">↗</button>}
           </div>
         </div>
       </aside>
@@ -644,7 +646,7 @@ export default function DashboardClient() {
 
         <section className="inventory-panel">
           <div className="panel-heading">
-            <div><h2>Servers</h2><p>Server records are scoped to your authenticated organization.</p></div>
+            <div><h2>Servers</h2><p>Server records are scoped to your local workspace.</p></div>
             {canCreate && <button className="button button-secondary" type="button" onClick={() => setShowAdd(true)}>Register a host</button>}
           </div>
           {inventoryBusy && servers.length === 0 ? (
