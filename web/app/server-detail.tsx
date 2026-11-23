@@ -301,19 +301,24 @@ export function ServerDetail({
           try {
             const event = JSON.parse(String(message.data)) as LiveEvent;
             if (event.type !== "telemetry.batch" || event.server_id !== server.id) return;
-            const observed = event.samples
-              .filter((sample) => sample.metric_name === metric && Number.isFinite(sample.value))
-              .map((sample) => {
-                const time = Number(sample.observed_at_unix_nanos) / 1_000_000;
-                return {
-                  bucket: new Date(time).toISOString(),
-                  average: sample.value,
-                  minimum: sample.value,
-                  maximum: sample.value,
-                  sample_count: 1,
-                } satisfies MetricPoint;
-              });
-            if (observed.length === 0) return;
+            // Match the history API aggregation: interface/device-labelled
+            // samples in one committed batch are summarized together, not
+            // displayed as if the last interface were the whole host.
+            const matchingSamples = event.samples.filter(
+              (sample) => sample.metric_name === metric && Number.isFinite(sample.value),
+            );
+            if (matchingSamples.length === 0) return;
+            const values = matchingSamples.map((sample) => sample.value);
+            const observedAt = Math.max(...matchingSamples.map((sample) => Number(sample.observed_at_unix_nanos)));
+            const observedTime = observedAt / 1_000_000;
+            if (!Number.isFinite(observedTime)) return;
+            const observed: MetricPoint = {
+              bucket: new Date(observedTime).toISOString(),
+              average: values.reduce((sum, value) => sum + value, 0) / values.length,
+              minimum: Math.min(...values),
+              maximum: Math.max(...values),
+              sample_count: matchingSamples.length,
+            };
             setLivePoints((previous) => {
               const cutoff = Date.now() - rangeConfig.durationMs;
               return [...previous, ...observed]
