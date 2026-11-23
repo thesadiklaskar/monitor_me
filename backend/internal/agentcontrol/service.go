@@ -240,9 +240,6 @@ func (s *Service) ReportHeartbeat(ctx context.Context, request *monitorv1.Heartb
 }
 
 func (s *Service) publishCommittedBatch(ctx context.Context, organizationID, serverID, agentID string, batch *monitorv1.TelemetryBatch) {
-	if s.publisher == nil {
-		return
-	}
 	publishContext, cancel := context.WithTimeout(context.WithoutCancel(ctx), 2*time.Second)
 	defer cancel()
 
@@ -288,11 +285,14 @@ func (s *Service) publishCommittedBatch(ctx context.Context, organizationID, ser
 			"server_id", serverID, "batch_id", batch.GetBatchId(), "error", err)
 		return
 	}
+	evaluateCommittedSamples(publishContext, s.db, organizationID, serverID, samples)
+	if s.publisher != nil {
 	if err := telemetry.PublishCommittedBatch(
 		publishContext, s.publisher, organizationID, serverID, agentID, batch.GetBatchId(), samples,
 	); err != nil {
 		slog.Default().Warn("durable telemetry committed but live notification failed",
 			"server_id", serverID, "batch_id", batch.GetBatchId(), "error", err)
+	}
 	}
 }
 
