@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"time"
 )
 
@@ -34,7 +35,10 @@ func Load(path string) (Credentials, error) {
 	if !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 {
 		return Credentials{}, errors.New("agent credential state must be a regular file")
 	}
-	if info.Mode().Perm()&0o077 != 0 {
+	// Windows exposes ACLs rather than POSIX permission bits through FileMode.
+	// The supported local runner stores this file under the current user's
+	// LOCALAPPDATA directory, which supplies the inherited per-user ACL.
+	if runtime.GOOS != "windows" && info.Mode().Perm()&0o077 != 0 {
 		return Credentials{}, errors.New("agent credential state permissions must not allow group or other access")
 	}
 	data, err := os.ReadFile(path)
@@ -102,13 +106,15 @@ func Save(path string, credentials Credentials) error {
 	if err := os.Rename(temporaryPath, path); err != nil {
 		return fmt.Errorf("replace agent credential state: %w", err)
 	}
-	dir, err := os.Open(directory)
-	if err == nil {
-		if syncErr := dir.Sync(); syncErr != nil {
-			dir.Close()
-			return fmt.Errorf("sync agent state directory: %w", syncErr)
+	if runtime.GOOS != "windows" {
+		dir, err := os.Open(directory)
+		if err == nil {
+			if syncErr := dir.Sync(); syncErr != nil {
+				dir.Close()
+				return fmt.Errorf("sync agent state directory: %w", syncErr)
+			}
+			_ = dir.Close()
 		}
-		_ = dir.Close()
 	}
 	return nil
 }
