@@ -90,6 +90,7 @@ func run(logger *slog.Logger) error {
 		Handler: httpapi.NewRouter(cfg.ServiceVersion, dependencies, identity.NewStore(database), httpapi.LiveDependencies{
 			Cache: cache, Telemetry: telemetry.NewStore(database), AllowedOrigins: cfg.WebAllowedOrigins,
 			RemoteAllowedUnits: cfg.RemoteAllowedUnits,
+			DisableAuthentication: cfg.DisableAuthentication,
 		}),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,
