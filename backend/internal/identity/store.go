@@ -94,6 +94,28 @@ type Server struct {
 	CreatedAt time.Time  `json:"created_at"`
 }
 
+
+// Project is a project owned by the authenticated organization.
+type Project struct {
+	ID        string    `json:"id"`
+	Name      string    `json:"name"`
+	Slug      string    `json:"slug"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// ServerProjectMapping assigns one workload selector on a server to a project.
+type ServerProjectMapping struct {
+	ID                 string    `json:"id"`
+	ServerID           string    `json:"server_id"`
+	ProjectID          string    `json:"project_id"`
+	ProjectName        string    `json:"project_name"`
+	ProjectSlug        string    `json:"project_slug"`
+	WorkloadType       string    `json:"workload_type"`
+	WorkloadSelector   string    `json:"workload_selector"`
+	AttributionMethod  string    `json:"attribution_method"`
+	CreatedAt          time.Time `json:"created_at"`
+}
+
 // IssuedServer returns a server and a one-time enrollment credential.
 type IssuedServer struct {
 	Server
@@ -581,6 +603,222 @@ func (s *Store) RevokeAgent(ctx context.Context, principal Principal, agentID st
 	}
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("commit agent revocation: %w", err)
+	}
+	return nil
+}
+
+
+
+// ListProjects returns only projects belonging to the authenticated organization.
+func (s *Store) ListProjects(ctx context.Context, principal Principal) ([]Project, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT id::text, name, slug, created_at
+		FROM projects
+		WHERE organization_id = $1
+		ORDER BY lower(name), id
+	`, principal.OrganizationID)
+	if err != nil {
+		return nil, fmt.Errorf("list organization projects: %w", err)
+	}
+	defer rows.Close()
+	projects := make([]Project, 0)
+	for rows.Next() {
+		var project Project
+		if err := rows.Scan(&project.ID, &project.Name, &project.Slug, &project.CreatedAt); err != nil {
+			return nil, fmt.Errorf("scan organization project: %w", err)
+		}
+		projects = append(projects, project)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate organization projects: %w", err)
+	}
+	return projects, nil
+}
+
+// CreateProject restricts project administration to organization owners/admins.
+func (s *Store) CreateProject(ctx context.Context, principal Principal, name, slug string) (Project, error) {
+	if !canAdminister(principal.Role) {
+		return Project{}, ErrForbidden
+	}
+	name = strings.TrimSpace(name)
+	slug = strings.ToLower(strings.TrimSpace(slug))
+	if len(name) < 2 || len(name) > 120 || !slugPattern.MatchString(slug) {
+		return Project{}, ErrInvalidInput
+	}
+	var project Project
+	err := s.db.QueryRowContext(ctx, `
+		INSERT INTO projects (organization_id, name, slug)
+		VALUES ($1, $2, $3)
+		ON CONFLICT (organization_id, slug) DO NOTHING
+		RETURNING id::text, name, slug, created_at
+	`, principal.OrganizationID, name, slug).Scan(
+		&project.ID, &project.Name, &project.Slug, &project.CreatedAt,
+	)
+	if errors.Is(err, sql.ErrNoRows) {
+		return Project{}, ErrInvalidInput
+	}
+	if err != nil {
+		return Project{}, fmt.Errorf("create organization project: %w", err)
+	}
+	return project, nil
+}
+
+// DeleteProject removes a project in the caller's organization. Telemetry samples
+// retain their history; the schema clears only their project attribution.
+func (s *Store) DeleteProject(ctx context.Context, principal Principal, projectID string) error {
+	if !canAdminister(principal.Role) {
+		return ErrForbidden
+	}
+	if !validUUID(projectID) {
+		return ErrNotFound
+	}
+	result, err := s.db.ExecContext(ctx, `
+		DELETE FROM projects WHERE id = $1 AND organization_id = $2
+	`, projectID, principal.OrganizationID)
+	if err != nil {
+		return fmt.Errorf("delete organization project: %w", err)
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("inspect project deletion: %w", err)
+	}
+	if affected == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// ListServerProjectMappings returns workload mappings for one organization-owned server.
+func (s *Store) ListServerProjectMappings(ctx context.Context, principal Principal, serverID string) ([]ServerProjectMapping, error) {
+	if !validUUID(serverID) {
+		return nil, ErrNotFound
+	}
+	var exists bool
+	if err := s.db.QueryRowContext(ctx, `
+		SELECT EXISTS (SELECT 1 FROM servers WHERE id = $1 AND organization_id = $2)
+	`, serverID, principal.OrganizationID).Scan(&exists); err != nil {
+		return nil, fmt.Errorf("verify server mapping scope: %w", err)
+	}
+	if !exists {
+		return nil, ErrNotFound
+	}
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT mapping.id::text, mapping.server_id::text, mapping.project_id::text,
+		       project.name, project.slug, mapping.workload_type,
+		       mapping.workload_selector, mapping.attribution_method, mapping.created_at
+		FROM server_project_mappings mapping
+		JOIN projects project
+		  ON project.id = mapping.project_id
+		 AND project.organization_id = mapping.organization_id
+		WHERE mapping.organization_id = $1 AND mapping.server_id = $2
+		ORDER BY mapping.workload_type, mapping.workload_selector
+	`, principal.OrganizationID, serverID)
+	if err != nil {
+		return nil, fmt.Errorf("list server workload mappings: %w", err)
+	}
+	defer rows.Close()
+	mappings := make([]ServerProjectMapping, 0)
+	for rows.Next() {
+		var mapping ServerProjectMapping
+		if err := rows.Scan(
+			&mapping.ID, &mapping.ServerID, &mapping.ProjectID, &mapping.ProjectName,
+			&mapping.ProjectSlug, &mapping.WorkloadType, &mapping.WorkloadSelector,
+			&mapping.AttributionMethod, &mapping.CreatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("scan server workload mapping: %w", err)
+		}
+		mappings = append(mappings, mapping)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate server workload mappings: %w", err)
+	}
+	return mappings, nil
+}
+
+// CreateServerProjectMapping assigns an existing cgroup/container/Systemd selector.
+// The compound organization foreign keys prevent cross-tenant mappings.
+func (s *Store) CreateServerProjectMapping(
+	ctx context.Context,
+	principal Principal,
+	serverID, projectID, workloadType, selector, attributionMethod string,
+) (ServerProjectMapping, error) {
+	if !canManageServers(principal.Role) {
+		return ServerProjectMapping{}, ErrForbidden
+	}
+	workloadType = strings.TrimSpace(workloadType)
+	selector = strings.TrimSpace(selector)
+	attributionMethod = strings.TrimSpace(attributionMethod)
+	if !validUUID(serverID) || !validUUID(projectID) ||
+		(len(workloadType) == 0 || len(workloadType) > 32) ||
+		(workloadType != "cgroup" && workloadType != "container" && workloadType != "systemd") ||
+		len(selector) == 0 || len(selector) > 512 ||
+		strings.ContainsAny(selector, "\r\n\x00") ||
+		(attributionMethod != "cgroup" && attributionMethod != "container" &&
+			attributionMethod != "systemd" && attributionMethod != "explicit" &&
+			attributionMethod != "process_tree") {
+		return ServerProjectMapping{}, ErrInvalidInput
+	}
+	var allowed bool
+	if err := s.db.QueryRowContext(ctx, `
+		SELECT
+			EXISTS (SELECT 1 FROM servers WHERE id = $1 AND organization_id = $3)
+			AND EXISTS (SELECT 1 FROM projects WHERE id = $2 AND organization_id = $3)
+	`, serverID, projectID, principal.OrganizationID).Scan(&allowed); err != nil {
+		return ServerProjectMapping{}, fmt.Errorf("verify workload mapping scope: %w", err)
+	}
+	if !allowed {
+		return ServerProjectMapping{}, ErrNotFound
+	}
+	var mapping ServerProjectMapping
+	err := s.db.QueryRowContext(ctx, `
+		INSERT INTO server_project_mappings (
+			organization_id, server_id, project_id, workload_type,
+			workload_selector, attribution_method
+		)
+		VALUES ($1, $2, $3, $4, $5, $6)
+		ON CONFLICT (server_id, workload_type, workload_selector) DO NOTHING
+		RETURNING id::text, server_id::text, project_id::text, workload_type,
+		          workload_selector, attribution_method, created_at
+	`, principal.OrganizationID, serverID, projectID, workloadType, selector, attributionMethod).Scan(
+		&mapping.ID, &mapping.ServerID, &mapping.ProjectID, &mapping.WorkloadType,
+		&mapping.WorkloadSelector, &mapping.AttributionMethod, &mapping.CreatedAt,
+	)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ServerProjectMapping{}, ErrInvalidInput
+	}
+	if err != nil {
+		return ServerProjectMapping{}, fmt.Errorf("create server workload mapping: %w", err)
+	}
+	mapping.ProjectName, mapping.ProjectSlug = "", ""
+	if err := s.db.QueryRowContext(ctx, `
+		SELECT name, slug FROM projects WHERE id = $1 AND organization_id = $2
+	`, projectID, principal.OrganizationID).Scan(&mapping.ProjectName, &mapping.ProjectSlug); err != nil {
+		return ServerProjectMapping{}, fmt.Errorf("load mapped project details: %w", err)
+	}
+	return mapping, nil
+}
+
+// DeleteServerProjectMapping removes a mapping only within the caller's organization.
+func (s *Store) DeleteServerProjectMapping(ctx context.Context, principal Principal, mappingID string) error {
+	if !canManageServers(principal.Role) {
+		return ErrForbidden
+	}
+	if !validUUID(mappingID) {
+		return ErrNotFound
+	}
+	result, err := s.db.ExecContext(ctx, `
+		DELETE FROM server_project_mappings
+		WHERE id = $1 AND organization_id = $2
+	`, mappingID, principal.OrganizationID)
+	if err != nil {
+		return fmt.Errorf("delete server workload mapping: %w", err)
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("inspect workload mapping deletion: %w", err)
+	}
+	if affected == 0 {
+		return ErrNotFound
 	}
 	return nil
 }
