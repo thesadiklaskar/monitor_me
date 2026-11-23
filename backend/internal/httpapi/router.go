@@ -47,6 +47,8 @@ func NewRouter(version string, dependencies []Dependency, identities *identity.S
 		mux.Handle("GET /v1/remote-operations/config", api.requireAuth(http.HandlerFunc(api.remoteOperationConfig)))
 		mux.Handle("GET /v1/remote-operations", api.requireAuth(http.HandlerFunc(api.listRemoteOperations)))
 		mux.Handle("POST /v1/servers/{serverID}/remote-operations", api.requireAuth(http.HandlerFunc(api.createRemoteOperation)))
+		mux.Handle("GET /v1/remote-operations", api.requireAuth(http.HandlerFunc(api.listRemoteOperations)))
+		mux.Handle("POST /v1/servers/{serverID}/remote-operations", api.requireAuth(http.HandlerFunc(api.createRemoteOperation)))
 		mux.Handle("GET /v1/remote-operation-audit", api.requireAuth(http.HandlerFunc(api.listRemoteOperationAudit)))
 		mux.Handle("GET /v1/alert-rules", api.requireAuth(http.HandlerFunc(api.listAlertRules)))
 		mux.Handle("POST /v1/alert-rules", api.requireAuth(http.HandlerFunc(api.createAlertRule)))
