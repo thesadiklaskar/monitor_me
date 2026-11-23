@@ -245,7 +245,10 @@ func (c *Client) pollRemoteOperation(
 		return fmt.Errorf("receive remote operation acknowledgement: %w", err)
 	}
 	ack := acknowledgement.GetAcknowledgement()
-	if ack == nil || ack.GetBatchId() != command.GetCommandId() || !ack.GetAccepted() {
+	if ack == nil {
+		return errors.New("control plane returned an invalid remote operation result acknowledgement")
+	}
+	if ack.GetBatchId() != command.GetCommandId() || !ack.GetAccepted() {
 		return fmt.Errorf("control plane rejected remote operation result: %s", ack.GetMessage())
 	}
 	return nil

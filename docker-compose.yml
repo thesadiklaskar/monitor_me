@@ -61,6 +61,7 @@ services:
       REDIS_ADDR: "redis:6379"
       REDIS_PASSWORD: "${REDIS_PASSWORD:-local_only_change_me}"
       WEB_ALLOWED_ORIGINS: "${WEB_ALLOWED_ORIGINS:-http://localhost:3000}"
+      REMOTE_ALLOWED_SYSTEMD_UNITS: "${REMOTE_ALLOWED_SYSTEMD_UNITS:-}"
       AGENT_GRPC_ADDR: ":8443"
       AGENT_TLS_CERT_FILE: "/run/certs/server.crt"
       AGENT_TLS_KEY_FILE: "/run/certs/server.key"

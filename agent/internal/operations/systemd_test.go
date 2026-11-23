@@ -19,7 +19,7 @@ func TestExecuteInvokesOnlyTheFixedSystemctlArguments(t *testing.T) {
 	directory := t.TempDir()
 	logPath := filepath.Join(directory, "arguments.txt")
 	binary := filepath.Join(directory, "systemctl")
-	script := "#!/bin/sh\nprintf '%s\\n' \"$@\" > \"$SYSTEMCTL_ARGUMENT_LOG\"\nprintf 'service action accepted\\n\""
+	script := "#!/bin/sh\nprintf '%s\\n' \"$@\" > \"$SYSTEMCTL_ARGUMENT_LOG\"\nprintf 'service action accepted\\n'\n"
 	if err := os.WriteFile(binary, []byte(script), 0o700); err != nil {
 		t.Fatal(err)
 	}

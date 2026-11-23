@@ -40,10 +40,11 @@ func Load() (Config, error) {
 		EnrollmentToken:    os.Getenv("MONITOR_ENROLLMENT_TOKEN"),
 	}
 	cfg.StateFile = env("MONITOR_AGENT_STATE_FILE", filepath.Join(cfg.SpoolDirectory, "agent-state.json"))
-	cfg.AllowedSystemdUnits, err = parseAllowedSystemdUnits(os.Getenv("MONITOR_ALLOWED_SYSTEMD_UNITS"))
+	allowedUnits, err := parseAllowedSystemdUnits(os.Getenv("MONITOR_ALLOWED_SYSTEMD_UNITS"))
 	if err != nil {
 		return Config{}, err
 	}
+	cfg.AllowedSystemdUnits = allowedUnits
 
 	if raw := os.Getenv("MONITOR_COLLECTION_INTERVAL"); raw != "" {
 		interval, err := time.ParseDuration(raw)
