@@ -251,7 +251,8 @@ export function ServerDetail({
   }, [metric, rangeConfig.durationMs, rangeConfig.step, server.id]);
 
   useEffect(() => {
-    void loadHistory();
+    const timer = window.setTimeout(() => { void loadHistory(); }, 0);
+    return () => window.clearTimeout(timer);
   }, [loadHistory]);
 
   useEffect(() => {
