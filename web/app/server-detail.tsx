@@ -132,6 +132,15 @@ function formatValue(value: number, unit: string): string {
   return `${value.toFixed(2)} ${unit}`;
 }
 
+function formatUptime(value: number): string {
+  if (!Number.isFinite(value) || value < 0) return "Unavailable";
+  const seconds = Math.floor(value);
+  const days = Math.floor(seconds / 86_400);
+  const hours = Math.floor((seconds % 86_400) / 3_600);
+  const minutes = Math.floor((seconds % 3_600) / 60);
+  return days > 0 ? `${days}d ${hours}h` : hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
+}
+
 function ServerMetricChart({
   points,
   range,
@@ -427,6 +436,15 @@ export function ServerDetail({
   );
   const processCount = latestSamples.find((sample) => sample.metric_name === "host.process.count");
   const hostInfo = latestSamples.find((sample) => sample.metric_name === "host.info");
+  const latestMetric = (name: string) => latestSamples.find((sample) => sample.metric_name === name);
+  const cpuLatest = latestMetric("host.cpu.utilization");
+  const memoryUsed = latestMetric("host.memory.used");
+  const memoryTotal = latestMetric("host.memory.total");
+  const memoryAvailable = latestMetric("host.memory.available");
+  const uptimeLatest = latestMetric("host.uptime.seconds");
+  const diskVolumes = latestSamples.filter((sample) => sample.metric_name === "host.disk.used.percent");
+  const networkReceive = latestSamples.filter((sample) => sample.metric_name === "host.network.receive.bytes_per_second");
+  const networkTransmit = latestSamples.filter((sample) => sample.metric_name === "host.network.transmit.bytes_per_second");
 
   const points = useMemo(() => {
     const byBucket = new Map<string, MetricPoint>();
@@ -505,6 +523,87 @@ export function ServerDetail({
         <ServerMetricChart points={points} range={range} unit={selectedMetric.unit} loading={loading} startTime={series?.from ?? null} />
       </article>
 
+
+      {latestSamples.length > 0 && (
+        <section className="inventory-panel detail-inventory-panel">
+          <div className="panel-heading">
+            <div>
+              <h2>Host health snapshot</h2>
+              <p>Latest reported CPU, memory, disk, network and uptime values.</p>
+            </div>
+            <button className="button button-secondary" type="button" onClick={() => { void loadLatest(); }} disabled={inventoryLoading}>
+              {inventoryLoading ? "Refreshing…" : "Refresh snapshot"}
+            </button>
+          </div>
+          <div className="summary-grid">
+            <article className="summary-card">
+              <span>CPU utilization</span>
+              <strong>{cpuLatest ? formatValue(cpuLatest.value, "percent") : "Waiting for sample"}</strong>
+              <small>Aggregate processor usage</small>
+            </article>
+            <article className="summary-card">
+              <span>Memory used</span>
+              <strong>{memoryUsed ? formatBytes(memoryUsed.value) : "Unavailable"}</strong>
+              <small>{memoryTotal ? `of ${formatBytes(memoryTotal.value)}` : memoryAvailable ? `${formatBytes(memoryAvailable.value)} available` : "Total memory unavailable"}</small>
+            </article>
+            <article className="summary-card">
+              <span>Uptime</span>
+              <strong>{uptimeLatest ? formatUptime(uptimeLatest.value) : "Unavailable"}</strong>
+              <small>Host running time</small>
+            </article>
+            <article className="summary-card">
+              <span>Processes</span>
+              <strong>{processCount ? Math.round(processCount.value).toLocaleString() : "Unavailable"}</strong>
+              <small>Current process count</small>
+            </article>
+          </div>
+          {diskVolumes.length > 0 && (
+            <div>
+              <h3>Mounted volumes</h3>
+              <div className="table-wrap">
+                <table>
+                  <thead><tr><th>Volume</th><th>Used</th><th>Capacity</th><th>Available</th></tr></thead>
+                  <tbody>{diskVolumes.map((sample) => {
+                    const labels = sample.labels ?? {};
+                    const key = labels.mountpoint ?? labels.device ?? "volume";
+                    const total = latestSamples.find((item) => item.metric_name === "host.disk.total.bytes" && (item.labels?.mountpoint ?? item.labels?.device ?? "volume") === key);
+                    const available = latestSamples.find((item) => item.metric_name === "host.disk.available.bytes" && (item.labels?.mountpoint ?? item.labels?.device ?? "volume") === key);
+                    return (
+                      <tr key={key}>
+                        <td>{labels.mountpoint ?? labels.device ?? "Unknown volume"}</td>
+                        <td>{formatValue(sample.value, "percent")}</td>
+                        <td>{total ? formatBytes(total.value) : "Unavailable"}</td>
+                        <td>{available ? formatBytes(available.value) : "Unavailable"}</td>
+                      </tr>
+                    );
+                  })}</tbody>
+                </table>
+              </div>
+            </div>
+          )}
+          {(networkReceive.length > 0 || networkTransmit.length > 0) && (
+            <div>
+              <h3>Network interfaces</h3>
+              <div className="table-wrap">
+                <table>
+                  <thead><tr><th>Interface</th><th>Download</th><th>Upload</th></tr></thead>
+                  <tbody>{Array.from(new Set([...networkReceive, ...networkTransmit].map((sample) => sample.labels?.interface ?? "unknown"))).map((iface) => {
+                    const received = networkReceive.find((sample) => (sample.labels?.interface ?? "unknown") === iface);
+                    const transmitted = networkTransmit.find((sample) => (sample.labels?.interface ?? "unknown") === iface);
+                    return (
+                      <tr key={iface}>
+                        <td>{iface}</td>
+                        <td>{received ? formatValue(received.value, "bytes/second") : "Unavailable"}</td>
+                        <td>{transmitted ? formatValue(transmitted.value, "bytes/second") : "Unavailable"}</td>
+                      </tr>
+                    );
+                  })}</tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </section>
+      )}
 
       {hostInfo && (
         <section className="inventory-panel detail-inventory-panel">
