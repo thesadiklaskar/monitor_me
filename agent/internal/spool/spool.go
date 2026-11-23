@@ -179,7 +179,7 @@ func (s *Store) Ack(batchIDs []string) error {
 	if err := temporary.Close(); err != nil {
 		return fmt.Errorf("close compacted spool queue: %w", err)
 	}
-	if err := os.Rename(tempName, s.path); err != nil {
+	if err := replaceFile(tempName, s.path); err != nil {
 		return fmt.Errorf("replace compacted spool queue: %w", err)
 	}
 	directory, err := os.Open(filepath.Dir(s.path))
