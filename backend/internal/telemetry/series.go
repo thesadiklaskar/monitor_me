@@ -104,7 +104,7 @@ func QueryRange(ctx context.Context, db *sql.DB, query RangeQuery) ([]SeriesPoin
 		ORDER BY bucket
 		LIMIT $7
 	`, interval, query.OrganizationID, query.ServerID, query.MetricName,
-		query.From.UTC(), query.To.UTC(), query.Limit, nullableProjectID(query.ProjectID)
+		query.From.UTC(), query.To.UTC(), query.Limit, nullableProjectID(query.ProjectID))
 	if err != nil {
 		return nil, fmt.Errorf("query aggregated telemetry series: %w", err)
 	}
