@@ -174,7 +174,7 @@ func (c *Client) SendPending(ctx context.Context, session state.Credentials, sto
 		sent++
 	}
 
-	if len(allowedUnits) > 0 {
+	if runtime.GOOS == "linux" && len(allowedUnits) > 0 {
 		if err := c.pollRemoteOperation(ctx, stream, session, allowedUnits); err != nil {
 			return sent, err
 		}
