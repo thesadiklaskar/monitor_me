@@ -69,7 +69,7 @@ export function clearSessionCookie(response: NextResponse, request: NextRequest)
 export async function callBackend(
   path: string,
   options: {
-    method?: "GET" | "POST";
+    method?: "GET" | "POST" | "DELETE";
     token?: string | null;
     body?: unknown;
   } = {},

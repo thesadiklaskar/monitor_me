@@ -36,6 +36,7 @@ type LiveSample = {
   unit: string;
   labels?: Record<string, string>;
   observed_at_unix_nanos: number;
+  project_id?: string;
 };
 
 type LiveEvent = {
@@ -209,10 +210,12 @@ function ServerMetricChart({
 export function ServerDetail({
   server,
   apiPublicURL,
+  projectId,
   onBack,
 }: {
   server: Server;
   apiPublicURL: string | null;
+  projectId: string | null;
   onBack: () => void;
 }) {
   const [metric, setMetric] = useState(metricDefinitions[0].name);
@@ -237,6 +240,7 @@ export function ServerDetail({
       step: rangeConfig.step,
       limit: "1000",
     });
+    if (projectId) query.set("project_id", projectId);
     try {
       const response = await apiRequest<MetricSeries>(
         `/api/servers/${encodeURIComponent(server.id)}/metrics?${query.toString()}`,
@@ -248,7 +252,7 @@ export function ServerDetail({
     } finally {
       setLoading(false);
     }
-  }, [metric, rangeConfig.durationMs, rangeConfig.step, server.id]);
+  }, [metric, projectId, rangeConfig.durationMs, rangeConfig.step, server.id]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => { void loadHistory(); }, 0);
@@ -305,7 +309,7 @@ export function ServerDetail({
             // samples in one committed batch are summarized together, not
             // displayed as if the last interface were the whole host.
             const matchingSamples = event.samples.filter(
-              (sample) => sample.metric_name === metric && Number.isFinite(sample.value),
+              (sample) => sample.metric_name === metric && Number.isFinite(sample.value) && (!projectId || sample.project_id === projectId),
             );
             if (matchingSamples.length === 0) return;
             const values = matchingSamples.map((sample) => sample.value);
@@ -353,7 +357,7 @@ export function ServerDetail({
       if (reconnectTimer) clearTimeout(reconnectTimer);
       socket?.close();
     };
-  }, [apiPublicURL, loadHistory, metric, rangeConfig.durationMs, server.id]);
+  }, [apiPublicURL, loadHistory, metric, projectId, rangeConfig.durationMs, server.id]);
 
   const points = useMemo(() => {
     const byBucket = new Map<string, MetricPoint>();

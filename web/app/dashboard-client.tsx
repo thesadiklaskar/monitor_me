@@ -3,6 +3,7 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { apiRequest } from "@/lib/client-api";
 import { ServerDetail } from "./server-detail";
+import ProjectWorkspace from "./project-workspace";
 
 type User = {
   id?: string;
@@ -39,6 +40,8 @@ type IssuedServer = {
 
 type AuthResponse = { user: User; expires_at: string };
 type InventoryResponse = { servers: Server[] };
+type Project = { id: string; name: string; slug: string; created_at: string };
+type ProjectListResponse = { projects: Project[] };
 type ConfigResponse = { agent_grpc_address: string | null; public_api_url: string | null };
 
 type ViewState = "checking" | "signed-out" | "signed-in";
@@ -431,6 +434,9 @@ export default function DashboardClient() {
   const [grpcAddress, setGrpcAddress] = useState<string | null>(null);
   const [publicAPIURL, setPublicAPIURL] = useState<string | null>(null);
   const [selectedServer, setSelectedServer] = useState<Server | null>(null);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [selectedProjectId, setSelectedProjectId] = useState("");
+  const [showProjects, setShowProjects] = useState(false);
   const [logoutBusy, setLogoutBusy] = useState(false);
 
   const loadServers = useCallback(async () => {
@@ -453,12 +459,14 @@ export default function DashboardClient() {
     void Promise.all([
       apiRequest<{ user: User }>("/api/auth/me"),
       apiRequest<ConfigResponse>("/api/config"),
-    ]).then(async ([session, config]) => {
+      apiRequest<ProjectListResponse>("/api/projects"),
+    ]).then(async ([session, config, projectResult]) => {
       if (!active) return;
       setUser(session.user);
       setView("signed-in");
       setGrpcAddress(config.agent_grpc_address);
       setPublicAPIURL(config.public_api_url);
+      setProjects(Array.isArray(projectResult.projects) ? projectResult.projects : []);
       await loadServers();
     }).catch(() => {
       if (!active) return;
@@ -470,6 +478,11 @@ export default function DashboardClient() {
   const onlineCount = useMemo(() => servers.filter((server) => server.status.toLowerCase() === "online").length, [servers]);
   const pendingCount = useMemo(() => servers.filter((server) => server.status.toLowerCase() === "pending").length, [servers]);
   const canCreate = Boolean(user && canManageServers(user.role));
+
+  const updateProjects = useCallback((nextProjects: Project[]) => {
+    setProjects(nextProjects);
+    setSelectedProjectId((current) => nextProjects.some((project) => project.id === current) ? current : "");
+  }, []);
 
   async function logout() {
     setLogoutBusy(true);
@@ -530,8 +543,8 @@ export default function DashboardClient() {
         </div>
         <nav className="side-nav" aria-label="Main navigation">
           <span className="nav-section-label">Workspace</span>
-          <a className="nav-item nav-item-active" href="#servers"><span>▦</span>Servers</a>
-          <span className="nav-item nav-item-disabled" aria-disabled="true"><span>◫</span>Projects <small>Later</small></span>
+          <button className={showProjects ? "nav-item" : "nav-item nav-item-active"} type="button" onClick={() => { setShowProjects(false); setSelectedServer(null); }}><span>▦</span>Servers</button>
+          <button className={showProjects ? "nav-item nav-item-active" : "nav-item"} type="button" onClick={() => { setSelectedServer(null); setShowProjects(true); }}><span>◫</span>Projects</button>
           <span className="nav-section-label nav-section-spaced">Manage</span>
           <span className="nav-item nav-item-disabled" aria-disabled="true"><span>◉</span>Alerts <small>Later</small></span>
           <span className="nav-item nav-item-disabled" aria-disabled="true"><span>⚙</span>Settings <small>Later</small></span>
@@ -547,13 +560,30 @@ export default function DashboardClient() {
       </aside>
 
       <main className="dashboard-main" id="servers">
-        {selectedServer ? (
-          <ServerDetail server={selectedServer} apiPublicURL={publicAPIURL} onBack={() => setSelectedServer(null)} />
+        {showProjects ? (
+          <ProjectWorkspace servers={servers} projects={projects} role={user.role} onProjectsChanged={updateProjects} onBack={() => setShowProjects(false)} />
+        ) : selectedServer ? (
+          <div className="server-detail-shell">
+            <label className="project-scope-select detail-project-scope">
+              <span>Project scope</span>
+              <select value={selectedProjectId} onChange={(event) => setSelectedProjectId(event.target.value)}>
+                <option value="">All projects</option>
+                {projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
+              </select>
+            </label>
+            <ServerDetail server={selectedServer} apiPublicURL={publicAPIURL} projectId={selectedProjectId || null} onBack={() => setSelectedServer(null)} />
+          </div>
         ) : <>
         <header className="topbar">
           <div><span className="breadcrumbs">Workspace / Servers</span><h1>Server overview</h1></div>
           <div className="topbar-actions">
             <span className="live-label"><span className="status-dot status-dot-online" /> API connected</span>
+            <label className="project-scope-select"><span>Project scope</span>
+              <select value={selectedProjectId} onChange={(event) => setSelectedProjectId(event.target.value)}>
+                <option value="">All projects</option>
+                {projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
+              </select>
+            </label>
             <button className="button button-secondary" type="button" onClick={() => void loadServers()} disabled={inventoryBusy}>{inventoryBusy ? "Refreshing…" : "Refresh"}</button>
             {canCreate && <button className="button button-primary" type="button" onClick={() => setShowAdd(true)}>+ Add server</button>}
           </div>
