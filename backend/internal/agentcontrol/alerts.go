@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
-	"strings"
 
 	"github.com/WorkRCS/monitor_me/backend/internal/telemetry"
 )
