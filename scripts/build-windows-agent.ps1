@@ -17,7 +17,7 @@ GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /
 '@
 
 Write-Host "Building the Windows x64 Monitor Me agent inside Docker..."
-docker run --rm --mount "type=bind,source=$repoRoot,target=/src" --workdir /src golang:1.27.4-alpine3.23 sh -lc $buildCommands
+docker run --rm --entrypoint /bin/sh --mount "type=bind,source=$repoRoot,target=/src" --workdir /src golang:1.27.4-alpine3.23 -c $buildCommands
 if ($LASTEXITCODE -ne 0) {
     throw "Windows agent build failed with exit code $LASTEXITCODE."
 }
