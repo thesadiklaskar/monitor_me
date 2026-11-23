@@ -24,8 +24,8 @@ type Config struct {
 	DBMaxIdleConnections int
 	DBConnectionLifetime time.Duration
 	StartupTimeout       time.Duration
-	WebAllowedOrigins    []string
-	RemoteAllowedUnits   []string
+	WebAllowedOrigins     []string
+	RemoteAllowedUnits    []string
 	DisableAuthentication bool
 }
 
