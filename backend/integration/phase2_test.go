@@ -293,14 +293,14 @@ func TestPhase2AuthenticationAndAgentLifecycle(t *testing.T) {
 	}
 	if _, err := agentClient.Enroll(ctx, &monitorv1.EnrollRequest{
 		EnrollmentToken: pendingServer.Enrollment.Token,
-		AgentVersion: "0.1.0-test", OperatingSystem: "linux", Architecture: "amd64",
+		AgentVersion:    "0.1.0-test", OperatingSystem: "linux", Architecture: "amd64",
 		Hostname: "pending-token-rotation-node",
 	}); err == nil || status.Code(err) != codes.Unauthenticated {
 		t.Fatalf("replaced enrollment token must be rejected, got %v", err)
 	}
 	if _, err := agentClient.Enroll(ctx, &monitorv1.EnrollRequest{
 		EnrollmentToken: pendingRotationResult.Enrollment.Token,
-		AgentVersion: "0.1.0-test", OperatingSystem: "linux", Architecture: "amd64",
+		AgentVersion:    "0.1.0-test", OperatingSystem: "linux", Architecture: "amd64",
 		Hostname: "pending-token-rotation-node",
 	}); err != nil {
 		t.Fatalf("replacement enrollment token should be accepted: %v", err)
