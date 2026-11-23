@@ -87,7 +87,7 @@ func (c *ProcCollector) collectWindows(ctx context.Context) ([]Sample, error) {
 			if !exists {
 				continue
 			}
-			busy, user, system, wait, valid := cpuPercent(previous, counters)
+			busy, user, system, _, valid := cpuPercent(previous, counters)
 			if !valid {
 				continue
 			}
