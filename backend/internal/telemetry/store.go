@@ -16,3 +16,8 @@ func NewStore(db *sql.DB) *Store {
 func (store *Store) QueryRange(ctx context.Context, query RangeQuery) ([]SeriesPoint, error) {
 	return QueryRange(ctx, store.db, query)
 }
+
+func (store *Store) QueryLatest(ctx context.Context, query LatestQuery) ([]LatestSample, error) {
+	return QueryLatest(ctx, store.db, query)
+}
+\nfunc (store *Store) QueryLatest(ctx context.Context, query LatestQuery) ([]LatestSample, error) {\n\treturn QueryLatest(ctx, store.db, query)\n}\n

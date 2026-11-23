@@ -251,3 +251,9 @@ tbody tr:hover { background:rgba(127,224,193,.025); }
 .project-empty{padding:30px 15px;color:var(--muted);font-size:11px;text-align:center}
 .project-workspace .field select{width:100%;min-width:0;min-height:37px;border:1px solid #34445c;border-radius:8px;background:#0b1421;color:var(--foreground);padding:7px 9px;font:inherit;font-size:11px}
 @media(max-width:760px){.project-workspace-grid,.project-form-grid{grid-template-columns:1fr}.project-scope-select select{max-width:100%}.detail-project-scope{align-items:flex-start}}
+
+.detail-inventory-panel h3{margin:2px 0 12px;color:#dbe6f2;font-size:12px}
+.detail-inventory-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:22px;padding:18px 20px}
+.detail-inventory-grid td{max-width:260px;overflow-wrap:anywhere;white-space:normal}
+.detail-subheading{margin-top:22px!important}
+@media(max-width:850px){.detail-inventory-grid{grid-template-columns:1fr}}

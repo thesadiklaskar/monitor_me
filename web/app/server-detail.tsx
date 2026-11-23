@@ -21,6 +21,22 @@ type MetricPoint = {
   sample_count: number;
 };
 
+type LatestSample = {
+  metric_name: string;
+  value: number;
+  unit: string;
+  labels?: Record<string, string>;
+  project_id?: string;
+  observed_at: string;
+};
+
+type LatestResponse = {
+  server_id: string;
+  project_id: string;
+  window_seconds: number;
+  samples: LatestSample[];
+};
+
 type MetricSeries = {
   server_id: string;
   metric: string;
@@ -221,6 +237,9 @@ export function ServerDetail({
   const [metric, setMetric] = useState(metricDefinitions[0].name);
   const [range, setRange] = useState<TimeRange>("1h");
   const [series, setSeries] = useState<MetricSeries | null>(null);
+  const [latestSamples, setLatestSamples] = useState<LatestSample[]>([]);
+  const [inventoryLoading, setInventoryLoading] = useState(true);
+  const [inventoryError, setInventoryError] = useState("");
   const [livePoints, setLivePoints] = useState<MetricPoint[]>([]);
   const [loading, setLoading] = useState(false);
   const [historyError, setHistoryError] = useState("");
@@ -359,6 +378,48 @@ export function ServerDetail({
     };
   }, [apiPublicURL, loadHistory, metric, projectId, rangeConfig.durationMs, server.id]);
 
+
+  const loadLatest = useCallback(async () => {
+    setInventoryLoading(true);
+    try {
+      const query = new URLSearchParams();
+      if (projectId) query.set("project_id", projectId);
+      const suffix = query.size > 0 ? `?${query.toString()}` : "";
+      const response = await apiRequest<LatestResponse>(
+        `/api/servers/${encodeURIComponent(server.id)}/metrics/latest${suffix}`,
+      );
+      setLatestSamples(Array.isArray(response.samples) ? response.samples : []);
+      setInventoryError("");
+    } catch (error) {
+      setInventoryError(error instanceof Error ? error.message : "Process and port inventory could not be loaded.");
+    } finally {
+      setInventoryLoading(false);
+    }
+  }, [projectId, server.id]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => { void loadLatest(); }, 0);
+    const refresh = window.setInterval(() => { void loadLatest(); }, 30_000);
+    return () => { window.clearTimeout(timer); window.clearInterval(refresh); };
+  }, [loadLatest]);
+
+  const processInventory = useMemo(
+    () => latestSamples
+      .filter((sample) => sample.metric_name === "process.memory.rss")
+      .sort((left, right) => right.value - left.value)
+      .slice(0, 20),
+    [latestSamples],
+  );
+  const tcpStates = useMemo(
+    () => latestSamples.filter((sample) => sample.metric_name === "host.network.tcp.connections"),
+    [latestSamples],
+  );
+  const listeningPorts = useMemo(
+    () => latestSamples.filter((sample) => sample.metric_name === "host.network.tcp.listening_port"),
+    [latestSamples],
+  );
+  const processCount = latestSamples.find((sample) => sample.metric_name === "host.process.count");
+
   const points = useMemo(() => {
     const byBucket = new Map<string, MetricPoint>();
     for (const point of series?.points ?? []) byBucket.set(point.bucket, point);
@@ -436,6 +497,65 @@ export function ServerDetail({
         <ServerMetricChart points={points} range={range} unit={selectedMetric.unit} loading={loading} startTime={series?.from ?? null} />
       </article>
 
+
+      <section className="inventory-panel detail-inventory-panel">
+        <div className="panel-heading">
+          <div>
+            <h2>Process and network inventory</h2>
+            <p>{processCount ? `${Math.round(processCount.value).toLocaleString()} processes reported` : "Process count unavailable"} · latest snapshot from the last 15 minutes</p>
+          </div>
+          <button className="button button-secondary" type="button" onClick={() => { void loadLatest(); }} disabled={inventoryLoading}>
+            {inventoryLoading ? "Refreshing…" : "Refresh inventory"}
+          </button>
+        </div>
+        {inventoryError && <div className="notice notice-error" role="alert">{inventoryError}</div>}
+        {inventoryLoading && latestSamples.length === 0 ? (
+          <div className="project-empty">Loading process and TCP inventory…</div>
+        ) : (
+          <div className="detail-inventory-grid">
+            <div>
+              <h3>Top processes by resident memory</h3>
+              {processInventory.length === 0 ? <p className="detail-footnote">No process RSS samples in the latest snapshot.</p> : (
+                <div className="table-wrap"><table>
+                  <thead><tr><th>Process</th><th>PID</th><th>RSS</th><th>Workload</th></tr></thead>
+                  <tbody>{processInventory.map((sample, index) => (
+                    <tr key={`${sample.labels?.pid ?? "pid"}-${sample.labels?.process ?? index}`}>
+                      <td>{sample.labels?.process ?? "Unknown"}</td>
+                      <td>{sample.labels?.pid ?? "—"}</td>
+                      <td>{formatValue(sample.value, sample.unit)}</td>
+                      <td>{sample.labels?.workload_selector ?? sample.labels?.cgroup_path ?? sample.labels?.attribution_method ?? "Host / unclassified"}</td>
+                    </tr>
+                  ))}</tbody>
+                </table></div>
+              )}
+            </div>
+            <div>
+              <h3>TCP connection states</h3>
+              {tcpStates.length === 0 ? <p className="detail-footnote">No TCP state samples in the latest snapshot.</p> : (
+                <div className="table-wrap"><table>
+                  <thead><tr><th>Family</th><th>State</th><th>Connections</th></tr></thead>
+                  <tbody>{tcpStates.map((sample, index) => (
+                    <tr key={`${sample.labels?.family ?? "family"}-${sample.labels?.state ?? index}`}>
+                      <td>{sample.labels?.family ?? "—"}</td><td>{sample.labels?.state ?? "Unknown"}</td><td>{Math.round(sample.value).toLocaleString()}</td>
+                    </tr>
+                  ))}</tbody>
+                </table></div>
+              )}
+              <h3 className="detail-subheading">Listening ports</h3>
+              {listeningPorts.length === 0 ? <p className="detail-footnote">No listening-port samples in the latest snapshot.</p> : (
+                <div className="table-wrap"><table>
+                  <thead><tr><th>Family</th><th>Port</th><th>Sockets</th></tr></thead>
+                  <tbody>{listeningPorts.slice(0, 24).map((sample, index) => (
+                    <tr key={`${sample.labels?.family ?? "family"}-${sample.labels?.port ?? index}`}>
+                      <td>{sample.labels?.family ?? "—"}</td><td>{sample.labels?.port ?? "—"}</td><td>{Math.round(sample.value).toLocaleString()}</td>
+                    </tr>
+                  ))}</tbody>
+                </table></div>
+              )}
+            </div>
+          </div>
+        )}
+      </section>
       <div className="detail-footnote">
         Historical values use bounded PostgreSQL aggregation. Live values are published only after the backend confirms the durable batch commit. Gaps represent missing samples and are not zero-filled.
       </div>

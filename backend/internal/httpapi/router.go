@@ -57,6 +57,8 @@ func NewRouter(version string, dependencies []Dependency, identities *identity.S
 
 		if api.telemetry != nil {
 			mux.Handle("GET /v1/servers/{serverID}/metrics", api.requireAuth(http.HandlerFunc(api.metrics)))
+			mux.Handle("GET /v1/servers/{serverID}/metrics/latest", api.requireAuth(http.HandlerFunc(api.latestMetrics)))
+			mux.Handle("GET /v1/servers/{serverID}/metrics/latest", api.requireAuth(http.HandlerFunc(api.latestMetrics)))
 		}
 		if api.cache != nil {
 			mux.Handle("POST /v1/live/ticket", api.requireAuth(http.HandlerFunc(api.createLiveTicket)))
