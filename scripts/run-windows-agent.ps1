@@ -18,18 +18,26 @@ $dataDirectory = Join-Path $env:LOCALAPPDATA "MonitorMe"
 $spoolDirectory = Join-Path $dataDirectory "spool"
 New-Item -ItemType Directory -Force -Path $spoolDirectory | Out-Null
 
-$token = Read-Host "Paste the one-time enrollment token from the Monitor Me Add Server dialog"
-if ([string]::IsNullOrWhiteSpace($token)) {
-    throw "An enrollment token is required."
+$stateFile = Join-Path $dataDirectory "agent-state.json"
+$token = ""
+if (-not (Test-Path $stateFile)) {
+    $token = Read-Host "Paste the one-time enrollment token from the Monitor Me Add Server dialog"
+    if ([string]::IsNullOrWhiteSpace($token)) {
+        throw "An enrollment token is required for first enrollment."
+    }
 }
 
 $env:MONITOR_AGENT_VERSION = "0.1.0-windows-local"
 $env:MONITOR_GRPC_ADDRESS = $GrpcAddress
 $env:MONITOR_TLS_CA_FILE = $certificate
-$env:MONITOR_ENROLLMENT_TOKEN = $token
 $env:MONITOR_COLLECTION_INTERVAL = "5s"
 $env:MONITOR_SPOOL_DIR = $spoolDirectory
-$env:MONITOR_AGENT_STATE_FILE = (Join-Path $dataDirectory "agent-state.json")
+$env:MONITOR_AGENT_STATE_FILE = $stateFile
+if (-not [string]::IsNullOrWhiteSpace($token)) {
+    $env:MONITOR_ENROLLMENT_TOKEN = $token
+} else {
+    Remove-Item Env:MONITOR_ENROLLMENT_TOKEN -ErrorAction SilentlyContinue
+}
 
 Write-Host "Starting the Windows host agent. Press Ctrl+C to stop it."
 Write-Host "Metrics are sent to $GrpcAddress every 5 seconds."
