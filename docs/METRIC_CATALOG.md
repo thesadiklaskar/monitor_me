@@ -144,7 +144,7 @@ Latency distributions must retain histogram buckets or another aggregation-frien
 
 ## 12. Platform Differences
 
-Linux may expose detailed counters through `/proc`, `/sys`, cgroups, and optional eBPF. Windows and macOS require native APIs and may expose different fields, permissions, and sampling costs. The agent must report capabilities per operating system rather than pretending every metric is identical.
+Linux may expose detailed counters through `/proc`, `/sys`, cgroups, and optional eBPF. Windows uses native operating-system counters through a platform abstraction and reports mounted-volume capacity, disk/network counters, uptime, OS identity and readable process RSS. Windows does not currently expose the Linux TCP-state/listening-port inventory, cgroup/Systemd workload attribution, or per-process CPU contract. macOS still requires a native collector. The agent must report capabilities per operating system rather than pretending every metric is identical.
 
 ## 13. Versioning
 
@@ -185,3 +185,25 @@ The Linux agent emits the full AgentHealth metric list as ordinary telemetry sam
 - `agent.last_successful_send`: Unix timestamp in seconds for the most recent matching accepted backend ACK observed during the current agent process lifetime. It is omitted until first delivery succeeds and is not persisted across agent restarts.
 
 The health snapshot is collected before the current interval's combined telemetry batch is appended, so spool size and queue depth can lag that batch by one collection interval. Missing first-sample CPU or last-send timestamps are left absent rather than represented as zero.
+
+
+## Appendix C. Initial Windows Agent Source Semantics
+
+The initial Windows collector uses gopsutil v4.26.9 to read Windows CPU times, virtual/swap memory, mounted-volume usage, disk I/O counters, network interface counters, uptime, OS/kernel identity, and process inventory. Counter rates use the agent's measured elapsed interval; the first snapshot establishes a baseline and does not emit rates.
+
+| Metric | Unit | Initial calculation/source | Availability note |
+| --- | --- | --- | --- |
+| `host.cpu.utilization` | percent | Aggregate Windows CPU time deltas | Omitted until a baseline exists |
+| `host.cpu.core.utilization` | percent | Per-logical-CPU time deltas where exposed | Platform-provided CPU grouping |
+| `host.memory.total`, `host.memory.available`, `host.memory.used` | bytes | Windows virtual-memory counters | Preserve gopsutil/Windows accounting semantics |
+| `host.memory.swap.total`, `host.memory.swap.used` | bytes | Windows page-file/swap counters where available | Omitted if the OS API does not report them |
+| `host.disk.total.bytes`, `host.disk.used.bytes`, `host.disk.available.bytes`, `host.disk.used.percent` | bytes / percent | Per-mounted-volume usage | Drive/volume labels; inaccessible or unmounted volumes are skipped |
+| `host.disk.read.bytes_per_second`, `host.disk.write.bytes_per_second` | bytes/second | Disk I/O byte-counter deltas | Omitted on first sample or counter reset |
+| `host.network.receive.bytes_per_second`, `host.network.transmit.bytes_per_second` | bytes/second | Per-interface byte-counter deltas | Labelled by interface |
+| `host.network.receive.packets_per_second`, `host.network.transmit.packets_per_second` | packets/second | Per-interface packet-counter deltas | Labelled by interface |
+| `host.uptime.seconds` | seconds | Windows host uptime | Snapshot gauge |
+| `host.info` | info | Hostname, Windows platform/version, kernel version and architecture labels | Metadata sample with value 1 |
+| `host.process.count` | processes | Process ID enumeration | Count may include processes whose details are not readable |
+| `process.memory.rss` | bytes | Per-process resident working set | Up to 128 readable processes; protected processes may be omitted |
+
+The first Windows collector slice intentionally does not claim TCP connection/listening-port inventory, Systemd/cgroup/container workload attribution, per-process CPU, Windows service installation, or signed upgrades.
