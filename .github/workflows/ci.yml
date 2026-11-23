@@ -141,6 +141,8 @@ jobs:
   compose:
     name: Docker Compose integration
     runs-on: ubuntu-latest
+    env:
+      MONITOR_ME_AUTH_DISABLED: "false"
     steps:
       - name: Check out source
         uses: actions/checkout@v4
@@ -246,7 +248,260 @@ jobs:
           TEST_DATABASE_URL: postgres://monitor_me:local_only_change_me@127.0.0.1:5432/monitor_me?sslmode=disable
           AGENT_GRPC_ADDRESS: localhost:8443
           AGENT_GRPC_ROOT_CA: ${{ github.workspace }}/.data/certs/server.crt
-        run: go test -tags=integration -run '^$' -bench '^BenchmarkPhase3PostgresIngestion$' -benchmem -benchtime=3s ./integration
+        run: go test -tags=integration -run '^      - name: Verify database migration
+        run: |
+          docker compose exec -T postgres \
+            psql -v ON_ERROR_STOP=1 -U monitor_me -d monitor_me \
+            -Atc "SELECT to_regclass('public.organizations') IS NOT NULL;" | grep -qx t
+      - name: Verify Redis connectivity
+        run: |
+          docker compose exec -T redis \
+            sh -c 'redis-cli --no-auth-warning -a "$REDIS_PASSWORD" ping' | grep -qx PONG
+      - name: Verify dependency-aware readiness
+        run: docker compose exec -T api wget -q -O - http://127.0.0.1:8080/health/ready
+      - name: Verify PostgreSQL durability during Redis outage and recovery
+        shell: bash
+        run: |
+          docker compose stop redis
+          if docker compose exec -T api wget -q -O - http://127.0.0.1:8080/health/ready; then
+            echo "API readiness must fail while the required Redis dependency is unavailable."
+            exit 1
+          fi
+          docker compose exec -T postgres \
+            psql -v ON_ERROR_STOP=1 -U monitor_me -d monitor_me \
+            -Atc "SELECT count(*) > 0 FROM users;" | grep -qx t
+          docker compose start redis
+          for attempt in $(seq 1 30); do
+            if docker compose exec -T api wget -q -O /dev/null http://127.0.0.1:8080/health/ready; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose ps --all
+          docker compose logs --no-color
+          exit 1
+      - name: Create PostgreSQL durability canary
+        run: |
+          docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U monitor_me -d monitor_me <<'SQL'
+          WITH organization AS (
+            INSERT INTO organizations (name, slug)
+            VALUES ('PostgreSQL Recovery CI', 'postgres-recovery-ci')
+            RETURNING id
+          ),
+          server AS (
+            INSERT INTO servers (organization_id, name, hostname, status)
+            SELECT id, 'postgres-recovery-ci', 'postgres-recovery-ci', 'online'
+            FROM organization
+            RETURNING id, organization_id
+          ),
+          agent AS (
+            INSERT INTO agents (server_id, version, status)
+            SELECT id, 'ci-recovery', 'online'
+            FROM server
+            RETURNING id, server_id
+          ),
+          batch AS (
+            INSERT INTO telemetry_batches (
+              agent_id, batch_id, schema_version, payload_hash, collected_at, sample_count
+            )
+            SELECT id, 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 1,
+                   decode(repeat('ab', 32), 'hex'), now(), 1
+            FROM agent
+            RETURNING agent_id, batch_id
+          )
+          INSERT INTO telemetry_samples (
+            organization_id, server_id, agent_id, batch_id, metric_name,
+            value, unit, labels, observed_at, attribution_method
+          )
+          SELECT server.organization_id, server.id, agent.id, batch.batch_id,
+                 'host.cpu.utilization', 42, 'percent', '{}'::jsonb, now(), 'host_total'
+          FROM server
+          JOIN agent ON agent.server_id = server.id
+          JOIN batch ON batch.agent_id = agent.id;
+          SQL
+      - name: Verify PostgreSQL outage and recovery
+        shell: bash
+        run: |
+          docker compose stop postgres
+          database_unavailable=0
+          for attempt in $(seq 1 15); do
+            if ! docker compose exec -T api wget -q -O /dev/null http://127.0.0.1:8080/health/ready; then
+              database_unavailable=1
+              break
+            fi
+            sleep 1
+          done
+          if [ "$database_unavailable" -ne 1 ]; then
+            echo "API readiness must fail while PostgreSQL is unavailable."
+            exit 1
+          fi
+          docker compose start postgres
+          database_recovered=0
+          for attempt in $(seq 1 30); do
+            if docker compose exec -T api wget -q -O /dev/null http://127.0.0.1:8080/health/ready; then
+              database_recovered=1
+              break
+            fi
+            sleep 2
+          done
+          if [ "$database_recovered" -ne 1 ]; then
+            docker compose ps --all
+            docker compose logs --no-color
+            exit 1
+          fi
+          docker compose exec -T postgres \
+            psql -v ON_ERROR_STOP=1 -U monitor_me -d monitor_me \
+            -Atc "SELECT count(*) = 1 FROM telemetry_samples sample JOIN organizations organization ON organization.id = sample.organization_id WHERE organization.slug = 'postgres-recovery-ci' AND sample.batch_id = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';" | grep -qx t
+      - name: Print logs on failure
+        if: failure()
+        run: docker compose logs --no-color
+      - name: Stop local stack
+        if: always()
+        run: docker compose down --volumes
+ -bench '^BenchmarkPhase3PostgresIngestion      - name: Verify database migration
+        run: |
+          docker compose exec -T postgres \
+            psql -v ON_ERROR_STOP=1 -U monitor_me -d monitor_me \
+            -Atc "SELECT to_regclass('public.organizations') IS NOT NULL;" | grep -qx t
+      - name: Verify Redis connectivity
+        run: |
+          docker compose exec -T redis \
+            sh -c 'redis-cli --no-auth-warning -a "$REDIS_PASSWORD" ping' | grep -qx PONG
+      - name: Verify dependency-aware readiness
+        run: docker compose exec -T api wget -q -O - http://127.0.0.1:8080/health/ready
+      - name: Verify PostgreSQL durability during Redis outage and recovery
+        shell: bash
+        run: |
+          docker compose stop redis
+          if docker compose exec -T api wget -q -O - http://127.0.0.1:8080/health/ready; then
+            echo "API readiness must fail while the required Redis dependency is unavailable."
+            exit 1
+          fi
+          docker compose exec -T postgres \
+            psql -v ON_ERROR_STOP=1 -U monitor_me -d monitor_me \
+            -Atc "SELECT count(*) > 0 FROM users;" | grep -qx t
+          docker compose start redis
+          for attempt in $(seq 1 30); do
+            if docker compose exec -T api wget -q -O /dev/null http://127.0.0.1:8080/health/ready; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose ps --all
+          docker compose logs --no-color
+          exit 1
+      - name: Create PostgreSQL durability canary
+        run: |
+          docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U monitor_me -d monitor_me <<'SQL'
+          WITH organization AS (
+            INSERT INTO organizations (name, slug)
+            VALUES ('PostgreSQL Recovery CI', 'postgres-recovery-ci')
+            RETURNING id
+          ),
+          server AS (
+            INSERT INTO servers (organization_id, name, hostname, status)
+            SELECT id, 'postgres-recovery-ci', 'postgres-recovery-ci', 'online'
+            FROM organization
+            RETURNING id, organization_id
+          ),
+          agent AS (
+            INSERT INTO agents (server_id, version, status)
+            SELECT id, 'ci-recovery', 'online'
+            FROM server
+            RETURNING id, server_id
+          ),
+          batch AS (
+            INSERT INTO telemetry_batches (
+              agent_id, batch_id, schema_version, payload_hash, collected_at, sample_count
+            )
+            SELECT id, 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 1,
+                   decode(repeat('ab', 32), 'hex'), now(), 1
+            FROM agent
+            RETURNING agent_id, batch_id
+          )
+          INSERT INTO telemetry_samples (
+            organization_id, server_id, agent_id, batch_id, metric_name,
+            value, unit, labels, observed_at, attribution_method
+          )
+          SELECT server.organization_id, server.id, agent.id, batch.batch_id,
+                 'host.cpu.utilization', 42, 'percent', '{}'::jsonb, now(), 'host_total'
+          FROM server
+          JOIN agent ON agent.server_id = server.id
+          JOIN batch ON batch.agent_id = agent.id;
+          SQL
+      - name: Verify PostgreSQL outage and recovery
+        shell: bash
+        run: |
+          docker compose stop postgres
+          database_unavailable=0
+          for attempt in $(seq 1 15); do
+            if ! docker compose exec -T api wget -q -O /dev/null http://127.0.0.1:8080/health/ready; then
+              database_unavailable=1
+              break
+            fi
+            sleep 1
+          done
+          if [ "$database_unavailable" -ne 1 ]; then
+            echo "API readiness must fail while PostgreSQL is unavailable."
+            exit 1
+          fi
+          docker compose start postgres
+          database_recovered=0
+          for attempt in $(seq 1 30); do
+            if docker compose exec -T api wget -q -O /dev/null http://127.0.0.1:8080/health/ready; then
+              database_recovered=1
+              break
+            fi
+            sleep 2
+          done
+          if [ "$database_recovered" -ne 1 ]; then
+            docker compose ps --all
+            docker compose logs --no-color
+            exit 1
+          fi
+          docker compose exec -T postgres \
+            psql -v ON_ERROR_STOP=1 -U monitor_me -d monitor_me \
+            -Atc "SELECT count(*) = 1 FROM telemetry_samples sample JOIN organizations organization ON organization.id = sample.organization_id WHERE organization.slug = 'postgres-recovery-ci' AND sample.batch_id = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';" | grep -qx t
+      - name: Print logs on failure
+        if: failure()
+        run: docker compose logs --no-color
+      - name: Stop local stack
+        if: always()
+        run: docker compose down --volumes
+ -benchmem -benchtime=3s ./integration
+      - name: Verify anonymous local dashboard mode
+        env:
+          MONITOR_ME_AUTH_DISABLED: "true"
+        shell: bash
+        run: |
+          docker compose up --build -d api web
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:3000/api/config -o /tmp/monitor-me-anonymous-config.json; then
+              break
+            fi
+            sleep 2
+          done
+          jq -e '.auth_disabled == true' /tmp/monitor-me-anonymous-config.json
+          curl --retry 5 --retry-all-errors --retry-delay 1 --retry-max-time 30 \
+            --connect-timeout 3 --max-time 10 -fsS \
+            http://127.0.0.1:3000/api/auth/me -o /tmp/monitor-me-anonymous-user.json
+          jq -e '.user.role == "owner" and .user.organization_id != ""' /tmp/monitor-me-anonymous-user.json
+          status=""
+          if ! status="$(curl --retry 5 --retry-all-errors --retry-delay 1 --retry-max-time 30 \
+            --connect-timeout 3 --max-time 10 -sS -o /tmp/monitor-me-anonymous-login.json -w '%{http_code}' \
+            -H 'Origin: http://127.0.0.1:3000' \
+            -H 'Content-Type: application/json' \
+            --data '{"email":"disabled@example.invalid","password":"not-used"}' \
+            http://127.0.0.1:3000/api/auth/login 2>/tmp/monitor-me-anonymous-login-curl.log)"; then
+            cat /tmp/monitor-me-anonymous-login-curl.log
+            exit 1
+          fi
+          if [ "$status" != "404" ]; then
+            echo "Expected login to be disabled with HTTP 404, got HTTP $status."
+            cat /tmp/monitor-me-anonymous-login.json
+            exit 1
+          fi
+          jq -e '.error.code == "authentication_disabled"' /tmp/monitor-me-anonymous-login.json
       - name: Verify database migration
         run: |
           docker compose exec -T postgres \
