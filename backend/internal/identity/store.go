@@ -105,15 +105,15 @@ type Project struct {
 
 // ServerProjectMapping assigns one workload selector on a server to a project.
 type ServerProjectMapping struct {
-	ID                 string    `json:"id"`
-	ServerID           string    `json:"server_id"`
-	ProjectID          string    `json:"project_id"`
-	ProjectName        string    `json:"project_name"`
-	ProjectSlug        string    `json:"project_slug"`
-	WorkloadType       string    `json:"workload_type"`
-	WorkloadSelector   string    `json:"workload_selector"`
-	AttributionMethod  string    `json:"attribution_method"`
-	CreatedAt          time.Time `json:"created_at"`
+	ID                string    `json:"id"`
+	ServerID          string    `json:"server_id"`
+	ProjectID         string    `json:"project_id"`
+	ProjectName       string    `json:"project_name"`
+	ProjectSlug       string    `json:"project_slug"`
+	WorkloadType      string    `json:"workload_type"`
+	WorkloadSelector  string    `json:"workload_selector"`
+	AttributionMethod string    `json:"attribution_method"`
+	CreatedAt         time.Time `json:"created_at"`
 }
 
 // IssuedServer returns a server and a one-time enrollment credential.
@@ -606,8 +606,6 @@ func (s *Store) RevokeAgent(ctx context.Context, principal Principal, agentID st
 	}
 	return nil
 }
-
-
 
 // ListProjects returns only projects belonging to the authenticated organization.
 func (s *Store) ListProjects(ctx context.Context, principal Principal) ([]Project, error) {

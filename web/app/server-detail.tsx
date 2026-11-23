@@ -228,8 +228,6 @@ export function ServerDetail({
   const rangeConfig = ranges[range];
 
   const loadHistory = useCallback(async () => {
-    setLoading(true);
-    setHistoryError("");
     const to = new Date();
     const from = new Date(to.getTime() - rangeConfig.durationMs);
     const query = new URLSearchParams({
@@ -244,6 +242,7 @@ export function ServerDetail({
         `/api/servers/${encodeURIComponent(server.id)}/metrics?${query.toString()}`,
       );
       setSeries(response);
+      setHistoryError("");
     } catch (error) {
       setHistoryError(error instanceof Error ? error.message : "Historical metric data could not be loaded.");
     } finally {
@@ -390,7 +389,7 @@ export function ServerDetail({
       <div className="detail-toolbar">
         <label className="metric-select-field">
           <span>Metric</span>
-          <select value={metric} onChange={(event) => { setLivePoints([]); setMetric(event.target.value); }}>
+          <select value={metric} onChange={(event) => { setLivePoints([]); setLoading(true); setHistoryError(""); setMetric(event.target.value); }}>
             {metricDefinitions.map((definition) => (
               <option key={definition.name} value={definition.name}>{definition.label}</option>
             ))}
@@ -402,13 +401,13 @@ export function ServerDetail({
               key={value}
               type="button"
               className={range === value ? "range-button range-button-active" : "range-button"}
-              onClick={() => { setLivePoints([]); setRange(value); }}
+              onClick={() => { setLivePoints([]); setLoading(true); setHistoryError(""); setRange(value); }}
             >
               {value}
             </button>
           ))}
         </div>
-        <button className="button button-secondary" type="button" onClick={() => void loadHistory()} disabled={loading}>
+        <button className="button button-secondary" type="button" onClick={() => { setLoading(true); setHistoryError(""); void loadHistory(); }} disabled={loading}>
           {loading ? "Refreshing…" : "Refresh history"}
         </button>
       </div>
