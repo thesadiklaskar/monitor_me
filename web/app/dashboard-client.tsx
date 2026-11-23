@@ -46,7 +46,7 @@ type Project = { id: string; name: string; slug: string; created_at: string };
 type ProjectListResponse = { projects: Project[] };
 type ConfigResponse = { agent_grpc_address: string | null; public_api_url: string | null; auth_disabled: boolean };
 
-type ViewState = "checking" | "signed-out" | "signed-in";
+type ViewState = "checking" | "signed-out" | "signed-in" | "unavailable";
 type AuthMode = "login" | "register";
 
 function displayError(error: unknown): string {
@@ -484,9 +484,17 @@ export default function DashboardClient() {
     let active = true;
 
     async function restoreSession() {
+      let anonymousMode = false;
       try {
-        // Authenticate first; protected project and inventory endpoints must
-        // not be requested while the browser is still signed out.
+        // Read the public runtime mode first so local anonymous installs never
+        // fall back to a login screen if their workspace API is unavailable.
+        const config = await apiRequest<ConfigResponse>("/api/config");
+        if (!active) return;
+        anonymousMode = config.auth_disabled === true;
+        setAuthDisabled(anonymousMode);
+        setGrpcAddress(config.agent_grpc_address);
+        setPublicAPIURL(config.public_api_url);
+
         const session = await apiRequest<{ user: User }>("/api/auth/me");
         if (!active) return;
 
@@ -496,7 +504,7 @@ export default function DashboardClient() {
       } catch {
         if (!active) return;
         setUser(null);
-        setView("signed-out");
+        setView(anonymousMode ? "unavailable" : "signed-out");
       }
     }
 
@@ -552,7 +560,18 @@ export default function DashboardClient() {
   }
 
   if (view === "checking") {
-    return <main className="loading-screen"><div className="loading-mark">M</div><p>Checking your secure session…</p></main>;
+    return <main className="loading-screen"><div className="loading-mark">M</div><p>Connecting to your Monitor Me workspace…</p></main>;
+  }
+
+  if (view === "unavailable") {
+    return (
+      <main className="loading-screen">
+        <div className="loading-mark">M</div>
+        <h1>Local workspace unavailable</h1>
+        <p>Monitor Me could not initialize the local workspace. Check that the API, database, and Docker services are healthy.</p>
+        <button className="button button-primary" type="button" onClick={() => window.location.reload()}>Retry connection</button>
+      </main>
+    );
   }
 
   if (view === "signed-out" || !user) {
