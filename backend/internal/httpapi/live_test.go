@@ -46,7 +46,7 @@ func TestLiveOriginAllowlistSeparatesAllowedAndUntrustedOrigins(t *testing.T) {
 func TestLiveOriginUsesForwardedHTTPSOrigin(t *testing.T) {
 	api := &API{}
 	request := httptest.NewRequest(http.MethodGet, "http://api:8080/v1/live/ws", nil)
-	request.Header.Set("Host", "monitor.example.com")
+	request.Host = "monitor.example.com"
 	request.Header.Set("Origin", "https://monitor.example.com")
 	request.Header.Set("X-Forwarded-Proto", "https")
 	if !api.liveOriginAllowed(request) {
