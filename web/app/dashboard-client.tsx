@@ -458,26 +458,49 @@ export default function DashboardClient() {
     }
   }, []);
 
-  useEffect(() => {
-    let active = true;
-    void Promise.all([
-      apiRequest<{ user: User }>("/api/auth/me"),
+  const loadWorkspaceMetadata = useCallback(async () => {
+    const [configResult, projectResult] = await Promise.allSettled([
       apiRequest<ConfigResponse>("/api/config"),
       apiRequest<ProjectListResponse>("/api/projects"),
-    ]).then(async ([session, config, projectResult]) => {
-      if (!active) return;
-      setUser(session.user);
-      setView("signed-in");
-      setGrpcAddress(config.agent_grpc_address);
-      setPublicAPIURL(config.public_api_url);
-      setProjects(Array.isArray(projectResult.projects) ? projectResult.projects : []);
-      await loadServers();
-    }).catch(() => {
-      if (!active) return;
-      setView("signed-out");
-    });
+    ]);
+
+    if (configResult.status === "fulfilled") {
+      setGrpcAddress(configResult.value.agent_grpc_address);
+      setPublicAPIURL(configResult.value.public_api_url);
+    } else {
+      setNotice(displayError(configResult.reason));
+    }
+
+    if (projectResult.status === "fulfilled") {
+      setProjects(Array.isArray(projectResult.value.projects) ? projectResult.value.projects : []);
+    } else {
+      setNotice(displayError(projectResult.reason));
+    }
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    async function restoreSession() {
+      try {
+        // Authenticate first; protected project and inventory endpoints must
+        // not be requested while the browser is still signed out.
+        const session = await apiRequest<{ user: User }>("/api/auth/me");
+        if (!active) return;
+
+        setUser(session.user);
+        setView("signed-in");
+        await Promise.all([loadWorkspaceMetadata(), loadServers()]);
+      } catch {
+        if (!active) return;
+        setUser(null);
+        setView("signed-out");
+      }
+    }
+
+    void restoreSession();
     return () => { active = false; };
-  }, [loadServers]);
+  }, [loadServers, loadWorkspaceMetadata]);
 
   const onlineCount = useMemo(() => servers.filter((server) => server.status.toLowerCase() === "online").length, [servers]);
   const pendingCount = useMemo(() => servers.filter((server) => server.status.toLowerCase() === "pending").length, [servers]);
@@ -522,6 +545,7 @@ export default function DashboardClient() {
   function onAuthenticated(nextUser: User) {
     setUser(nextUser);
     setView("signed-in");
+    void loadWorkspaceMetadata();
     void loadServers();
   }
 
