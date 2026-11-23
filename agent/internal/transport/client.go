@@ -192,7 +192,7 @@ func (c *Client) pollRemoteOperation(
 	allowedUnits []string,
 ) error {
 	poll := &monitorv1.AgentToServerMessage{
-		AgentId: session.AgentID,
+		AgentId:      session.AgentID,
 		SessionToken: session.SessionToken,
 		Payload: &monitorv1.AgentToServerMessage_Event{Event: &monitorv1.AgentEvent{
 			EventId: "command-poll", EventType: "command_poll", OccurredAtUnixNanos: time.Now().UTC().UnixNano(),
@@ -230,7 +230,7 @@ func (c *Client) pollRemoteOperation(
 		return fmt.Errorf("encode remote operation result: %w", err)
 	}
 	resultMessage := &monitorv1.AgentToServerMessage{
-		AgentId: session.AgentID,
+		AgentId:      session.AgentID,
 		SessionToken: session.SessionToken,
 		Payload: &monitorv1.AgentToServerMessage_Event{Event: &monitorv1.AgentEvent{
 			EventId: command.GetCommandId(), EventType: "command_result",
