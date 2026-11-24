@@ -746,3 +746,28 @@ input:focus-visible,textarea:focus-visible,select:focus-visible,button:focus-vis
   .sidebar-bottom { margin-top: 4px; }
   .sidebar-status { padding: 4px 2px; }
 }
+
+
+/* Grafana-inspired log labels and dashboard chart affordances. */
+.log-labels-cell { min-width: 190px; max-width: 310px; white-space: normal; }
+.log-label-list { display: flex; flex-wrap: wrap; gap: 5px; }
+.log-label {
+  display: inline-flex;
+  max-width: 100%;
+  padding: 3px 6px;
+  overflow-wrap: anywhere;
+  border: 1px solid #46546a;
+  border-radius: 5px;
+  background: #222d3c;
+  color: #c3ccda;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 9px;
+  line-height: 1.45;
+}
+.dashboard-chart-wrap svg { height: 220px; min-width: 520px; }
+.dashboard-chart-range { fill: rgba(170,182,255,.13); stroke: none; }
+.dashboard-chart-latest-guide { stroke: rgba(170,182,255,.55); stroke-width: 1; stroke-dasharray: 4 5; }
+.dashboard-chart-latest-dot { fill: #dbe0ff; stroke: #899aff; stroke-width: 2; }
+.dashboard-chart-axis-label { fill: #aeb9c8; font-size: 11px; }
+.dashboard-chart-footer { min-height: 22px; }
+.log-results-card [data-slot="table"] { min-width: 920px; }
