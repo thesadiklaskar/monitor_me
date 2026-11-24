@@ -15,6 +15,7 @@ import (
 
 	monitorv1 "example.com/monitor-me/backend/gen/monitor/v1"
 	"example.com/monitor-me/backend/internal/telemetry"
+	"example.com/monitor-me/backend/internal/logstore"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
@@ -53,36 +54,91 @@ func (s *Service) Stream(stream monitorv1.AgentControl_StreamServer) error {
 			}
 			continue
 		}
-		batch := message.GetTelemetryBatch()
-		if batch == nil {
-			return status.Error(codes.InvalidArgument, "unsupported agent stream payload")
+		logBatch := message.GetLogBatch()
+		if logBatch == nil {
+			batch := message.GetTelemetryBatch()
+			if batch == nil {
+				return status.Error(codes.InvalidArgument, "unsupported agent stream payload")
+			}
+			accepted, rejectionCode, persistErr := s.persistTelemetryBatch(
+				stream.Context(), message.GetAgentId(), message.GetSessionToken(), batch,
+			)
+			if persistErr != nil {
+				if status.Code(persistErr) == codes.InvalidArgument {
+					accepted = false
+					rejectionCode = "invalid_batch"
+				} else {
+					return persistErr
+				}
+			}
+			ack := &monitorv1.BatchAcknowledgement{
+				BatchId: batch.GetBatchId(), Accepted: accepted, RejectionCode: rejectionCode,
+			}
+			if accepted {
+				ack.Message = "telemetry batch committed"
+			} else if rejectionCode == "idempotency_conflict" {
+				ack.Message = "batch ID was already used for different telemetry content"
+			} else {
+				ack.Message = "telemetry batch failed validation"
+			}
+			if err := stream.Send(&monitorv1.ServerToAgentMessage{
+				Payload: &monitorv1.ServerToAgentMessage_Acknowledgement{Acknowledgement: ack},
+			}); err != nil {
+				return err
+			}
+			continue
 		}
-		accepted, rejectionCode, persistErr := s.persistTelemetryBatch(
+
+		if s.logs == nil {
+			return status.Error(codes.Unavailable, "durable log storage is not configured")
+		}
+		batch := logstore.Batch{
+			ID: logBatch.GetBatchId(), CollectedAtUnixNanos: logBatch.GetCollectedAtUnixNanos(),
+			SchemaVersion: logBatch.GetSchemaVersion(), Events: make([]logstore.Event, 0, len(logBatch.GetEvents())),
+		}
+		for _, event := range logBatch.GetEvents() {
+			if event == nil {
+				return status.Error(codes.InvalidArgument, "log batch contains an empty event")
+			}
+			batch.Events = append(batch.Events, logstore.Event{
+				ID: event.GetEventId(), EventTimeUnixNanos: event.GetEventTimeUnixNanos(),
+				ObservedAtUnixNanos: event.GetObservedAtUnixNanos(), Source: event.GetSource(),
+				Severity: event.GetSeverity(), Body: event.GetBody(), Attributes: event.GetAttributes(),
+			})
+		}
+		accepted, rejectionCode, ingestErr := s.logs.Ingest(
 			stream.Context(), message.GetAgentId(), message.GetSessionToken(), batch,
 		)
-		if persistErr != nil {
-			if status.Code(persistErr) == codes.InvalidArgument {
+		if ingestErr != nil {
+			switch {
+			case errors.Is(ingestErr, logstore.ErrUnauthorized):
+				return status.Error(codes.Unauthenticated, "agent session is invalid, expired, or revoked")
+			case errors.Is(ingestErr, logstore.ErrInvalidBatch):
 				accepted = false
-				rejectionCode = "invalid_batch"
-			} else {
-				return persistErr
+				rejectionCode = "invalid_log_batch"
+			case errors.Is(ingestErr, logstore.ErrIdempotencyConflict):
+				accepted = false
+				rejectionCode = "idempotency_conflict"
+			default:
+				return status.Error(codes.Unavailable, "durable log storage is temporarily unavailable")
 			}
 		}
 		ack := &monitorv1.BatchAcknowledgement{
-			BatchId: batch.GetBatchId(), Accepted: accepted, RejectionCode: rejectionCode,
+			BatchId: batch.ID, Accepted: accepted, RejectionCode: rejectionCode,
 		}
 		if accepted {
-			ack.Message = "telemetry batch committed"
+			ack.Message = "log batch durably accepted"
 		} else if rejectionCode == "idempotency_conflict" {
-			ack.Message = "batch ID was already used for different telemetry content"
+			ack.Message = "log batch ID was already used for different event content"
 		} else {
-			ack.Message = "telemetry batch failed validation"
+			ack.Message = "log batch failed validation"
 		}
 		if err := stream.Send(&monitorv1.ServerToAgentMessage{
 			Payload: &monitorv1.ServerToAgentMessage_Acknowledgement{Acknowledgement: ack},
 		}); err != nil {
 			return err
 		}
+
 	}
 }
 

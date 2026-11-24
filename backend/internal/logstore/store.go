@@ -353,6 +353,10 @@ func (s *Store) insertRows(ctx context.Context, rows []clickHouseRow) error {
 	return s.execute(ctx, "INSERT INTO "+s.database+".logs FORMAT JSONEachRow", &body)
 }
 
+func (s *Store) Ping(ctx context.Context) error {
+	return s.execute(ctx, "SELECT 1", nil)
+}
+
 func (s *Store) execute(ctx context.Context, query string, body io.Reader) error {
 	values := url.Values{}
 	values.Set("query", query)
