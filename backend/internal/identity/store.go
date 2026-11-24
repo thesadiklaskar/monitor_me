@@ -1205,8 +1205,16 @@ func (s *Store) CreateRemoteOperation(
 		return RemoteOperation{}, ErrInvalidInput
 	}
 
+	// Queueing a command and recording its audit event are one atomic action.
+	// The agent must never receive a command that the control plane failed to audit.
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return RemoteOperation{}, fmt.Errorf("begin remote operation transaction: %w", err)
+	}
+	defer tx.Rollback()
+
 	var result RemoteOperation
-	err := s.db.QueryRowContext(ctx, `
+	err = tx.QueryRowContext(ctx, `
 		INSERT INTO remote_operations (
 			organization_id, server_id, agent_id, created_by, operation, target,
 			status, expires_at
@@ -1232,13 +1240,16 @@ func (s *Store) CreateRemoteOperation(
 	if err != nil {
 		return RemoteOperation{}, fmt.Errorf("queue remote operation: %w", err)
 	}
-	if _, err := s.db.ExecContext(ctx, `
+	if _, err := tx.ExecContext(ctx, `
 		INSERT INTO remote_operation_audit (
 			organization_id, remote_operation_id, actor_user_id, action, details
 		)
 		VALUES ($1, $2, $3, 'queued', jsonb_build_object('operation', $4, 'target', $5))
 	`, principal.OrganizationID, result.ID, principal.UserID, operation, target); err != nil {
 		return RemoteOperation{}, fmt.Errorf("audit remote operation queue: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return RemoteOperation{}, fmt.Errorf("commit remote operation transaction: %w", err)
 	}
 	result.ServerName = ""
 	return result, nil

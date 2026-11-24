@@ -22,6 +22,7 @@ import (
 
 	monitorv1 "github.com/WorkRCS/monitor_me/backend/gen/monitor/v1"
 	"github.com/WorkRCS/monitor_me/backend/internal/security"
+	"github.com/WorkRCS/monitor_me/backend/internal/identity"
 	"github.com/gorilla/websocket"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"google.golang.org/grpc"
@@ -1026,6 +1027,81 @@ func TestPhase2AuthenticationAndAgentLifecycle(t *testing.T) {
 	if firstBatchSamples != 4 || secondBatchSamples != 1 {
 		t.Fatalf("idempotent batch must persist four samples and unique retry batch one: first=%d second=%d",
 			firstBatchSamples, secondBatchSamples)
+	}
+
+	// A failed audit insert must roll back the queued command as well.
+	identityStore := identity.NewStore(database)
+	operationPrincipal := identity.Principal{
+		UserID: registered.User.ID, OrganizationID: registered.User.OrganizationID, Role: "owner",
+	}
+	const operationTarget = "monitor-me-agent.service"
+	if _, err := database.ExecContext(ctx, `
+		CREATE OR REPLACE FUNCTION test_fail_queued_operation_audit()
+		RETURNS trigger LANGUAGE plpgsql AS $
+		BEGIN
+			IF NEW.action = 'queued' THEN
+				RAISE EXCEPTION 'injected queued audit failure';
+			END IF;
+			RETURN NEW;
+		END;
+		$
+	`); err != nil {
+		t.Fatalf("create remote operation audit failure fixture: %v", err)
+	}
+	if _, err := database.ExecContext(ctx, `
+		CREATE TRIGGER test_fail_queued_operation_audit
+		BEFORE INSERT ON remote_operation_audit
+		FOR EACH ROW EXECUTE FUNCTION test_fail_queued_operation_audit()
+	`); err != nil {
+		t.Fatalf("install remote operation audit failure fixture: %v", err)
+	}
+	t.Cleanup(func() {
+		cleanupContext, cleanupCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cleanupCancel()
+		_, _ = database.ExecContext(cleanupContext,
+			"DROP TRIGGER IF EXISTS test_fail_queued_operation_audit ON remote_operation_audit")
+		_, _ = database.ExecContext(cleanupContext,
+			"DROP FUNCTION IF EXISTS test_fail_queued_operation_audit()")
+	})
+	if _, err := identityStore.CreateRemoteOperation(
+		ctx, operationPrincipal, serverID, "restart_service", operationTarget, []string{operationTarget},
+	); err == nil {
+		t.Fatal("remote operation should fail when its required audit insert fails")
+	}
+	var uncommittedOperations int
+	if err := database.QueryRowContext(ctx, `
+		SELECT count(*) FROM remote_operations
+		WHERE organization_id = $1 AND server_id = $2 AND target = $3
+	`, operationPrincipal.OrganizationID, serverID, operationTarget).Scan(&uncommittedOperations); err != nil {
+		t.Fatalf("verify remote operation rollback: %v", err)
+	}
+	if uncommittedOperations != 0 {
+		t.Fatalf("remote operation escaped its failed audit transaction: found %d queued rows", uncommittedOperations)
+	}
+	if _, err := database.ExecContext(ctx,
+		"DROP TRIGGER test_fail_queued_operation_audit ON remote_operation_audit"); err != nil {
+		t.Fatalf("remove remote operation audit failure fixture: %v", err)
+	}
+	if _, err := database.ExecContext(ctx,
+		"DROP FUNCTION test_fail_queued_operation_audit()"); err != nil {
+		t.Fatalf("remove remote operation audit failure function: %v", err)
+	}
+	queuedOperation, err := identityStore.CreateRemoteOperation(
+		ctx, operationPrincipal, serverID, "restart_service", operationTarget, []string{operationTarget},
+	)
+	if err != nil {
+		t.Fatalf("queue audited remote operation: %v", err)
+	}
+	var queuedAuditCount int
+	if err := database.QueryRowContext(ctx, `
+		SELECT count(*) FROM remote_operation_audit
+		WHERE organization_id = $1 AND remote_operation_id = $2 AND action = 'queued'
+	`, operationPrincipal.OrganizationID, queuedOperation.ID).Scan(&queuedAuditCount); err != nil {
+		t.Fatalf("verify queued remote operation audit: %v", err)
+	}
+	if queuedAuditCount != 1 || queuedOperation.Status != "queued" {
+		t.Fatalf("remote operation and audit were not committed together: status=%s audit_count=%d",
+			queuedOperation.Status, queuedAuditCount)
 	}
 
 	revokeAgent := requestJSON(t, ctx, http.MethodPost,
