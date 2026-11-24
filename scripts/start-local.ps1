@@ -66,12 +66,37 @@ function Assert-CurrentSource {
         Write-Warning "Local main contains commits ahead of origin/main; building the current local checkout."
     }
 
-    $dirtyFiles = & git status --short 2>$null
-    if ($LASTEXITCODE -eq 0 -and $dirtyFiles) {
-        if ($env:MONITOR_ME_ALLOW_DIRTY_SOURCE -ne "1") {
-            throw "The working tree contains local changes. Review and preserve them, then commit/stash before building. Set MONITOR_ME_ALLOW_DIRTY_SOURCE=1 only when you intentionally want to build modified source. No Docker services were changed."
+    $dirtyFiles = @(& git status --short --untracked-files=all 2>$null)
+    if ($LASTEXITCODE -eq 0 -and $dirtyFiles.Count -gt 0) {
+        $generatedPaths = @(
+            "backend/gen/monitor/v1/agent.pb.go",
+            "backend/gen/monitor/v1/agent_grpc.pb.go",
+            "backend/go.mod",
+            "backend/go.sum",
+            "web/tsconfig.tsbuildinfo"
+        )
+        $generatedChanges = @()
+        $sourceChanges = @()
+        foreach ($entry in $dirtyFiles) {
+            if ([string]::IsNullOrWhiteSpace($entry) -or $entry.Length -lt 4) { continue }
+            $path = $entry.Substring(3).Trim().Replace("\\", "/")
+            if ($generatedPaths -contains $path) {
+                $generatedChanges += $path
+            } else {
+                $sourceChanges += $entry
+            }
         }
-        Write-Warning "Explicit dirty-source override is enabled; the Docker build will include local modifications."
+
+        if ($sourceChanges.Count -gt 0 -and $env:MONITOR_ME_ALLOW_DIRTY_SOURCE -ne "1") {
+            $details = $sourceChanges -join [Environment]::NewLine
+            throw ("Uncommitted source changes were found. They have not been changed or discarded:" + [Environment]::NewLine + $details + [Environment]::NewLine + "Review and preserve these files, then commit/stash before building. Set MONITOR_ME_ALLOW_DIRTY_SOURCE=1 only for an intentional modified-source build. No Docker services were changed.")
+        }
+        if ($generatedChanges.Count -gt 0) {
+            Write-Warning ("Preserving local generated build outputs: " + (($generatedChanges | Sort-Object -Unique) -join ", "))
+        }
+        if ($sourceChanges.Count -gt 0 -and $env:MONITOR_ME_ALLOW_DIRTY_SOURCE -eq "1") {
+            Write-Warning "Explicit modified-source override is enabled; the Docker build will include local source modifications."
+        }
     }
 }
 
