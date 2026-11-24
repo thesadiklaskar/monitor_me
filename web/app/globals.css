@@ -729,3 +729,46 @@ input:focus-visible,textarea:focus-visible,select:focus-visible,button:focus-vis
 .log-results-card [data-slot="table"] { min-width: 920px; }
 
 .dashboard-chart-wrap { max-width: 100%; overflow-x: auto; scrollbar-width: thin; }
+
+
+/* Readability pass: clear navigation, tables and controls at normal viewing distance. */
+body { font-size: 14px; line-height: 1.5; }
+.installation-indicator { align-items: center; }
+.installation-indicator strong { max-width: none; font-size: 12px; line-height: 1.35; }
+.installation-indicator span:not(.installation-indicator-icon):not(.chevron) { font-size: 11px; }
+.nav-section-label { font-size: 10px; letter-spacing: .12em; }
+.nav-item { min-height: 46px; font-size: 14px; }
+.nav-item-label { overflow: visible; text-overflow: clip; }
+.sidebar-status { font-size: 11px; }
+.breadcrumbs { font-size: 11px; }
+.live-label { font-size: 12px; }
+.welcome-strip p { font-size: 13px; line-height: 1.55; }
+.phase-label { font-size: 12px; }
+.summary-card span { font-size: 13px; }
+.summary-card small { font-size: 11px; }
+.panel-heading h2 { font-size: 16px; }
+.panel-heading p { font-size: 13px; line-height: 1.5; }
+.empty-state h3 { font-size: 15px; }
+.empty-state p { font-size: 13px; line-height: 1.6; }
+th { font-size: 11px; letter-spacing: .09em; }
+td { font-size: 13px; }
+.server-name-cell strong, .last-seen-cell strong, .server-open-link { font-size: 13px; }
+.server-name-cell span:not(.status-dot), .last-seen-cell span { font-size: 11px; }
+.status-pill { font-size: 11px; }
+.button { font-size: 13px; }
+.detail-subtitle, .detail-live-state { font-size: 13px; }
+.detail-select-label, .metric-select-field { font-size: 12px; }
+.detail-topbar p, .metric-panel-heading p { font-size: 12px; }
+.metric-panel-heading h3 { font-size: 15px; }
+.metric-summary-row span { font-size: 10px; }
+.metric-summary-row strong { font-size: 14px; }
+.log-message-cell { font-size: 13px; line-height: 1.6; }
+.log-label { font-size: 10px; }
+.chart-axis-label, .dashboard-chart-axis-label { font-size: 11px; }
+.detail-footnote, .detail-data-note { font-size: 11px; }
+@media (max-width: 760px) {
+  .nav-item { min-height: 42px; font-size: 13px; }
+  .panel-heading { padding: 16px; }
+  th { font-size: 10px; }
+  td { font-size: 12px; }
+}
