@@ -31,8 +31,8 @@ function formatTime(value: string) {
   return Number.isNaN(date.getTime()) ? "Unknown time" : date.toLocaleString();
 }
 
-export default function AlertsWorkspace({ servers, role, onBack }: {
-  servers: Server[]; role: string; onBack: () => void;
+export default function AlertsWorkspace({ servers, role }: {
+  servers: Server[]; role: string;
 }) {
   const [rules, setRules] = useState<Rule[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
@@ -114,10 +114,9 @@ export default function AlertsWorkspace({ servers, role, onBack }: {
     <section className="alerts-workspace">
       <header className="alerts-workspace-header">
         <div>
-          <button className="detail-back-button" type="button" onClick={onBack}>← Back to servers</button>
-          <div className="eyebrow">Operations and notifications</div>
+          <div className="eyebrow">ALERTING / RULES & EVENTS</div>
           <h1>Alerts</h1>
-          <p>Rules evaluate committed telemetry. Breaches create in-app notifications; normal readings create recovery events.</p>
+          <p>Create threshold rules for host metrics and review firing or recovered events.</p>
         </div>
         <div className="alerts-counts"><span>{rules.length} rules</span><span>{events.filter((item) => item.status === "firing").length} firing</span><span>{unreadCount} unread</span></div>
       </header>
