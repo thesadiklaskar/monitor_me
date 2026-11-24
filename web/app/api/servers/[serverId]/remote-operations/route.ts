@@ -5,7 +5,6 @@ import {
   errorResponse,
   requestJSON,
   sameOriginMutation,
-  sessionToken,
 } from "@/lib/server-api";
 
 export const dynamic = "force-dynamic";
@@ -15,8 +14,6 @@ export async function POST(request: NextRequest, context: RouteContext) {
   if (!sameOriginMutation(request)) {
     return errorResponse(403, "origin_rejected", "The request origin is not allowed.");
   }
-  const token = sessionToken(request);
-  if (!token) return errorResponse(401, "unauthorized", "Sign in to queue a remote operation.");
   const { serverId } = await context.params;
   if (!/^[0-9a-f-]{36}$/i.test(serverId)) {
     return errorResponse(400, "invalid_server_id", "The server identifier is invalid.");
@@ -27,6 +24,6 @@ export async function POST(request: NextRequest, context: RouteContext) {
   }
   return backendResponse(await callBackend(
     "/v1/servers/" + encodeURIComponent(serverId) + "/remote-operations",
-    { method: "POST", token, body },
+    { method: "POST", body },
   ));
 }
