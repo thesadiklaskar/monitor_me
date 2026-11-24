@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"example.com/monitor-me/backend/internal/identity"
+	"monitor-me.internal/backend/internal/identity"
 )
 
 func TestInteractiveAuthenticationRoutesAreNotRegistered(t *testing.T) {

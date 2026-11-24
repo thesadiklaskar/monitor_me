@@ -18,7 +18,7 @@ import (
 	"time"
 	"unicode/utf16"
 
-	"example.com/monitor-me/agent/internal/logspool"
+	"monitor-me.internal/agent/internal/logspool"
 )
 
 const maxPowerShellOutput = 2 << 20

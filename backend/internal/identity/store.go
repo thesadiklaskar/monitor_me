@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"example.com/monitor-me/backend/internal/security"
+	"monitor-me.internal/backend/internal/security"
 )
 
 var (

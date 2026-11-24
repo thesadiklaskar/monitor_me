@@ -17,7 +17,7 @@ import (
 	"strings"
 	"time"
 
-	"example.com/monitor-me/agent/internal/logspool"
+	"monitor-me.internal/agent/internal/logspool"
 )
 
 const maxJournalLine = 512 << 10
