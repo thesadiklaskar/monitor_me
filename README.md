@@ -42,7 +42,7 @@ sudo ./install.sh
 
 The development repository is currently `WorkRCS/monitor_me`; the public target is `thesadiklaskar/monitor_me`. Do not use the public clone URL until the final code and release have actually been transferred there.
 
-The root `install.sh` is a guided Ubuntu/Debian Linux x86-64 bootstrap. It installs Docker/Compose, Nginx, Certbot and UFW; generates database/cache secrets; requests a Let's Encrypt certificate; applies an administrator CIDR boundary; builds the stack; runs migrations; and checks API/web readiness. The development `main` branch now stores `install.sh` as an executable file (`100755`), so the intended command is `sudo ./install.sh`. Preserve this executable mode when transferring the final source to `thesadiklaskar/monitor_me`.
+The root `install.sh` is a guided Ubuntu/Debian Linux x86-64 bootstrap. It installs Docker/Compose, Nginx, Certbot and UFW; generates database/cache secrets; requests a Let's Encrypt certificate; enables automatic certificate renewal (including Nginx reload and gRPC API restart); applies an administrator CIDR boundary; builds the stack; runs migrations; and checks API/web readiness. The development `main` branch now stores `install.sh` as an executable file (`100755`), so the intended command is `sudo ./install.sh`. Preserve this executable mode when transferring the final source to `thesadiklaskar/monitor_me`.
 
 The installer asks for:
 1. A DNS hostname whose A record routes to the control plane or its public HTTPS load balancer.
