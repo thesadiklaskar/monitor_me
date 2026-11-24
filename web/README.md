@@ -7,6 +7,7 @@ This folder contains the Monitor Me operator interface. It is a self-hosted Next
 The navigation is intentionally limited to five areas:
 
 - **Dashboard** — fleet cards for every enrolled machine; select a machine to view its live health, real CPU/core, memory, storage, disk, network and process graphs together with recent host logs.
+- **Servers** — machine inventory, enrollment and the existing per-machine detail view.
 - **Logs** — time-bounded search, severity/source filters, event details and paged results.
 - **Dashboards** — editable saved views with persisted default machine/time filters, panel editor, responsive grid, drag/drop ordering, metrics visualizations and host-log panels.
 - **Alerts** — editable threshold rules, pause/resume, firing/recovered events and in-app notifications.
