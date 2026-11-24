@@ -9,7 +9,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"example.com/monitor-me/agent/internal/config"
+	"monitor-me.internal/agent/internal/config"
 )
 
 func runPlatformService(cfg config.Config, logger *slog.Logger) error {

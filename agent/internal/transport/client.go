@@ -11,12 +11,12 @@ import (
 	"runtime"
 	"time"
 
-	monitorv1 "example.com/monitor-me/agent/gen/monitor/v1"
-	"example.com/monitor-me/agent/internal/config"
-	"example.com/monitor-me/agent/internal/logspool"
-	"example.com/monitor-me/agent/internal/operations"
-	"example.com/monitor-me/agent/internal/spool"
-	"example.com/monitor-me/agent/internal/state"
+	monitorv1 "monitor-me.internal/agent/gen/monitor/v1"
+	"monitor-me.internal/agent/internal/config"
+	"monitor-me.internal/agent/internal/logspool"
+	"monitor-me.internal/agent/internal/operations"
+	"monitor-me.internal/agent/internal/spool"
+	"monitor-me.internal/agent/internal/state"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 )

@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"time"
 
-	"example.com/monitor-me/backend/internal/logstore"
+	"monitor-me.internal/backend/internal/logstore"
 )
 
 func (api *API) logsSearch(writer http.ResponseWriter, request *http.Request) {

@@ -9,9 +9,9 @@ import (
 	"sync"
 	"time"
 
-	"example.com/monitor-me/backend/internal/identity"
-	"example.com/monitor-me/backend/internal/logstore"
-	"example.com/monitor-me/backend/internal/telemetry"
+	"monitor-me.internal/backend/internal/identity"
+	"monitor-me.internal/backend/internal/logstore"
+	"monitor-me.internal/backend/internal/telemetry"
 	redisv9 "github.com/redis/go-redis/v9"
 )
 

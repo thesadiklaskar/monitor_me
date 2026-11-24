@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"example.com/monitor-me/backend/internal/identity"
-	"example.com/monitor-me/backend/internal/telemetry"
+	"monitor-me.internal/backend/internal/identity"
+	"monitor-me.internal/backend/internal/telemetry"
 	"github.com/gorilla/websocket"
 )
 

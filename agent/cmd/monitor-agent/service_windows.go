@@ -9,7 +9,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"example.com/monitor-me/agent/internal/config"
+	"monitor-me.internal/agent/internal/config"
 	"golang.org/x/sys/windows/svc"
 )
 
