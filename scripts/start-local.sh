@@ -50,7 +50,12 @@ assert_current_source() {
   fi
 
   if [[ -n "$(git status --short)" ]]; then
-    echo "WARNING: Working tree has local changes; the Docker build includes them." >&2
+    if [[ "${MONITOR_ME_ALLOW_DIRTY_SOURCE:-0}" != "1" ]]; then
+      echo "Working tree has local changes. Review and preserve them, then commit/stash before building." >&2
+      echo "Set MONITOR_ME_ALLOW_DIRTY_SOURCE=1 only when intentionally building modified source. No Docker services were changed." >&2
+      exit 1
+    fi
+    echo "WARNING: Explicit dirty-source override is enabled; building local modifications." >&2
   fi
 }
 
