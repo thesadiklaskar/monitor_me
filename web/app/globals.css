@@ -879,3 +879,7 @@ td { font-size: 13px; }
   .empty-state-guide { padding: 30px 16px; }
   .setup-steps { margin-bottom: 20px; }
 }
+
+@media(max-width:760px) {
+  .sidebar-collapsed .side-nav { display:none; }
+}
