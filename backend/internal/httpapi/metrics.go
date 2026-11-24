@@ -38,7 +38,6 @@ func (api *API) metrics(writer http.ResponseWriter, request *http.Request) {
 		OrganizationID: principal.OrganizationID,
 		ServerID:       request.PathValue("serverID"),
 		MetricName:     queryValues.Get("metric"),
-		ProjectID:      queryValues.Get("project_id"),
 		From:           from,
 		To:             to,
 		Step:           step,
@@ -52,7 +51,6 @@ func (api *API) metrics(writer http.ResponseWriter, request *http.Request) {
 	writeJSON(writer, http.StatusOK, map[string]any{
 		"server_id":  query.ServerID,
 		"metric":     query.MetricName,
-		"project_id": query.ProjectID,
 		"from":       query.From,
 		"to":         query.To,
 		"step":       query.Step.String(),
@@ -65,7 +63,6 @@ func (api *API) latestMetrics(writer http.ResponseWriter, request *http.Request)
 	query := telemetry.LatestQuery{
 		OrganizationID: principal.OrganizationID,
 		ServerID:       request.PathValue("serverID"),
-		ProjectID:      request.URL.Query().Get("project_id"),
 	}
 	samples, err := api.telemetry.QueryLatest(request.Context(), query)
 	if err != nil {
@@ -74,7 +71,6 @@ func (api *API) latestMetrics(writer http.ResponseWriter, request *http.Request)
 	}
 	writeJSON(writer, http.StatusOK, map[string]any{
 		"server_id":      query.ServerID,
-		"project_id":     query.ProjectID,
 		"window_seconds": 900,
 		"samples":        samples,
 	})
