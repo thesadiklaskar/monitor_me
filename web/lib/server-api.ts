@@ -16,11 +16,6 @@ function backendBaseURL(): URL {
   return url;
 }
 
-export function sessionToken(_request: NextRequest): string {
-  // Each deployment has one implicit installation context and no browser accounts.
-  return "local-install-access";
-}
-
 export function sameOriginMutation(request: NextRequest): boolean {
   const originHeader = request.headers.get("origin");
   if (!originHeader) return false;
@@ -60,7 +55,6 @@ export async function callBackend(
   path: string,
   options: {
     method?: "GET" | "POST" | "DELETE";
-    token?: string | null;
     body?: unknown;
   } = {},
 ): Promise<BackendResult> {
@@ -68,7 +62,6 @@ export async function callBackend(
     const base = backendBaseURL();
     const target = new URL(path, base);
     const headers = new Headers({ Accept: "application/json" });
-    if (options.token) headers.set("Authorization", `Bearer ${options.token}`);
     if (options.body !== undefined) headers.set("Content-Type", "application/json");
 
     const response = await fetch(target, {
