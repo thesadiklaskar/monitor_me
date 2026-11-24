@@ -9,7 +9,7 @@ The navigation is intentionally limited to four areas:
 - **Servers** — machine inventory, enrollment and per-machine health/metrics.
 - **Logs** — time-bounded search, severity/source filters, event details and paged results.
 - **Dashboards** — saved installation-wide dashboards with metric panels.
-- **Alerts** — threshold rules, firing/recovered events and in-app notifications.\n- **Grafana** — full Grafana OSS companion at `/grafana/`, backed by a provisioned read-only PostgreSQL datasource; local Compose exposes the same service through `/grafana/` and `http://localhost:3001`.
+- **Alerts** — threshold rules, firing/recovered events and in-app notifications.
 
 There is no login/signup, customer profile, organization, project, workspace or remote host-control UI. Do not add those concepts back. Processes, systemd units, containers, cgroups, disks and network interfaces are host metadata, not customer projects.
 
@@ -60,7 +60,7 @@ A committed npm lockfile is a release requirement; until it exists, `npm install
 - `app/server-detail.tsx` — host metrics, historical/live charts and process/socket inventory.
 - `app/log-explorer.tsx` — searchable log explorer.
 - `app/dashboards.tsx` — saved dashboards and metric panels.
-- `app/alerts.tsx` — threshold rules and notifications.\n- `next.config.ts` — same-origin local Grafana proxy; production Nginx proxies `/grafana/` directly.
+- `app/alerts.tsx` — threshold rules and notifications.
 - `app/api/` — same-origin API proxies.
 - `app/globals.css` — design tokens, layout, responsive and component styles.
 
