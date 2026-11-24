@@ -1,12 +1,13 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { Bell, Copy, FileText, LayoutDashboard, PanelLeftClose, PanelLeftOpen, Plus, RefreshCw, Server as ServerIcon } from "lucide-react";
+import { Activity, Bell, Copy, FileText, LayoutDashboard, PanelLeftClose, PanelLeftOpen, Plus, RefreshCw, Server as ServerIcon } from "lucide-react";
 import { apiRequest } from "@/lib/client-api";
 import { ServerDetail } from "./server-detail";
 import AlertsView from "./alerts";
 import DashboardsView from "./dashboards";
 import LogExplorer from "./log-explorer";
+import OverviewDashboard from "./overview-dashboard";
 
 type Server = {
   id: string;
@@ -328,6 +329,7 @@ export default function DashboardClient() {
   const [grpcAddress, setGrpcAddress] = useState<string | null>(null);
   const [publicAPIURL, setPublicAPIURL] = useState<string | null>(null);
   const [selectedServer, setSelectedServer] = useState<Server | null>(null);
+  const [showOverview, setShowOverview] = useState(false);
   const [showDashboards, setShowDashboards] = useState(false);
   const [showLogs, setShowLogs] = useState(false);
   const [showAlerts, setShowAlerts] = useState(false);
@@ -427,15 +429,18 @@ export default function DashboardClient() {
         </div>
         <nav className="side-nav" aria-label="Main navigation">
           <span className="nav-section-label">Monitoring</span>
-          <button title="Servers" aria-label="Servers" className={!showDashboards && !showLogs && !showAlerts ? "nav-item nav-item-active" : "nav-item"} type="button" onClick={() => {  setShowDashboards(false); setShowLogs(false); setShowAlerts(false);  setSelectedServer(null); }}><span className="nav-item-icon"><ServerIcon size={18} strokeWidth={1.8} /></span><span className="nav-item-label">Servers</span></button>
-          <button title="Logs" aria-label="Logs" className={showLogs ? "nav-item nav-item-active" : "nav-item"} type="button" onClick={() => {  setShowDashboards(false); setShowAlerts(false);  setSelectedServer(null); setShowLogs(true); }}><span className="nav-item-icon"><FileText size={18} strokeWidth={1.8} /></span><span className="nav-item-label">Logs</span></button>
-          <button title="Dashboards" aria-label="Dashboards" className={showDashboards ? "nav-item nav-item-active" : "nav-item"} type="button" onClick={() => {  setShowLogs(false); setShowAlerts(false);  setSelectedServer(null); setShowDashboards(true); }}><span className="nav-item-icon"><LayoutDashboard size={18} strokeWidth={1.8} /></span><span className="nav-item-label">Dashboards</span></button>
-                    <button title="Alerts" aria-label="Alerts" className={showAlerts ? "nav-item nav-item-active" : "nav-item"} type="button" onClick={() => {  setShowDashboards(false); setShowLogs(false);  setSelectedServer(null); setShowAlerts(true); }}><span className="nav-item-icon"><Bell size={18} strokeWidth={1.8} /></span><span className="nav-item-label">Alerts</span></button>
+          <button title="Dashboard" aria-label="Dashboard" className={showOverview ? "nav-item nav-item-active" : "nav-item"} type="button" onClick={() => { setShowOverview(true); setShowDashboards(false); setShowLogs(false); setShowAlerts(false); setSelectedServer(null); }}><span className="nav-item-icon"><Activity size={18} strokeWidth={1.8} /></span><span className="nav-item-label">Dashboard</span></button>
+          <button title="Servers" aria-label="Servers" className={!showOverview && !showDashboards && !showLogs && !showAlerts ? "nav-item nav-item-active" : "nav-item"} type="button" onClick={() => { setShowOverview(false); setShowDashboards(false); setShowLogs(false); setShowAlerts(false); setSelectedServer(null); }}><span className="nav-item-icon"><ServerIcon size={18} strokeWidth={1.8} /></span><span className="nav-item-label">Servers</span></button>
+          <button title="Logs" aria-label="Logs" className={showLogs ? "nav-item nav-item-active" : "nav-item"} type="button" onClick={() => { setShowOverview(false); setShowDashboards(false); setShowAlerts(false); setSelectedServer(null); setShowLogs(true); }}><span className="nav-item-icon"><FileText size={18} strokeWidth={1.8} /></span><span className="nav-item-label">Logs</span></button>
+          <button title="Dashboards" aria-label="Dashboards" className={showDashboards ? "nav-item nav-item-active" : "nav-item"} type="button" onClick={() => { setShowOverview(false); setShowLogs(false); setShowAlerts(false); setSelectedServer(null); setShowDashboards(true); }}><span className="nav-item-icon"><LayoutDashboard size={18} strokeWidth={1.8} /></span><span className="nav-item-label">Dashboards</span></button>
+          <button title="Alerts" aria-label="Alerts" className={showAlerts ? "nav-item nav-item-active" : "nav-item"} type="button" onClick={() => { setShowOverview(false); setShowDashboards(false); setShowLogs(false); setSelectedServer(null); setShowAlerts(true); }}><span className="nav-item-icon"><Bell size={18} strokeWidth={1.8} /></span><span className="nav-item-label">Alerts</span></button>
         </nav>
       </aside>
 
       <main className="dashboard-main" id="servers">
-        {showLogs ? (
+        {showOverview ? (
+          <OverviewDashboard servers={servers} />
+        ) : showLogs ? (
           <LogExplorer servers={servers} />
         ) : showAlerts ? (
           <AlertsView servers={servers} />
