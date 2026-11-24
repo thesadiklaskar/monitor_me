@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/WorkRCS/monitor_me/agent/internal/collector"
+	"example.com/monitor-me/agent/internal/collector"
 )
 
 func BenchmarkSpoolAppend(b *testing.B) {
