@@ -131,6 +131,7 @@ $ready = $false
 for ($attempt = 0; $attempt -lt 40; $attempt++) {
     $apiReady = $false
     $webReady = $false
+    $grafanaReady = $false
     try {
         $apiResponse = Invoke-WebRequest -UseBasicParsing -Uri "http://localhost:8080/health/ready" -TimeoutSec 3
         $apiReady = $apiResponse.StatusCode -eq 200
@@ -139,7 +140,11 @@ for ($attempt = 0; $attempt -lt 40; $attempt++) {
         $webResponse = Invoke-WebRequest -UseBasicParsing -Uri "http://localhost:3000/api/config" -TimeoutSec 3
         $webReady = $webResponse.StatusCode -eq 200
     } catch {}
-    if ($apiReady -and $webReady) {
+    try {
+        $grafanaResponse = Invoke-WebRequest -UseBasicParsing -Uri "http://localhost:3001/api/health" -TimeoutSec 3
+        $grafanaReady = $grafanaResponse.StatusCode -eq 200
+    } catch {}
+    if ($apiReady -and $webReady -and $grafanaReady) {
         $ready = $true
         break
     }
@@ -150,8 +155,9 @@ if (-not $ready) {
     Write-Host "The stack did not become healthy. Recent service state:" -ForegroundColor Red
     docker compose ps --all
     docker compose logs --no-color --since=5m --tail=100
-    throw "Monitor Me did not pass API and dashboard readiness checks."
+    throw "Monitor Me did not pass API, dashboard and Grafana readiness checks."
 }
 
 Write-Host "Monitor Me is ready at http://localhost:3000"
+Write-Host "Grafana is ready at http://localhost:3001 (admin / local password configured in docker-compose.yml)."
 if (-not $NoBrowser) { Start-Process "http://localhost:3000" }
