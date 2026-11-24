@@ -3,6 +3,14 @@
 **Last reviewed:** 2026-11-24  
 **Delivery rule:** Work directly on `main`. Do not start feature upgrades until the current source builds cleanly and the complete local stack passes its acceptance gate.
 
+## Product scope lock — 2026-11-24
+
+The intended product is a simple independent monitoring installation, not a hosted team workspace. The main operator navigation is limited to **Servers**, **Logs**, **Dashboards** and **Alerts**. There are no browser user accounts, organizations, customer projects, workspace selectors or Project Mapping screens. Technical workload context (process, systemd unit, container, cgroup, volume and interface) stays attached to the host as metadata. The UI source has been simplified accordingly, but no fresh frontend build or browser acceptance has run yet.
+
+Do not treat removing a menu item as completing the backend migration. Existing project and organization tables, keys and filters still exist in the database/API and must be removed through forward migrations that preserve machine, metric, log, alert and dashboard data. Do not delete project/organization tables or reset volumes as a shortcut.
+
+The root-level `install.sh` does not yet exist. The current `deploy/production/deploy.sh` requires an operator-prepared environment file, Docker, Nginx, Certbot, a valid TLS certificate, hostname, gRPC address and `ADMIN_CIDR`. The requested `git clone ... && sudo ./install.sh` workflow is a release-blocking deliverable, not an implemented command.
+
 ## 0. Release-blocking stability gate — first
 
 - [ ] Pull the exact latest `main` revision and verify the local source hash before building. The Windows and POSIX startup scripts now reject a stale/diverged checkout, validate Compose configuration, build every image first, and only then start services with `--no-build`.
@@ -19,8 +27,8 @@
 
 ## 1. Remove legacy customer, profile and organization logic
 
-- [ ] Make the data model genuinely single-install: remove interactive users, profiles, organizations, memberships, sessions and organization-based authorization from backend APIs, queries, tests and migrations.
-- [ ] Remove `organization_id` scoping and user actor foreign keys from server inventory, enrollment, projects/workload mappings, telemetry, logs, dashboards, alerts, operations, audit and live-stream records. Installation-local ownership replaces tenant ownership.
+- [ ] Make the data model genuinely single-install: remove interactive users, profiles, organizations, memberships, sessions, customer projects, project mappings and tenant-based authorization from backend APIs, queries, tests and migrations.
+- [ ] Remove `organization_id` and `project_id` scoping, project tables/mappings and user actor foreign keys from server inventory, enrollment, telemetry, logs, dashboards, alerts, operations, audit and live-stream records. Preserve useful workload context as machine/process/service/container labels. Installation-local ownership replaces tenant ownership.
 - [ ] Add a carefully ordered, numbered forward migration for existing databases. Preserve servers, agent/session identity, metric/log history, dashboards, alert history and audit data. Detect ambiguous or corrupt legacy state and stop with an actionable message; never pick an arbitrary organization or drop data.
 - [ ] Keep agent enrollment tokens and device/session credentials: these authenticate monitored machines, not customer accounts or browser users.
 - [ ] Ensure one installation maps to one private datastore/volume set. No hosted SaaS, shared customer tenancy or central account service.
@@ -51,11 +59,11 @@
 ## 5. Grafana-style metrics and dashboards
 
 - [x] Improve saved-dashboard time-series panels with timestamp-scaled x-axis, average line, min/max band, y-axis labels, visible gaps and latest-point tooltip. Expand the panel metric catalog to include currently defined host metrics. Browser/runtime acceptance is pending.
-- [x] Replace the compressed icon-only navigation with full menu labels, and refresh the UI to a calmer slate/periwinkle palette with keyboard focus indicators. Source change is committed; owner visual acceptance is pending.
+- [x] Replace icon-only navigation with full words and simplify the primary navigation to Servers, Logs, Dashboards and Alerts. Remove Project Mapping and Remote Operations from the main menu; remove project filters from logs, dashboards, alerts and host metric detail. Refresh the dark slate UI with a calmer teal accent and keyboard focus indicators. Source changes are committed; frontend build/browser acceptance is pending.
 - [ ] Deliver a global node selector, time range, timezone, live/pause state and explicit refresh interval.
 - [ ] Add low-latency metric push/update without manual page refresh, reconnect and stale-data indicators. Choose a default refresh cadence only after CPU/network/storage profiling.
 - [ ] Add a dashboard/panel editor with resize/reorder, stat, time-series, table and logs panels; query editor, units, legends, thresholds, variables/templates, saved dashboards and annotations.
-- [ ] Support per-node and installation-wide views without introducing organizations or user accounts.
+- [ ] Support per-node and installation-wide views without introducing organizations, projects, workspaces or user accounts.
 
 ## 6. Alerting and operations maturity
 
@@ -79,12 +87,12 @@
 
 ## Current implementation snapshot (not a release claim)
 
-- The monitoring UI source now uses a calmer dark slate/periwinkle palette, expanded full-name navigation, time-aware average/min-max charts and structured log labels. This has not yet passed owner browser acceptance or a frontend build.
+- The monitoring UI source now uses a dark slate/teal palette and a simple Servers / Logs / Dashboards / Alerts navigation. Project filters and Project Mapping navigation have been removed from the product-facing UI. Time-aware average/min/max charts and structured log labels remain. This has not yet passed owner browser acceptance or a frontend build.
 - The new [platform support matrix](PLATFORM_SUPPORT_MATRIX.md) separates Linux control-plane hosting from Linux/Windows agent build targets and records the pending runtime acceptance gates.
 - No-login single-install dashboard/API shell is present; local Compose dashboard/API/database ports are loopback-bound.
 - Host metric agent, durable telemetry spool, TLS gRPC delivery and the initial metrics/alerts/dashboard/operations slices exist.
 - Linux journald → bounded log spool → TLS gRPC → ClickHouse ingestion, bounded 200-row keyset search and initial Log Explorer exist.
 - Windows Application/System Event Log collection source and redaction tests exist in source, but Windows runtime acceptance is pending.
 - Log Explorer live mode currently polls every 10 seconds; native push, file tail, saved searches, context search and production ClickHouse recovery/scale acceptance are incomplete.
-- Legacy user/organization IDs and organization-based schema/query paths remain in the database. This is a required architecture refactor, not a finished single-install data model.
+- Legacy user/organization IDs, organization-based schema/query paths, project tables and project_id query paths remain in the database. The product-facing UI hides project concepts, but a numbered, data-preserving migration and backend/API cleanup are still release blockers.
 - A source-portability scan found no dependency on the current GitHub owner/repository URL in Go imports. Stable internal Go module paths are intentional; release/download origins must remain configurable.
