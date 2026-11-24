@@ -2,9 +2,9 @@
 
 **Monitor Me is a self-hosted infrastructure observability platform** for individual server owners and small teams who want to monitor their own VPS, VM, cloud VM or dedicated servers from an installation they operate themselves.
 
-The product is being built around its own native host agent, telemetry ingestion pipeline, metric model, project attribution, alert engine, and operator dashboard. Each owner runs a separate installation and retains control of their monitoring data; no hosted SaaS account is required.
+The product is being built around its own native host agent, telemetry ingestion pipeline, host metric model, workload metadata, alert engine, and operator dashboard. Each owner runs a separate installation and retains control of their monitoring data; no hosted SaaS account is required.
 
-> **Project setup:** **Historical baseline completed; current release gate open.** The no-login browser shell, native metrics path and first Linux journald → ClickHouse log path exist; this is not yet a released Grafana replacement. The three earlier compile blockers are corrected in current source. The latest Go dependency failure was an HTTP/2 stream error while go mod tidy queried sum.golang.org; the backend image now avoids running tidy during image builds, compiles only the shipped API/migration binaries with -mod=mod, explicitly creates /out, and uses HTTP/1.1 for Go downloads while keeping TLS/checksum verification enabled. Startup scripts verify main freshness, require a clean tree unless explicitly overridden, validate Compose, build all images (including Linux/Windows agent cross-compiles) before changing services, then start with --no-build and check API/dashboard readiness. The 84 Go source/test files were scanned for owner-specific URLs; a follow-up installer/deployment-doc scan also removed sample monitor.example hosts. Go imports use the independent internal namespace monitor-me.internal. However backend/go.sum and web/package-lock.json are still missing, so dependency lock/reproducibility work remains. The latest Actions jobs were not assigned runners (runner_id 0, zero steps), so no fresh CI tests have executed. The intended product is one independent self-hosted installation per owner (VM, VPS, VPC, cloud or bare metal), with no hosted control plane, login, profile or organization workflow. Legacy user/organization database/query logic still requires a safe forward migration. Linux journald ingestion and bounded Log Explorer exist; Windows Event Log is source-only pending runtime acceptance; file tail and push-based live logs remain incomplete. The Log Explorer auto-refresh toggle polls every 10 seconds; it is not a push-based live stream. One-command production bootstrap, advanced dashboard editing, backups/ClickHouse restore and high-volume benchmarks remain open. See the [release readiness audit](docs/RELEASE_READINESS_AUDIT.md), [prioritized backlog](docs/PRODUCT_BACKLOG.md), and [project state](docs/PROJECT_STATE.md).
+> **Project setup:** **Historical baseline completed; current release gate open.** The no-login browser shell, native metrics path and first Linux journald → ClickHouse log path exist; this is not yet a released Grafana replacement. The earlier compile blockers have source fixes, but the current application has not yet passed a fresh complete build. The latest Go dependency failure was an HTTP/2 stream error while go mod tidy queried sum.golang.org; the backend image now avoids running tidy during image builds, compiles only the shipped API/migration binaries with -mod=mod, explicitly creates /out, and uses HTTP/1.1 for Go downloads while keeping TLS/checksum verification enabled. Startup scripts verify main freshness, require a clean tree unless explicitly overridden, validate Compose, build all images (including Linux/Windows agent cross-compiles) before changing services, then start with --no-build and check API/dashboard readiness. The 84 Go source/test files were scanned for owner-specific URLs; a follow-up installer/deployment-doc scan also removed sample monitor.example hosts. Go imports use the independent internal namespace monitor-me.internal. However backend/go.sum and web/package-lock.json are still missing, so dependency lock/reproducibility work remains. The latest Actions jobs were not assigned runners (runner_id 0, zero steps), so no fresh CI tests have executed. The intended product is one independent self-hosted installation per owner (VM, VPS, VPC, cloud or bare metal), with no hosted control plane, login, profile, organization, workspace or project workflow. The main UI now focuses on Servers, Logs, Dashboards and Alerts; legacy user/organization and project database/query logic still requires safe forward migrations. Linux journald ingestion and bounded Log Explorer exist; Windows Event Log is source-only pending runtime acceptance; file tail and push-based live logs remain incomplete. The Log Explorer auto-refresh toggle polls every 10 seconds; it is not a push-based live stream. One-command production bootstrap, advanced dashboard editing, backups/ClickHouse restore and high-volume benchmarks remain open. See the [release readiness audit](docs/RELEASE_READINESS_AUDIT.md), [prioritized backlog](docs/PRODUCT_BACKLOG.md), and [project state](docs/PROJECT_STATE.md).
 
 ---
 
@@ -58,7 +58,7 @@ The complete product contract, architecture boundaries and acceptance targets ar
 | Agent protocol and ingestion | **Historical Phase 3 CI baseline** | TLS enrollment, persisted agent session, heartbeat, reconnect/backoff and durable telemetry ingestion existed in the previously verified baseline; the newest source changes still need fresh Go/Compose acceptance |
 | Native host agent | **Linux baseline; Windows acceptance pending** | Linux collector path exists; Windows metrics and Application/System Event Log reader source exist but need actual Windows runtime/service tests. File-tail logs, signed releases and broader platform parity remain |
 | Telemetry history and live transport | **Phase 3 verified** | Bounded PostgreSQL range query, 30-day raw retention, 90-day idempotency retention, one-use session-bound WebSocket tickets, cross-tenant isolation, and bounded subscriber queues pass CI |
-| Project/workload attribution | **Phase 3 verified (Linux mapping path)** | cgroup/Systemd/container selectors, exact server/project mappings, and explicit host-total/unclassified/shared attribution pass database integration tests; full Docker Engine discovery remains later work |
+| Host/workload metadata | **Linux source path exists; product simplification in progress** | cgroup/Systemd/container metadata helps explain process and host resource usage. The separate Project entity and Project Mapping UI are not part of the intended product; legacy project tables and `project_id` query paths still require a data-preserving migration |
 | Monitoring dashboard | **In Progress** | Saved dashboards/basic panels, metric refresh and bounded log pages exist; log live mode currently polls every 10 seconds. Native log push/replay, flexible panel editor, variables, richer visualizations and owner acceptance remain |
 | Production firewall setup | **In Progress** | UFW/firewalld helper opens HTTPS for public node bootstrap while Nginx restricts dashboard/API/WebSocket paths to ADMIN_CIDR; deployment validates this allowlist before enabling remote no-login. Real-host IPv4/IPv6 and cloud security-group checks remain |
 | Production release | Not started | Planned for Phase 5 |
@@ -106,13 +106,12 @@ The following are target capabilities. They are not represented as implemented u
 - Agent health, server uptime, and last-seen status.
 - Native monitoring agent for supported Linux, Windows, and macOS versions.
 
-### Project and Workload Monitoring
+### Host and Workload Context
 
-- Header-level **All Projects / Project Selector**.
-- Dashboard updates without a full page reload when the project changes.
-- Project-specific CPU, memory, disk, network, process, and supported application metrics.
-- Docker container and Systemd service discovery where supported and authorized.
-- Linux cgroups-based resource attribution, with explicit labels for inferred or shared resources.
+- One machine is monitored as one machine; there are no customer projects, workspaces or organization selectors.
+- Show host, process, systemd service, container and cgroup labels as optional technical context, not as separate tenant or project entities.
+- Docker container and Systemd service discovery only where supported and authorized.
+- Linux cgroups-based resource attribution, with explicit labels for inferred, shared or unclassified resources.
 
 ### Process and Application Visibility
 
@@ -192,7 +191,7 @@ For a one-command local control-plane setup, start Docker Desktop / Docker Engin
 
 The helper creates `.env` from `.env.example` when needed, generates a localhost-only development TLS certificate, builds the Compose services, waits for the dashboard probe, and opens (PowerShell) or prints (shell) `http://localhost:3000`. It does not erase existing database volumes. The helper is for local development only; do not reuse its self-signed certificate or loopback-only no-login mode on a public deployment.
 
-The API exposes `/health/live` and `/health/ready`. Liveness reports process health independently; readiness checks PostgreSQL, Redis and ClickHouse and returns HTTP 503 when a required dependency is unavailable. Docker Compose runs a one-shot migration service before the API starts. The dashboard includes server/project views, historical/live charts, alert and notification workflows, and allowlisted remote operations.
+The API exposes `/health/live` and `/health/ready`. Liveness reports process health independently; readiness checks PostgreSQL, Redis and ClickHouse and returns HTTP 503 when a required dependency is unavailable. Docker Compose runs a one-shot migration service before the API starts. The dashboard focuses on machine inventory, host metrics, logs, saved dashboards and alerts. Project Mapping and Remote Operations are not shown in the simplified product navigation.
 
 Build the native agent and its tests:
 
@@ -244,7 +243,7 @@ Browser live connections first call `POST /v1/live/ticket` with the bearer sessi
           Custom Go Backend
        - Single-install context and agent enrollment
        - Telemetry validation and ingestion
-       - Project and workload attribution
+       - Host and workload metadata
        - Historical query and alert processing
        - Authorized remote-action orchestration
              /             \
@@ -259,12 +258,12 @@ Browser live connections first call `POST /v1/live/ticket` with the bearer sessi
                  v
          Next.js Dashboard
        - Overall server view
-       - All Projects / project view
+       - Machine-level host view
        - Live and historical charts
        - Alerts, events, and operations
 ```
 
-The control plane opens as one self-hosted installation with no user login or organization-creation workflow. A private compatibility identity remains inside the database schema for existing foreign keys and resource scoping; it is not a customer account or selectable organization. Monitored nodes still enroll through short-lived, single-use credentials and TLS-protected gRPC. Phase 3 provides a native Linux collector, durable spool, idempotent PostgreSQL ingestion, range queries, retention, and live delivery. The diagram shows the intended end-state data flow, not a claim that every component is already implemented.
+The control plane opens as one self-hosted installation with no user login or organization-creation workflow. A private compatibility identity and legacy project records remain inside the database for existing foreign keys and resource scoping; they are migration debt, not product concepts exposed to the operator. Monitored nodes still enroll through short-lived, single-use credentials and TLS-protected gRPC. Phase 3 provides a native Linux collector, durable spool, idempotent PostgreSQL ingestion, range queries, retention, and live delivery. The diagram shows the intended end-state data flow, not a claim that every component is already implemented.
 
 ## Docker and Deployment Model
 
@@ -315,14 +314,14 @@ The production firewall policy is defined for two roles: a control-plane VPS/VM 
 | 1 | Product Specification and Technical Blueprint | **Completed** | Requirements, metric catalog, acceptance matrix, and architecture baseline |
 | 2 | Platform Foundation and Secure Connectivity | **Completed** | Go/Next.js foundation, PostgreSQL/Redis, migrations, internal installation scope, TLS gRPC enrollment, heartbeat, reconnect, and revocation pass the historical CI baseline |
 | 3 | Monitoring Agent and Telemetry Data Engine | **Completed** | Linux host collection, durable spool, TLS gRPC ingestion, PostgreSQL history/retention, authorized live delivery, workload attribution, and CI benchmarks all verified |
-| 4 | Dashboard and Operational Features | **In Progress** | Server/project dashboards, custom charts, application visibility, alerts, notifications, one-click installation workflow, and secure remote actions |
+| 4 | Dashboard and Operational Features | **In Progress** | Machine dashboards, custom charts, host/process visibility, alerts, notifications, one-command installation workflow, and secure network boundaries |
 | 5 | Cross-Platform Production and Scale | In Progress | Linux amd64/arm64 and Windows x64 checksummed agent bundles, target-side service installers, Nginx no-login access gate, and UFW/firewalld helper are implemented in code. Windows runtime acceptance, publisher signing, macOS, raw logs, fleet tests and real-host verification remain |
 
 A phase is marked Completed only after implementation, acceptance tests, relevant security/failure checks, documentation, and Git commit requirements pass.
 
 ## MVP Readiness
 
-The historical Phase 1–3 baseline passed its CI gates. The latest single-install refactor still needs a fresh CI pass. This does **not** mean the first usable product MVP is released. The current single-install implementation removes browser login/signup, account login methods and organization creation from the operator workflow; private legacy database relationship rows remain pending a dedicated schema migration. Host metrics, server inventory, historical/live charts, projects, alerts and operations exist in varying implementation states; raw logs, publisher-signed installers and the complete one-command production control-plane bootstrap remain outstanding. The API, Linux agent, durable ingestion, history, and live transport are verified foundations for the next server-detail/history/live views.
+The historical Phase 1–3 baseline passed its CI gates. The latest single-install refactor still needs a fresh CI pass. This does **not** mean the first usable product MVP is released. The current single-install implementation removes browser login/signup, account login methods and organization creation from the operator workflow; private legacy database relationship rows remain pending a dedicated schema migration. Project Mapping and Remote Operations have been removed from the main navigation; the dashboard is simplified to Servers, Logs, Dashboards and Alerts. The corresponding legacy project and remote-operation backend files are not yet removed or migrated. Host metrics, server inventory, historical/live charts and alerts exist in varying implementation states; project-oriented UI has been removed from the main navigation, but legacy project schema/query paths remain. Raw log source coverage, publisher-signed installers and the complete one-command production control-plane bootstrap remain outstanding. The API, Linux agent, durable ingestion, history, and live transport are verified foundations for the next server-detail/history/live views.
 
 ## Documentation Map
 
@@ -366,7 +365,7 @@ After the implementation is complete, the final Excalidraw system design will be
 - Agent enrollment and communication.
 - Telemetry and event data flows.
 - Database schema and retention paths.
-- Project/workload attribution.
+- Host and workload metadata (processes, services, containers and cgroups); no project entity.
 - Authentication, authorization, and trust boundaries.
 - Failure handling, recovery, and deployment topology.
 - Measured scaling and performance characteristics.
