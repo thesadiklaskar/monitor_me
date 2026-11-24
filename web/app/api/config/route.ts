@@ -19,7 +19,6 @@ export async function GET() {
     {
       agent_grpc_address: process.env.MONITOR_ME_AGENT_GRPC_ADDRESS || null,
       public_api_url: publicAPIOrigin(),
-      auth_disabled: process.env.MONITOR_ME_AUTH_DISABLED === "true",
     },
     { headers: { "Cache-Control": "no-store" } },
   );
