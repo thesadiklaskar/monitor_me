@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { Activity, ArrowDown, ArrowUp, LayoutDashboard, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { apiRequest } from "@/lib/client-api";
+import { formatByteRate } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -72,7 +73,7 @@ function formatMetric(value: number, unit: string): string {
     const amount = value / (1024 ** 3);
     return amount.toFixed(2) + " GiB";
   }
-  if (unit === "bytes/s") return (value / (1024 ** 2)).toFixed(2) + " MiB/s";
+  if (unit === "bytes/s") return formatByteRate(value);
   if (unit === "%") return value.toFixed(1) + "%";
   return value.toLocaleString(undefined, { maximumFractionDigits: 2 }) + (unit ? " " + unit : "");
 }
