@@ -82,6 +82,21 @@ func TestPostgresRetentionKeepsIdempotencyRecordsLongerThanSamples(t *testing.T)
 
 	insertBatch(retainedBatchID, 31*24*time.Hour)
 	insertBatch(expiredBatchID, 100*24*time.Hour)
+	insertLogBatch := func(batchID string, age time.Duration) {
+		t.Helper()
+		payloadHash := sha256.Sum256([]byte("log-" + batchID))
+		if _, err := database.ExecContext(ctx, `
+			INSERT INTO agent_log_batches (
+				organization_id, server_id, agent_id, batch_id, payload_hash, event_count, received_at
+			) VALUES ($1, $2, $3, $4, $5, 1, $6)
+		`, organizationID, serverID, agentID, batchID, payloadHash[:], now.Add(-age)); err != nil {
+			t.Fatalf("insert log idempotency batch %s: %v", batchID, err)
+		}
+	}
+	retainedLogBatchID := "33333333333333333333333333333333"
+	expiredLogBatchID := "44444444444444444444444444444444"
+	insertLogBatch(retainedLogBatchID, 31*24*time.Hour)
+	insertLogBatch(expiredLogBatchID, 100*24*time.Hour)
 
 	policy := telemetry.DefaultRetentionPolicy()
 	policy.BatchSize = 100
@@ -89,7 +104,7 @@ func TestPostgresRetentionKeepsIdempotencyRecordsLongerThanSamples(t *testing.T)
 	if err != nil {
 		t.Fatalf("prune expired raw telemetry: %v", err)
 	}
-	if result.SamplesDeleted != 2 || result.BatchesDeleted != 1 {
+	if result.SamplesDeleted != 2 || result.BatchesDeleted != 1 || result.LogBatchesDeleted != 1 {
 		t.Fatalf("unexpected first retention pass: %+v", result)
 	}
 
@@ -122,6 +137,16 @@ func TestPostgresRetentionKeepsIdempotencyRecordsLongerThanSamples(t *testing.T)
 		t.Fatalf("first sweep should retain only the 31-day batch: retained=%d expired=%d",
 			retainedCount, expiredCount)
 	}
+	var retainedLogCount, expiredLogCount int
+	if err := database.QueryRowContext(ctx, `
+		SELECT count(*) FILTER (WHERE batch_id = $2), count(*) FILTER (WHERE batch_id = $3)
+		FROM agent_log_batches WHERE agent_id = $1
+	`, agentID, retainedLogBatchID, expiredLogBatchID).Scan(&retainedLogCount, &expiredLogCount); err != nil {
+		t.Fatalf("verify retained log idempotency records: %v", err)
+	}
+	if retainedLogCount != 1 || expiredLogCount != 0 {
+		t.Fatalf("first sweep should retain only the 31-day log batch: retained=%d expired=%d", retainedLogCount, expiredLogCount)
+	}
 
 	// The retention sweep is global, so unrelated telemetry created by other
 	// tests may also expire when the simulated clock advances. Assert only this
@@ -130,7 +155,7 @@ func TestPostgresRetentionKeepsIdempotencyRecordsLongerThanSamples(t *testing.T)
 	if err != nil {
 		t.Fatalf("prune expired idempotency record: %v", err)
 	}
-	if result.BatchesDeleted < 1 {
+	if result.BatchesDeleted < 1 || result.LogBatchesDeleted < 1 {
 		t.Fatalf("expected the simulated 91-day sweep to delete at least one batch: %+v", result)
 	}
 	if err := database.QueryRowContext(ctx, `
@@ -141,5 +166,12 @@ func TestPostgresRetentionKeepsIdempotencyRecordsLongerThanSamples(t *testing.T)
 	if batchCount != 0 {
 		t.Fatalf("the retained 90-day idempotency record should expire after 91 days, got %d remaining",
 			batchCount)
+	}
+	var logBatchCount int
+	if err := database.QueryRowContext(ctx, `SELECT count(*) FROM agent_log_batches WHERE agent_id = $1`, agentID).Scan(&logBatchCount); err != nil {
+		t.Fatalf("count expired log idempotency records: %v", err)
+	}
+	if logBatchCount != 0 {
+		t.Fatalf("the retained 90-day log idempotency record should expire after 91 days, got %d remaining", logBatchCount)
 	}
 }
