@@ -21,7 +21,6 @@ type API struct {
 	telemetry                        *telemetry.Store
 	logs                             *logstore.Store
 	allowedLiveOrigins               map[string]struct{}
-	allowedRemoteUnits               []string
 	installationPrincipalMu          sync.Mutex
 	cachedInstallationPrincipal      identity.Principal
 	installationPrincipalExpiresAt    time.Time
