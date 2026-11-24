@@ -25,11 +25,11 @@ func (api *API) createAlertRule(writer http.ResponseWriter, request *http.Reques
 	rule, err := api.identities.CreateAlertRule(request.Context(), principalFromRequest(request), input)
 	switch {
 	case errors.Is(err, identity.ErrForbidden):
-		writeAPIError(writer, http.StatusForbidden, "forbidden", "Only organization owners and administrators can manage alert rules.")
+		writeAPIError(writer, http.StatusForbidden, "forbidden", "Alert rule changes are not permitted.")
 	case errors.Is(err, identity.ErrInvalidInput):
 		writeAPIError(writer, http.StatusBadRequest, "invalid_alert_rule", "The alert rule fields are invalid.")
 	case errors.Is(err, identity.ErrNotFound):
-		writeAPIError(writer, http.StatusNotFound, "alert_scope_not_found", "The selected server or project was not found in this organization.")
+		writeAPIError(writer, http.StatusNotFound, "alert_scope_not_found", "The selected machine was not found.")
 	case err != nil:
 		writeAPIError(writer, http.StatusInternalServerError, "alert_rule_create_failed", "The alert rule could not be created.")
 	default:
@@ -42,7 +42,7 @@ func (api *API) deleteAlertRule(writer http.ResponseWriter, request *http.Reques
 	err := api.identities.DeleteAlertRule(request.Context(), principalFromRequest(request), ruleID)
 	switch {
 	case errors.Is(err, identity.ErrForbidden):
-		writeAPIError(writer, http.StatusForbidden, "forbidden", "Only organization owners and administrators can delete alert rules.")
+		writeAPIError(writer, http.StatusForbidden, "forbidden", "Alert rule changes are not permitted.")
 	case errors.Is(err, identity.ErrNotFound):
 		writeAPIError(writer, http.StatusNotFound, "not_found", "The alert rule was not found.")
 	case err != nil:
