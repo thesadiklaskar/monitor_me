@@ -15,7 +15,7 @@ No item may be marked Verified based only on a code stub, mock UI, or documentat
 
 | ID | Feature | Priority | Acceptance evidence | Current status |
 | --- | --- | --- | --- | --- |
-| F-001 | Add Server and scoped enrollment token | P0 | Server creation UI, one-time token display/copy/expiry, token revoke/reissue, Windows/Linux target guidance and copyable source-based native-agent setup commands implemented; signed downloadable remote installers and end-to-end acceptance remain | In Progress |
+| F-001 | Add Node and one-use enrollment token | P0 | Add Machine creates a short-lived token without target-OS selection; dashboard offers PowerShell/POSIX launchers; signed downloadable installers, automatic hostname naming and end-to-end acceptance remain | In Progress |
 | F-002 | Native Go host agent lifecycle | P0 | Native foreground process, validated configuration, JSON logs, signal shutdown, process CPU/collector/WAL health telemetry, and Linux systemd unit validation pass race-enabled CI checks | Verified |
 | F-003 | Host CPU and per-core metrics | P0 | Linux /proc/stat counter fixtures, reset tests, and documented source semantics | Verified |
 | F-004 | Host memory, swap, cache metrics | P0 | Unit and OS-specific semantics tests | Verified |
@@ -51,6 +51,12 @@ No item may be marked Verified based only on a code stub, mock UI, or documentat
 | F-034 | Production operations and backup | P1 | Production Compose/Nginx, readiness, PostgreSQL backup/restore and app-image rollback scripts are prepared; real VPS/restore/rollback exercise remains | In Progress |
 | F-035 | Final as-built Excalidraw design | P1 | Diagram reviewed against actual source, data flows, and deployment | Planned |
 | F-036 | Production Linux host firewall setup | P1 | Dry-run/additive UFW/firewalld helper supports control-plane allow rules and agent-only no-inbound mode with recorded rollback; default-policy convergence, IPv4/IPv6, Docker, SSH and external host tests remain | In Progress |
+
+
+| F-037 | Single-install no-login operator mode | P0 | No signup/login/organization UI; implicit install workspace; local loopback access; remote no-login mode is blocked unless HTTPS and administrator network restrictions are verified | In Progress |
+| F-038 | Automatic control-plane and node bootstrap | P0 | One control-plane command generates secrets/TLS, starts Compose, applies migrations/health checks and firewall policy; per-node command detects OS/architecture, installs signed native agent and service without Docker/source checkout | In Progress |
+| F-039 | High-volume raw log ingestion and exploration | P0 | Linux journald/files and Windows Event Logs/files; ClickHouse durable batch ingestion, indexed time-bounded search, live tail, retention, redaction, back-pressure and crash/replay/load tests; currently not implemented | Planned |
+| F-040 | Professional monitoring-console shell | P0 | Responsive operator console, collapsible icon sidebar, consistent icon system, global node/time selectors, accessible controls, clear status/data states and removal of placeholder UI | In Progress |
 
 ## Phase-Level Verification
 
