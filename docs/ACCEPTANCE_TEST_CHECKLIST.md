@@ -1,50 +1,52 @@
 # Monitor Me — Owner Acceptance Checklist
 
-This checklist is for the owner to test Monitor Me locally on their own computer. No VPS, public DNS, public certificate, or production firewall change is required. A green build alone is not product acceptance. Do not run remote stop/restart against critical services.
+This checklist verifies the current single-install, no-login local experience and native node bootstrap. It does not claim production readiness or raw-log ingestion.
 
 ## 1. Prepare the local stack
 
-1. Install the toolchain listed in docs/DEVELOPMENT.md: Go, Node/npm and Docker Compose v2.
-2. Copy .env.example to .env and replace the local-only PostgreSQL and Redis passwords.
-3. From the repository root, run:
+1. Start Docker Desktop / Docker Engine.
+2. From the repository root, run:
 
-       make certs
-       docker compose up --build -d
-       docker compose ps --all
+   ```powershell
+   .\scripts\start-local.ps1
+   ```
 
-4. Confirm PostgreSQL, Redis, API and web become healthy. Open http://localhost:3000.
+   On Linux, use `./scripts/start-local.sh`.
 
-## 2. Owner setup and server enrollment
+3. The helper creates `.env` and a localhost-only development TLS certificate if absent, builds the Compose services and native agent artifacts, starts the services and probes the dashboard.
+4. Confirm PostgreSQL, Redis, API, agent-artifacts and web are healthy/completed as appropriate. Open `http://localhost:3000`.
+5. Confirm the dashboard opens without signup, login or organization creation. Local no-login access must remain bound to loopback; do not expose this profile to LAN/public networks.
 
-1. Complete first-owner setup with a unique test email, strong password and organization name.
-2. Sign out and sign in again; refresh the page and confirm the session remains active.
-3. Add a test Linux server. Copy the one-time enrollment token once and record its expiry; do not paste it into a shared chat, shell history or committed file.
-4. Verify the server appears in the organization inventory with its initial pending state.
-5. Reissue a token and confirm the older unused token is rejected. Revoke an unused token and confirm it cannot enroll.
+Do not delete existing database volumes or run `docker compose down -v` during ordinary upgrades or acceptance.
 
-## 3. Enroll a real Linux agent
+## 2. Add a machine without OS selection
 
-Use a disposable Linux host or Linux VM for the complete Linux capability set. Docker Desktop on Windows/macOS can run the control-plane containers. An initial Windows-native collector is also available for local host acceptance; it does not yet include TCP/listening-port inventory, cgroup/Systemd workload attribution, or Windows service installation. Follow docs/DEVELOPMENT.md and use the generated one-time server token plus the local development CA.
+1. In the dashboard choose **Add Machine**, provide a display label and create the one-time token.
+2. Confirm the enrollment dialog has no Windows/Linux selector and presents both shell commands; run only the command matching the terminal available on the target host.
+3. Confirm the token is never included in the command, URL or shell history and is requested through a hidden prompt on the target.
+4. Confirm a newly created machine appears as pending until its native agent reports.
 
-Confirm:
-- Agent enrollment succeeds and the server receives an agent identity.
-- The heartbeat changes the server state and last-seen timestamp.
-- The agent continues reporting after a process restart using its persisted session.
-- If the API or network is briefly unavailable, the local WAL retains batches and delivers them after connectivity returns.
+## 3. Enroll a native Linux or Windows agent
 
-Do not grant broad Docker socket access just to run the agent. Docker is not required on a monitored Linux host.
+For a local Windows PC using the same control plane:
 
+```powershell
+& ([scriptblock]::Create((Invoke-RestMethod -Uri 'http://localhost:3000/install/agent-windows.ps1'))) -ServerUrl 'http://localhost:3000' -GrpcAddress 'localhost:8443'
+```
 
-## 3A. Enroll the local Windows host
+Run PowerShell as Administrator. The installer should detect Windows x64, download the artifact and public CA, verify SHA-256, install/start the MonitorMeAgent Windows Service, prompt for the token securely, wait for the persisted session and remove the token from its config. Verify with `Get-Service MonitorMeAgent`; inspect `%ProgramData%\MonitorMe\agent.log` when troubleshooting.
 
-1. From the repository root, run `.\scripts\build-windows-agent.ps1` in PowerShell. The script uses the Docker Go builder and writes the x64 executable under the ignored `.data/windows-agent/` directory.
-2. In the dashboard, choose **Add Server**, name the record `Windows local PC`, and copy its one-time enrollment token.
-3. Open a second PowerShell window at the repository root and run `.\scripts\run-windows-agent.ps1`. Paste the one-time token when prompted.
-4. Keep the window open for local acceptance. The agent collects every five seconds and stores its session/WAL below `%LOCALAPPDATA%\MonitorMe`. Press Ctrl+C to stop it.
-5. Open the Windows server record in the dashboard and verify CPU, memory, mounted-volume capacity/I/O, network throughput, uptime, process inventory and System information.
-6. Run the helper again later; it should reuse the persisted agent session without asking for another enrollment token.
+For a Linux systemd host on the same machine as the local stack:
 
-The local Windows agent is a foreground process in this first slice, not a Windows service. Run it under an account with sufficient process-inspection permissions for the process inventory you expect to see. Do not paste the enrollment token into a committed file or shell command.
+```sh
+curl -fsSL 'http://localhost:3000/install/agent-linux.sh' | sudo bash -s -- --server-url 'http://localhost:3000' --grpc-address 'localhost:8443'
+```
+
+The installer should detect Linux amd64/arm64, verify the downloaded binary SHA-256, securely prompt for the one-time token, install and enable the systemd service, wait for session persistence and remove the token from its EnvironmentFile. Verify with `systemctl status monitor-me-agent` and `journalctl -u monitor-me-agent -f`.
+
+For a remote host, use the control plane HTTPS URL and the reachable gRPC endpoint from the Add Machine dialog. A remote host must trust the public control-plane certificate chain. The monitored node needs outbound TLS gRPC only; do not open an inbound Monitor Me firewall port on the agent-only host.
+
+The target machine must not require Docker, Go, Node.js or a repository checkout for these download-based installers. The current Windows artifact is x64; Linux artifacts are amd64/arm64. macOS and non-systemd Linux are not supported by these installers yet.
 
 ## 4. Dashboard telemetry
 
