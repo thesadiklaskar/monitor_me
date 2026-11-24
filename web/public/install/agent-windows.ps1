@@ -171,7 +171,8 @@ try {
     Write-Host "Monitor Me agent installed and running as a Windows Service."
     Write-Host "Detected: Windows $([Runtime.InteropServices.RuntimeInformation]::OSArchitecture) · agent version $agentVersion"
     Write-Host "Status: Get-Service MonitorMeAgent"
-    Write-Host "Logs: Get-WinEvent -LogName Application -MaxEvents 50"
+    Write-Host "Diagnostics: $(Join-Path $dataDirectory 'agent.log')"
+    Write-Host "Windows Service events: Get-WinEvent -LogName System -MaxEvents 50"
 }
 finally {
     Remove-Item -LiteralPath $temporaryDirectory -Recurse -Force -ErrorAction SilentlyContinue
