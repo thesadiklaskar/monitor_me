@@ -54,6 +54,7 @@ type MetricDefinition = {
 };
 
 type PanelResult = { points: SeriesPoint[]; error?: string };
+type Loaded<T> = { value: T; error?: string };
 type DashboardData = {
   latest: LatestSample[];
   panels: Record<string, PanelResult>;
@@ -164,6 +165,7 @@ function MetricCard({
   definition,
   result,
   latest,
+  loading,
 }: {
   definition: MetricDefinition;
   result?: PanelResult;
@@ -233,7 +235,7 @@ export default function OverviewDashboard({ servers }: { servers: Server[] }) {
   const otherCount = servers.length - connectedCount;
 
   const loadServerDashboard = useCallback(async () => {
-    if (!selectedServer) return;
+    if (!selectedServerId) return;
     const requestId = ++requestSequence.current;
     const now = Date.now();
     const from = new Date(now - timeWindowMs).toISOString();
@@ -243,14 +245,14 @@ export default function OverviewDashboard({ servers }: { servers: Server[] }) {
 
     const [latestResult, logsResult, panelEntries] = await Promise.all([
       apiRequest<LatestResponse>(
-        "/api/servers/" + encodeURIComponent(selectedServer.id) + "/metrics/latest",
-      ).then((response) => ({ value: Array.isArray(response.samples) ? response.samples : [] as LatestSample[] }))
-        .catch((loadError: unknown) => ({ error: loadError instanceof Error ? loadError.message : "Latest samples could not be loaded.", value: [] as LatestSample[] })),
+        "/api/servers/" + encodeURIComponent(selectedServerId) + "/metrics/latest",
+      ).then((response): Loaded<LatestSample[]> => ({ value: Array.isArray(response.samples) ? response.samples : [] }))
+        .catch((loadError: unknown): Loaded<LatestSample[]> => ({ error: loadError instanceof Error ? loadError.message : "Latest samples could not be loaded.", value: [] })),
       apiRequest<LogResponse>(
-        "/api/servers/" + encodeURIComponent(selectedServer.id) + "/logs?" +
+        "/api/servers/" + encodeURIComponent(selectedServerId) + "/logs?" +
         new URLSearchParams({ from, to, limit: "21" }).toString(),
-      ).then((response) => ({ value: Array.isArray(response.events) ? response.events : [] as LogEvent[] }))
-        .catch((loadError: unknown) => ({ error: loadError instanceof Error ? loadError.message : "Host logs could not be loaded.", value: [] as LogEvent[] })),
+      ).then((response): Loaded<LogEvent[]> => ({ value: Array.isArray(response.events) ? response.events : [] }))
+        .catch((loadError: unknown): Loaded<LogEvent[]> => ({ error: loadError instanceof Error ? loadError.message : "Host logs could not be loaded.", value: [] })),
       Promise.all(metricPanels.map(async (definition) => {
         try {
           return [definition.key, await fetchMetric(selectedServer.id, definition, from, to)] as const;
@@ -271,10 +273,10 @@ export default function OverviewDashboard({ servers }: { servers: Server[] }) {
     if (latestResult.error) setError(latestResult.error);
     else setError("");
     setLoading(false);
-  }, [selectedServer]);
+  }, [selectedServerId]);
 
   useEffect(() => {
-    if (!selectedServer) return;
+    if (!selectedServerId) return;
     const initial = window.setTimeout(() => { void loadServerDashboard(); }, 0);
     const interval = window.setInterval(() => { void loadServerDashboard(); }, 15000);
     return () => {
@@ -282,7 +284,7 @@ export default function OverviewDashboard({ servers }: { servers: Server[] }) {
       window.clearInterval(interval);
       requestSequence.current += 1;
     };
-  }, [loadServerDashboard, selectedServer]);
+  }, [loadServerDashboard, selectedServerId]);
 
   function openServer(serverId: string) {
     requestSequence.current += 1;
