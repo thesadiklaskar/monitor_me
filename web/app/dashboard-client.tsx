@@ -423,7 +423,7 @@ export default function DashboardClient() {
         </div>
         <div className="installation-indicator" title="This self-hosted installation">
           <span className="installation-indicator-icon"><Activity size={15} strokeWidth={1.8} /></span>
-          <div className="installation-indicator-copy"><strong>Infrastructure monitoring</strong><span>This installation</span></div>
+          <div className="installation-indicator-copy"><strong>Monitor Me installation</strong><span>Self-hosted monitoring</span></div>
         </div>
         <nav className="side-nav" aria-label="Main navigation">
           <span className="nav-section-label">Monitoring</span>
