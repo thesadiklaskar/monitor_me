@@ -110,6 +110,8 @@ services:
     build:
       context: .
       dockerfile: deploy/agent-artifacts/Dockerfile
+      args:
+        MONITOR_AGENT_VERSION: "${MONITOR_AGENT_VERSION:-0.1.0-dev}"
     restart: "no"
     environment:
       MONITOR_AGENT_VERSION: "${MONITOR_AGENT_VERSION:-0.1.0-dev}"
