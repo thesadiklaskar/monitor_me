@@ -11,7 +11,7 @@ while [ "$#" -gt 0 ]; do
     --force-enroll) FORCE_ENROLL=1; shift ;;
     -h|--help)
       echo "Monitor Me native Linux installer"
-      echo "Usage: curl -fsSL https://monitor.example/install/agent-linux.sh | sudo bash -s -- --server-url https://monitor.example --grpc-address monitor.example:8443"
+      echo "Usage: curl -fsSL https://YOUR_MONITOR_HOST/install/agent-linux.sh | sudo bash -s -- --server-url https://YOUR_MONITOR_HOST --grpc-address YOUR_MONITOR_HOST:8443"
       exit 0
       ;;
     *) echo "Unknown option: $1" >&2; exit 2 ;;
