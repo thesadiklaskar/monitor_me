@@ -116,7 +116,7 @@ sudo bash ./scripts/linux-preflight.sh --control-plane
 sudo bash ./scripts/linux-preflight.sh --agent
 ~~~
 
-The control-plane installer supports Ubuntu/Debian amd64. The Linux agent requires systemd, readable procfs counters, curl and sha256sum. Linux amd64 is the primary agent target; an arm64/aarch64 build is available for compatible hosts.
+The control-plane installer supports Ubuntu/Debian amd64. The production Linux agent target is systemd-based Linux amd64 with readable procfs counters, curl and sha256sum.
 
 ## Enrol monitored machines
 
@@ -231,7 +231,7 @@ The restore script first creates a pre-restore PostgreSQL snapshot. The ClickHou
 ## Current deployment scope
 
 - **Control plane:** Ubuntu or Debian, Linux amd64, systemd, Docker Engine and Compose v2.
-- **Linux agent:** systemd-based Linux with readable procfs counters. Linux amd64 is the primary target; arm64/aarch64 builds are available.
+- **Linux agent:** systemd-based Linux amd64 with readable procfs counters.
 - **Networking:** public DNS, public TCP 80 for certificate validation, HTTPS 443 for operator and agent bootstrap routes, and TLS gRPC 8443 for agent telemetry.
 - **Operator access:** network allowlist through ADMIN_CIDR; there is no application-level sign-in.
 - **Host logs:** systemd journal collection. Arbitrary /var/log file tailing and generic syslog-file ingestion are not included.
