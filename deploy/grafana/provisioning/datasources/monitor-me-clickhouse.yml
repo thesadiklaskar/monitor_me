@@ -1,0 +1,27 @@
+apiVersion: 1
+
+datasources:
+  - name: Monitor Me ClickHouse
+    uid: monitor-me-clickhouse
+    type: grafana-clickhouse-datasource
+    access: proxy
+    editable: false
+    version: 1
+    jsonData:
+      host: clickhouse
+      port: 9000
+      protocol: native
+      username: grafana_reader
+      defaultDatabase: monitor_me
+      defaultTable: logs
+      configMode: classic
+      dialTimeout: 10
+      queryTimeout: 60
+      connMaxLifetime: 5
+      maxIdleConns: 5
+      maxOpenConns: 10
+      validateSql: true
+      enableRowLimit: true
+      enableMapKeysDiscovery: false
+    secureJsonData:
+      password: ${GRAFANA_CLICKHOUSE_PASSWORD}
