@@ -48,7 +48,7 @@ func QueryLatest(ctx context.Context, db *sql.DB, query LatestQuery) ([]LatestSa
 		  AND server_id = $2
 		  AND observed_at >= now() - $3::interval
 		ORDER BY metric_name, labels, observed_at DESC
-		LIMIT $5
+		LIMIT $4
 	`, query.OrganizationID, query.ServerID, fmt.Sprintf("%d seconds", int(latestMetricWindow.Seconds())),
 		latestMetricLimit)
 	if err != nil {
