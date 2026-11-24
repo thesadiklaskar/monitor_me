@@ -37,7 +37,13 @@ func main() {
 	default:
 		level.Set(slog.LevelInfo)
 	}
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: level}))
+	logWriter, closeLog, logErr := openAgentLogWriter(os.Getenv("MONITOR_LOG_FILE"))
+	if logErr != nil {
+		slog.Error("could not initialize agent log output", "error", logErr)
+		os.Exit(2)
+	}
+	defer closeLog()
+	logger := slog.New(slog.NewJSONHandler(logWriter, &slog.HandlerOptions{Level: level}))
 	if err := runPlatformService(cfg, logger); err != nil {
 		logger.Error("agent stopped with an error", "error", err)
 		os.Exit(1)
