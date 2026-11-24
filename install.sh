@@ -111,8 +111,7 @@ else
   [[ "$LE_EMAIL" == *@*.* ]] || fail "Enter a valid email address."
   if [[ -n "$PUBLIC_IPV4" ]]; then
     RESOLVED_IPV4="$(getent ahostsv4 "$PUBLIC_HOSTNAME" | awk 'NR==1 {print $1}' || true)"
-    [[ -n "$RESOLVED_IPV4" ]] || fail "DNS for $PUBLIC_HOSTNAME does not resolve. Add an A record pointing to $PUBLIC_IPV4."
-    [[ "$RESOLVED_IPV4" == "$PUBLIC_IPV4" ]] || fail "$PUBLIC_HOSTNAME resolves to $RESOLVED_IPV4, not $PUBLIC_IPV4."
+    [[ -n "$RESOLVED_IPV4" ]] || fail "DNS for $PUBLIC_HOSTNAME has no IPv4 A record. Point it to this control plane or its HTTPS load balancer."
   fi
   POSTGRES_PASSWORD="$(openssl rand -hex 32)"
   REDIS_PASSWORD="$(openssl rand -hex 32)"
@@ -157,7 +156,7 @@ fi
 [[ "$LE_EMAIL" == *@*.* ]] || fail "Enter a valid LE_EMAIL in .env.production."
 if [[ -n "$PUBLIC_IPV4" ]]; then
   RESOLVED_IPV4="$(getent ahostsv4 "$PUBLIC_HOSTNAME" | awk 'NR==1 {print $1}' || true)"
-  [[ "$RESOLVED_IPV4" == "$PUBLIC_IPV4" ]] || fail "DNS for $PUBLIC_HOSTNAME must resolve to $PUBLIC_IPV4."
+  [[ -n "$RESOLVED_IPV4" ]] || fail "DNS for $PUBLIC_HOSTNAME has no IPv4 A record. Point it to this control plane or its HTTPS load balancer."
 fi
 
 CERT_GROUP_ID="$(sed -n 's/^CERT_GROUP_ID=//p' "$ENV_FILE" | tail -n 1)"
