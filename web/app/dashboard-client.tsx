@@ -310,7 +310,7 @@ function EnrollmentDialog({
           <textarea readOnly value={issued.enrollment.token} rows={3} onFocus={(event) => event.currentTarget.select()} />
         </label>
         <button className="button button-secondary button-wide" type="button" onClick={copyToken}>
-          {copied ? "Copied to clipboard" : "Copy one-time token"}
+          <Copy size={15} /> {copied ? "Copied to clipboard" : "Copy one-time token"}
         </button>
 
         <div className="install-instructions">
@@ -683,7 +683,7 @@ export default function DashboardClient() {
                 {projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
               </select>
             </label>
-            <button className="button button-secondary" type="button" onClick={() => void loadServers()} disabled={inventoryBusy}>{inventoryBusy ? <RefreshCw size={15} className="button-spinner" /> : <RefreshCw size={15} />} Refresh</button>
+            <button className="button button-secondary" type="button" onClick={() => void loadServers()} disabled={inventoryBusy}><RefreshCw size={15} /> {inventoryBusy ? "Refreshing…" : "Refresh"}</button>
             {canCreate && <button className="button button-primary" type="button" onClick={() => setShowAdd(true)}><Plus size={16} /> Add machine</button>}
           </div>
         </header>
