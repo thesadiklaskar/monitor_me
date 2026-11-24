@@ -279,12 +279,10 @@ function ServerMetricChart({
 export function ServerDetail({
   server,
   apiPublicURL,
-  projectId,
   onBack,
 }: {
   server: Server;
   apiPublicURL: string | null;
-  projectId: string | null;
   onBack: () => void;
 }) {
   const [metric, setMetric] = useState(metricDefinitions[0].name);
@@ -312,7 +310,6 @@ export function ServerDetail({
       step: rangeConfig.step,
       limit: "1000",
     });
-    if (projectId) query.set("project_id", projectId);
     try {
       const response = await apiRequest<MetricSeries>(
         `/api/servers/${encodeURIComponent(server.id)}/metrics?${query.toString()}`,
@@ -324,7 +321,7 @@ export function ServerDetail({
     } finally {
       setLoading(false);
     }
-  }, [metric, projectId, rangeConfig.durationMs, rangeConfig.step, server.id]);
+  }, [metric, rangeConfig.durationMs, rangeConfig.step, server.id]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => { void loadHistory(); }, 0);
@@ -381,7 +378,7 @@ export function ServerDetail({
             // samples in one committed batch are summarized together, not
             // displayed as if the last interface were the whole host.
             const matchingSamples = event.samples.filter(
-              (sample) => sample.metric_name === metric && Number.isFinite(sample.value) && (!projectId || sample.project_id === projectId),
+              (sample) => sample.metric_name === metric && Number.isFinite(sample.value),
             );
             if (matchingSamples.length === 0) return;
             const values = matchingSamples.map((sample) => sample.value);
@@ -429,17 +426,14 @@ export function ServerDetail({
       if (reconnectTimer) clearTimeout(reconnectTimer);
       socket?.close();
     };
-  }, [apiPublicURL, loadHistory, metric, projectId, rangeConfig.durationMs, server.id]);
+  }, [apiPublicURL, loadHistory, metric, rangeConfig.durationMs, server.id]);
 
 
   const loadLatest = useCallback(async () => {
     setInventoryLoading(true);
     try {
-      const query = new URLSearchParams();
-      if (projectId) query.set("project_id", projectId);
-      const suffix = query.size > 0 ? `?${query.toString()}` : "";
       const response = await apiRequest<LatestResponse>(
-        `/api/servers/${encodeURIComponent(server.id)}/metrics/latest${suffix}`,
+        `/api/servers/${encodeURIComponent(server.id)}/metrics/latest`,
       );
       setLatestSamples(Array.isArray(response.samples) ? response.samples : []);
       setInventoryError("");
@@ -448,7 +442,7 @@ export function ServerDetail({
     } finally {
       setInventoryLoading(false);
     }
-  }, [projectId, server.id]);
+  }, [server.id]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => { void loadLatest(); }, 0);
