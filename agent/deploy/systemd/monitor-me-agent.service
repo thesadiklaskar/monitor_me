@@ -1,6 +1,5 @@
 [Unit]
 Description=Monitor Me Linux Host Monitoring Agent
-Documentation=https://github.com/WorkRCS/monitor_me
 Wants=network-online.target
 After=network-online.target
 

@@ -14,8 +14,8 @@ RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.12 && \
 ENV PATH="/go/bin:${PATH}"
 
 RUN protoc -I proto \
-    --go_out=. --go_opt=module=github.com/WorkRCS/monitor_me/backend \
-    --go-grpc_out=. --go-grpc_opt=module=github.com/WorkRCS/monitor_me/backend \
+    --go_out=. --go_opt=module=example.com/monitor-me/backend \
+    --go-grpc_out=. --go-grpc_opt=module=example.com/monitor-me/backend \
     proto/monitor/v1/agent.proto
 
 RUN go mod tidy

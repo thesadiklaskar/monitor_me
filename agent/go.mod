@@ -1,4 +1,4 @@
-module github.com/WorkRCS/monitor_me/agent
+module example.com/monitor-me/agent
 
 go 1.27.0
 

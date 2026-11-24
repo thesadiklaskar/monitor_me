@@ -1,4 +1,4 @@
-module github.com/WorkRCS/monitor_me/backend
+module example.com/monitor-me/backend
 
 go 1.27.0
 

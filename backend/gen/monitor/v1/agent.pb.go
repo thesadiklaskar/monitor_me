@@ -1018,7 +1018,7 @@ const file_monitor_v1_agent_proto_rawDesc = "" +
 	"\fAgentControl\x12?\n" +
 	"\x06Enroll\x12\x19.monitor.v1.EnrollRequest\x1a\x1a.monitor.v1.EnrollResponse\x12N\n" +
 	"\x0fReportHeartbeat\x12\x1c.monitor.v1.HeartbeatRequest\x1a\x1d.monitor.v1.HeartbeatResponse\x12P\n" +
-	"\x06Stream\x12 .monitor.v1.AgentToServerMessage\x1a .monitor.v1.ServerToAgentMessage(\x010\x01B@Z>github.com/WorkRCS/monitor_me/backend/gen/monitor/v1;monitorv1b\x06proto3"
+	"\x06Stream\x12 .monitor.v1.AgentToServerMessage\x1a .monitor.v1.ServerToAgentMessage(\x010\x01B@Z>example.com/monitor-me/backend/gen/monitor/v1;monitorv1b\x06proto3"
 
 var (
 	file_monitor_v1_agent_proto_rawDescOnce sync.Once
