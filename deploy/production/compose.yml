@@ -48,6 +48,7 @@ services:
     environment:
       API_ADDR: ":8080"
       SERVICE_VERSION: "${MONITOR_ME_RELEASE}"
+      MONITOR_ME_AUTH_DISABLED: "${MONITOR_ME_AUTH_DISABLED:-false}"
       DATABASE_URL: "${DATABASE_URL:?Set DATABASE_URL}"
       REDIS_ADDR: "redis:6379"
       REDIS_PASSWORD: "${REDIS_PASSWORD:?Set REDIS_PASSWORD}"
@@ -96,6 +97,7 @@ services:
     restart: unless-stopped
     environment:
       NODE_ENV: production
+      MONITOR_ME_AUTH_DISABLED: "${MONITOR_ME_AUTH_DISABLED:-false}"
       PORT: "3000"
       HOSTNAME: "0.0.0.0"
       MONITOR_ME_API_BASE_URL: "http://api:8080"
