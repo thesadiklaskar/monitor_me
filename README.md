@@ -49,7 +49,7 @@ sudo bash ./install.sh
 ```
 
 The installer asks for:
-1. A DNS hostname whose A record points to the VPS public IP.
+1. A DNS hostname whose A record routes to the control plane or its public HTTPS load balancer.
 2. The administrator public IP/CIDR (it suggests the SSH client IP when available).
 3. An email address for certificate expiry notices.
 4. Confirmation before enabling UFW if the host firewall is inactive.
