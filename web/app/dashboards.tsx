@@ -438,7 +438,8 @@ export default function DashboardsView({ servers }: { servers: Server[] }) {
         from,
         to,
         step: rangeSteps[range],
-        limit: "120",
+        // date_bin uses epoch-aligned buckets; include both edge buckets.
+        limit: "150",
         metric: panel.metric_name,
       });
       try {
