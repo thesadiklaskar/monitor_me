@@ -96,7 +96,7 @@ The hosting provider does not determine compatibility; the control-plane operati
 | **Dedicated server / own data centre** | Supported on Ubuntu/Debian amd64 with a routable DNS name, the same ports and a working outbound connection. |
 | **Other cloud providers** | The same VM requirements apply. No provider-specific account, IAM or VPC API integration is required or configured by Monitor Me. |
 
-A load balancer can be used only when it forwards the required traffic correctly. Port 80 must reach the host's certificate-challenge endpoint, HTTPS must preserve the administrator source address used by the allowlist, and TCP 8443 must pass the agent's TLS gRPC connection to the control plane. The current Nginx setup does not consume proxy-supplied client IP headers as a trusted identity source.
+A load balancer can be used only in a pass-through configuration: forward TCP 80 to the host's HTTP certificate-challenge endpoint, pass TCP 443 through to Nginx without terminating TLS, and pass TCP 8443 through to the API without terminating agent TLS. It must preserve the original administrator source IP so the `ADMIN_CIDR` allowlist works. The shipped configuration does not trust proxy-supplied client-IP headers or support a TLS-terminating reverse proxy in front of these endpoints.
 
 
 ### Cloud-provider examples
