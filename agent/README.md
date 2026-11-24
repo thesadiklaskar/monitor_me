@@ -119,16 +119,20 @@ Follow logs with `journalctl -u monitor-me-agent -f`. Use `systemctl restart mon
 
 ## Windows local acceptance
 
-1. Start the local Docker Compose control plane from the repository root and sign in at `http://localhost:3000`.
-2. Choose **Add Server**, create a record such as `Windows local PC`, and copy its one-time enrollment token.
-3. In a second PowerShell window at the repository root, run:
+1. Start the control plane with `.` scripts\\start-local.ps1` from PowerShell, or use an existing local Compose stack.
+2. Choose **Add Server**, select Windows, create the host record and copy its one-time enrollment token.
+3. From the repository root on the monitored Windows host, run:
 
    ```powershell
-   .\\scripts\\build-windows-agent.ps1
-   .\\scripts\\run-windows-agent.ps1
+   .\\scripts\\setup-windows-agent.ps1
    ```
 
-4. Paste the one-time token when prompted. The agent connects to `localhost:8443`, validates the development CA, and stores its session/WAL under `%LOCALAPPDATA%\\MonitorMe`.
-5. Open the new server in the dashboard. After the next collection interval, inspect CPU, memory, disk capacity/I/O, network throughput, uptime, process inventory, and System information.
+4. The helper builds the Windows x64 agent with Docker if the binary is absent, then starts it. Paste the one-time token when the hidden prompt appears. For a remote host, pass the reachable gRPC address and trusted CA explicitly:
 
-Keep the PowerShell window open during local acceptance. Press Ctrl+C to stop the foreground agent. On later runs, the persisted session is reused and no new enrollment token is required. This helper does not install a Windows service or configure automatic startup.
+   ```powershell
+   .\\scripts\\setup-windows-agent.ps1 -GrpcAddress monitor.example.com:8443 -CaFile C:\\certs\\monitor-me-ca.crt
+   ```
+
+5. The agent stores its session/WAL under `%LOCALAPPDATA%\\MonitorMe`. Open the server in the dashboard and inspect CPU, memory, disk capacity/I/O, network throughput, uptime, process inventory and System information.
+
+Keep the PowerShell window open during local acceptance. Press Ctrl+C to stop the foreground agent. On later runs, the persisted session is reused and no new enrollment token is needed. The initial Windows helper does not yet install a Windows service or configure automatic startup.
