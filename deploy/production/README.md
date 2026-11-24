@@ -34,7 +34,7 @@ Check that GID 15001 is unused before creating it; if it is already allocated, s
 
     ./deploy/production/deploy.sh
 
-The script validates Compose interpolation, builds version-tagged images, starts PostgreSQL/Redis, waits for readiness, applies SQL migrations, starts API/web, and probes API readiness plus the web config endpoint. It does not configure DNS, Nginx, cloud security groups, or host firewall rules.
+The script validates Compose interpolation, builds version-tagged images plus Linux/Windows native agent artifacts, starts PostgreSQL/Redis, waits for readiness, applies SQL migrations, starts API/web, and probes API readiness plus the web config endpoint. When `MONITOR_ME_AUTH_DISABLED=true`, it requires root and an explicit `ADMIN_CIDR`, writes the Nginx administrator allowlist, validates/reloads Nginx, verifies that installer/CA/artifact paths remain public while dashboard and live WebSocket paths include the allowlist, and only then applies host firewall rules. It still does not provision DNS, obtain certificates, install Nginx/Docker, or update cloud security groups.
 
 After the initial certificate is issued and the API-readable key copy is created, replace the temporary bootstrap vhost with nginx.conf.example as /etc/nginx/conf.d/monitor-me.conf, then run nginx -t and reload Nginx. Certbot's deploy hook refreshes the API-readable group-restricted copy on subsequent renewals. Verify HTTPS, /v1/live/ws WebSocket upgrade and gRPC TLS from an independent network. Enrolled agents must trust the certificate CA used by the public gRPC endpoint.
 
