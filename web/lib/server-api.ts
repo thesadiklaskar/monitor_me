@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 
-export const SESSION_COOKIE = "monitor_me_session";
 const DEFAULT_API_BASE_URL = "http://127.0.0.1:8080";
 
 type BackendResult = {
@@ -17,10 +16,9 @@ function backendBaseURL(): URL {
   return url;
 }
 
-export function sessionToken(request: NextRequest): string | null {
-  if (process.env.MONITOR_ME_AUTH_DISABLED === "true") return "local-anonymous-access";
-  const token = request.cookies.get(SESSION_COOKIE)?.value;
-  return token && token.length >= 32 && token.length <= 128 ? token : null;
+export function sessionToken(_request: NextRequest): string {
+  // Each deployment has one implicit installation context and no browser accounts.
+  return "local-install-access";
 }
 
 export function sameOriginMutation(request: NextRequest): boolean {
@@ -56,38 +54,6 @@ export function sameOriginMutation(request: NextRequest): boolean {
   } catch {
     return false;
   }
-}
-
-export function sessionCookieOptions(request: NextRequest, expiresAt: string) {
-  const expires = new Date(expiresAt);
-  const requestedExpiry = expires.getTime();
-  const maxAge = Number.isFinite(requestedExpiry)
-    ? Math.max(1, Math.floor((requestedExpiry - Date.now()) / 1000))
-    : 60 * 60 * 24;
-
-  return {
-    httpOnly: true,
-    secure:
-      request.nextUrl.protocol === "https:" ||
-      request.headers.get("x-forwarded-proto")?.split(",")[0].trim() === "https",
-    sameSite: "lax" as const,
-    path: "/",
-    maxAge,
-    expires: Number.isFinite(requestedExpiry) ? expires : undefined,
-  };
-}
-
-export function clearSessionCookie(response: NextResponse, request: NextRequest): void {
-  response.cookies.set(SESSION_COOKIE, "", {
-    httpOnly: true,
-    secure:
-      request.nextUrl.protocol === "https:" ||
-      request.headers.get("x-forwarded-proto")?.split(",")[0].trim() === "https",
-    sameSite: "lax",
-    path: "/",
-    maxAge: 0,
-    expires: new Date(0),
-  });
 }
 
 export async function callBackend(
