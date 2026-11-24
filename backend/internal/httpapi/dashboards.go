@@ -64,6 +64,7 @@ func (api *API) createDashboardPanel(writer http.ResponseWriter, request *http.R
 		MetricName    string `json:"metric_name"`
 		TimeRange     string `json:"time_range"`
 		Position      int    `json:"position"`
+		GridWidth     int    `json:"grid_width"`
 	}
 	if !decodeJSON(writer, request, &input) {
 		return
@@ -72,7 +73,7 @@ func (api *API) createDashboardPanel(writer http.ResponseWriter, request *http.R
 		request.Context(), principalFromRequest(request), strings.TrimSpace(request.PathValue("dashboardID")),
 		identity.DashboardPanelInput{
 			Title: input.Title, Visualization: input.Visualization, ServerID: input.ServerID,
-			MetricName: input.MetricName, TimeRange: input.TimeRange, Position: input.Position,
+			MetricName: input.MetricName, TimeRange: input.TimeRange, Position: input.Position, GridWidth: input.GridWidth,
 		},
 	)
 	switch {
@@ -86,6 +87,39 @@ func (api *API) createDashboardPanel(writer http.ResponseWriter, request *http.R
 		writeAPIError(writer, http.StatusInternalServerError, "panel_create_failed", "The dashboard panel could not be created.")
 	default:
 		writeJSON(writer, http.StatusCreated, map[string]any{"panel": panel})
+	}
+}
+
+func (api *API) updateDashboardPanel(writer http.ResponseWriter, request *http.Request) {
+	var input struct {
+		Title         string `json:"title"`
+		Visualization string `json:"visualization"`
+		ServerID      string `json:"server_id"`
+		MetricName    string `json:"metric_name"`
+		TimeRange     string `json:"time_range"`
+		GridWidth     int    `json:"grid_width"`
+	}
+	if !decodeJSON(writer, request, &input) {
+		return
+	}
+	panel, err := api.identities.UpdateDashboardPanel(
+		request.Context(), principalFromRequest(request), strings.TrimSpace(request.PathValue("panelID")),
+		identity.DashboardPanelInput{
+			Title: input.Title, Visualization: input.Visualization, ServerID: input.ServerID,
+			MetricName: input.MetricName, TimeRange: input.TimeRange, GridWidth: input.GridWidth,
+		},
+	)
+	switch {
+	case errors.Is(err, identity.ErrForbidden):
+		writeAPIError(writer, http.StatusForbidden, "forbidden", "Dashboard changes are not permitted.")
+	case errors.Is(err, identity.ErrNotFound):
+		writeAPIError(writer, http.StatusNotFound, "not_found", "The dashboard panel or selected machine was not found.")
+	case errors.Is(err, identity.ErrInvalidInput):
+		writeAPIError(writer, http.StatusBadRequest, "invalid_panel", "The panel configuration is invalid.")
+	case err != nil:
+		writeAPIError(writer, http.StatusInternalServerError, "panel_update_failed", "The dashboard panel could not be updated.")
+	default:
+		writeJSON(writer, http.StatusOK, map[string]any{"panel": panel})
 	}
 }
 

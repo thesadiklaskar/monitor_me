@@ -86,6 +86,7 @@ type DashboardPanel struct {
 	MetricName     string    `json:"metric_name"`
 	TimeRange      string    `json:"time_range"`
 	Position       int       `json:"position"`
+	GridWidth      int       `json:"grid_width"`
 	CreatedAt      time.Time `json:"created_at"`
 	UpdatedAt      time.Time `json:"updated_at"`
 }
@@ -97,6 +98,7 @@ type DashboardPanelInput struct {
 	MetricName     string
 	TimeRange      string
 	Position       int
+	GridWidth      int
 }
 
 
@@ -592,7 +594,7 @@ func (s *Store) ListDashboards(ctx context.Context, principal Principal) ([]Dash
 		SELECT d.id::text, d.name, d.description, d.is_default,
 		       d.created_at, d.updated_at,
 		       panel.id::text, panel.title, panel.visualization, panel.server_id::text,
-		       panel.metric_name, panel.time_range, panel.position,
+		       panel.metric_name, panel.time_range, panel.position, panel.grid_width,
 		       panel.created_at, panel.updated_at
 		FROM dashboards d
 		LEFT JOIN dashboard_panels panel
@@ -611,13 +613,13 @@ func (s *Store) ListDashboards(ctx context.Context, principal Principal) ([]Dash
 	for rows.Next() {
 		var dashboard Dashboard
 		var panelID, panelTitle, visualization, serverID, metricName, timeRange sql.NullString
-		var position sql.NullInt64
+		var position, gridWidth sql.NullInt64
 		var panelCreatedAt, panelUpdatedAt sql.NullTime
 		if err := rows.Scan(
 			&dashboard.ID, &dashboard.Name, &dashboard.Description, &dashboard.IsDefault,
 			&dashboard.CreatedAt, &dashboard.UpdatedAt,
 			&panelID, &panelTitle, &visualization, &serverID,
-			&metricName, &timeRange, &position, &panelCreatedAt, &panelUpdatedAt,
+			&metricName, &timeRange, &position, &gridWidth, &panelCreatedAt, &panelUpdatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("scan installation dashboard: %w", err)
 		}
@@ -633,7 +635,8 @@ func (s *Store) ListDashboards(ctx context.Context, principal Principal) ([]Dash
 				ID: panelID.String, DashboardID: dashboard.ID, Title: panelTitle.String,
 				Visualization: visualization.String, ServerID: serverID.String,
 				MetricName: metricName.String, TimeRange: timeRange.String,
-				Position: int(position.Int64), CreatedAt: panelCreatedAt.Time, UpdatedAt: panelUpdatedAt.Time,
+				Position: int(position.Int64), GridWidth: int(gridWidth.Int64),
+				CreatedAt: panelCreatedAt.Time, UpdatedAt: panelUpdatedAt.Time,
 			}
 			dashboards[indexByID[dashboard.ID]].Panels = append(dashboards[indexByID[dashboard.ID]].Panels, panel)
 		}
@@ -706,12 +709,16 @@ func (s *Store) DeleteDashboard(ctx context.Context, principal Principal, dashbo
 // CreateDashboardPanel validates every referenced entity in the dashboard's organization.
 func (s *Store) CreateDashboardPanel(ctx context.Context, principal Principal, dashboardID string, input DashboardPanelInput) (DashboardPanel, error) {
 	input.Title = strings.TrimSpace(input.Title)
+	if input.GridWidth == 0 {
+		input.GridWidth = 6
+	}
 	if !validUUID(dashboardID) || !validUUID(input.ServerID) ||
 		len(input.Title) < 2 || len(input.Title) > 120 ||
 		!alertMetricPattern.MatchString(input.MetricName) ||
-		(input.Visualization != "timeseries" && input.Visualization != "stat" && input.Visualization != "table") ||
+		!validPanelVisualization(input.Visualization) ||
 		(input.TimeRange != "1h" && input.TimeRange != "6h" && input.TimeRange != "24h" &&
 			input.TimeRange != "7d" && input.TimeRange != "30d") ||
+		!validPanelGridWidth(input.GridWidth) ||
 		input.Position < 0 || input.Position > 1000 {
 		return DashboardPanel{}, ErrInvalidInput
 	}
@@ -719,9 +726,9 @@ func (s *Store) CreateDashboardPanel(ctx context.Context, principal Principal, d
 	err := s.db.QueryRowContext(ctx, `
 		INSERT INTO dashboard_panels (
 			organization_id, dashboard_id, title, visualization, server_id,
-			metric_name, time_range, position, created_by, updated_by
+			metric_name, time_range, position, grid_width, created_by, updated_by
 		)
-		SELECT d.organization_id, d.id, $4, $5, server.id, $6, $7, $8, $9, $9
+		SELECT d.organization_id, d.id, $4, $5, server.id, $6, $7, $8, $9, $10, $10
 		FROM dashboards d
 		JOIN servers server
 		  ON server.id = $3
@@ -729,12 +736,12 @@ func (s *Store) CreateDashboardPanel(ctx context.Context, principal Principal, d
 		WHERE d.id = $1
 		  AND d.organization_id = $2
 		RETURNING id::text, dashboard_id::text, title, visualization, server_id::text,
-		          metric_name, time_range, position, created_at, updated_at
+		          metric_name, time_range, position, grid_width, created_at, updated_at
 	`, dashboardID, principal.OrganizationID, input.ServerID, input.Title, input.Visualization,
-		input.MetricName, input.TimeRange, input.Position, principal.UserID).Scan(
+		input.MetricName, input.TimeRange, input.Position, input.GridWidth, principal.UserID).Scan(
 		&panel.ID, &panel.DashboardID, &panel.Title, &panel.Visualization,
 		&panel.ServerID, &panel.MetricName, &panel.TimeRange,
-		&panel.Position, &panel.CreatedAt, &panel.UpdatedAt,
+		&panel.Position, &panel.GridWidth, &panel.CreatedAt, &panel.UpdatedAt,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return DashboardPanel{}, ErrNotFound
@@ -743,6 +750,74 @@ func (s *Store) CreateDashboardPanel(ctx context.Context, principal Principal, d
 		return DashboardPanel{}, fmt.Errorf("create dashboard panel: %w", err)
 	}
 	return panel, nil
+}
+
+// UpdateDashboardPanel replaces a panel's saved query and presentation settings.
+// The panel, parent dashboard and selected server must all belong to the installation.
+func (s *Store) UpdateDashboardPanel(ctx context.Context, principal Principal, panelID string, input DashboardPanelInput) (DashboardPanel, error) {
+	input.Title = strings.TrimSpace(input.Title)
+	if input.GridWidth == 0 {
+		input.GridWidth = 6
+	}
+	if !validUUID(panelID) || !validUUID(input.ServerID) ||
+		len(input.Title) < 2 || len(input.Title) > 120 ||
+		!alertMetricPattern.MatchString(input.MetricName) ||
+		!validPanelVisualization(input.Visualization) ||
+		(input.TimeRange != "1h" && input.TimeRange != "6h" && input.TimeRange != "24h" &&
+			input.TimeRange != "7d" && input.TimeRange != "30d") ||
+		!validPanelGridWidth(input.GridWidth) {
+		return DashboardPanel{}, ErrInvalidInput
+	}
+
+	var panel DashboardPanel
+	err := s.db.QueryRowContext(ctx, `
+		UPDATE dashboard_panels panel
+		SET title = $3,
+		    visualization = $4,
+		    server_id = server.id,
+		    metric_name = $6,
+		    time_range = $7,
+		    grid_width = $8,
+		    updated_by = $9,
+		    updated_at = now()
+		FROM dashboards dashboard
+		JOIN servers server
+		  ON server.id = $5
+		 AND server.organization_id = dashboard.organization_id
+		WHERE panel.id = $1
+		  AND panel.organization_id = $2
+		  AND dashboard.id = panel.dashboard_id
+		  AND dashboard.organization_id = panel.organization_id
+		RETURNING panel.id::text, panel.dashboard_id::text, panel.title,
+		          panel.visualization, panel.server_id::text, panel.metric_name,
+		          panel.time_range, panel.position, panel.grid_width,
+		          panel.created_at, panel.updated_at
+	`, panelID, principal.OrganizationID, input.Title, input.Visualization,
+		input.ServerID, input.MetricName, input.TimeRange, input.GridWidth, principal.UserID).Scan(
+		&panel.ID, &panel.DashboardID, &panel.Title, &panel.Visualization,
+		&panel.ServerID, &panel.MetricName, &panel.TimeRange, &panel.Position,
+		&panel.GridWidth, &panel.CreatedAt, &panel.UpdatedAt,
+	)
+	if errors.Is(err, sql.ErrNoRows) {
+		return DashboardPanel{}, ErrNotFound
+	}
+	if err != nil {
+		return DashboardPanel{}, fmt.Errorf("update dashboard panel: %w", err)
+	}
+	return panel, nil
+}
+
+func validPanelVisualization(value string) bool {
+	switch value {
+	case "timeseries", "stat", "table", "bar", "area", "gauge", "heatmap":
+		return true
+	default:
+		return false
+	}
+}
+
+func validPanelGridWidth(value int) bool {
+	return value == 4 || value == 6 || value == 8 || value == 12
 }
 
 // MoveDashboardPanel updates the persisted ordering of panels within one dashboard.
