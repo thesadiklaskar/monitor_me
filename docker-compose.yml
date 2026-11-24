@@ -115,6 +115,48 @@ services:
     volumes:
       - agent_artifacts:/out
 
+  grafana-db-setup:
+    image: postgres:18.7
+    entrypoint: ["/bin/sh", "/bootstrap-reader.sh"]
+    restart: "no"
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-monitor_me}
+      POSTGRES_USER: ${POSTGRES_USER:-monitor_me}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local_only_change_me}
+      GRAFANA_DB_PASSWORD: ${GRAFANA_DB_PASSWORD:-0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef}
+    volumes:
+      - ./deploy/grafana/bootstrap-reader.sh:/bootstrap-reader.sh:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  grafana:
+    image: ${GRAFANA_IMAGE:-grafana/grafana:13.3.1}
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-localgrafanaadminpasswordchange}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_SERVER_ROOT_URL: ${GRAFANA_ROOT_URL:-http://localhost:3001/}
+      GF_SERVER_SERVE_FROM_SUB_PATH: "false"
+      GF_SECURITY_COOKIE_SECURE: "false"
+      GF_SECURITY_COOKIE_SAMESITE: "lax"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_SERVER_ENABLE_GZIP: "true"
+      POSTGRES_DB: ${POSTGRES_DB:-monitor_me}
+      GRAFANA_DB_PASSWORD: ${GRAFANA_DB_PASSWORD:-0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef}
+    ports:
+      - "127.0.0.1:${GRAFANA_PORT:-3001}:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./deploy/grafana/provisioning:/etc/grafana/provisioning:ro
+    depends_on:
+      grafana-db-setup:
+        condition: service_completed_successfully
+
   web:
     build:
       context: ./web
@@ -147,6 +189,7 @@ services:
         condition: service_completed_successfully
 
 volumes:
+  grafana_data:
   postgres_data:
   redis_data:
   clickhouse_data:
