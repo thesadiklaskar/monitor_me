@@ -14,6 +14,8 @@
 
 This document translates the product brief into an implementation-oriented specification. The product is being built as an original monitoring platform. It must not embed or depend on an existing monitoring platform such as Grafana, Prometheus, Zabbix, or Netdata.
 
+> **Superseding product decision — 2026-11-24:** This original Phase 1 requirements baseline included team, project, organization and remote-operation features that are no longer in scope. The current product is an individual owner's independent self-hosted monitoring installation. No browser login/signup, user management, organization, customer project, workspace selector, or remote host-control action. Primary navigation is Servers, Logs, Dashboards and Alerts. Host/process/systemd/container/cgroup data remains technical host context only. Requirements FR-009 (project views), FR-010 (project attribution/mappings), FR-014 (remote host actions) and FR-018 (enterprise organization access) are **retired**. The remaining legacy code and schema are migration debt, not target functionality. See [the current product contract](PRODUCT_VISION_PLUG_AND_PLAY.md) and [release backlog](PRODUCT_BACKLOG.md).
+
 ## 2. Product Vision
 
 Monitor Me is intended to provide a simple, secure, cross-platform way to enroll machines, observe host and project-level resource usage, investigate application behavior, receive alerts, and perform controlled operational actions.
