@@ -112,17 +112,15 @@ if [[ "$migration_complete" != 1 ]]; then
   echo "Database migration did not finish within the readiness window." >&2
   exit 1
 fi
-compose up -d --no-build api web grafana
+compose up -d --no-build api web
 api_port="$(sed -n 's/^API_HTTP_BIND_PORT=//p' "$ENV_FILE" | tail -n 1)"
 web_port="$(sed -n 's/^WEB_BIND_PORT=//p' "$ENV_FILE" | tail -n 1)"
 api_port="${api_port:-18080}"
 web_port="${web_port:-13000}"
-grafana_port=13001
 ready=0
 for attempt in $(seq 1 45); do
   if curl --connect-timeout 2 --max-time 5 -fsS "http://127.0.0.1:$api_port/health/ready" >/dev/null &&
-     curl --connect-timeout 2 --max-time 5 -fsS "http://127.0.0.1:$web_port/api/config" >/dev/null &&
-     curl --connect-timeout 2 --max-time 5 -fsSL "http://127.0.0.1:$grafana_port/grafana/api/health" >/dev/null; then
+     curl --connect-timeout 2 --max-time 5 -fsS "http://127.0.0.1:$web_port/api/config" >/dev/null; then
     ready=1
     break
   fi
@@ -130,10 +128,8 @@ for attempt in $(seq 1 45); do
 done
 compose ps --all
 if [[ "$ready" != 1 ]]; then
-  compose logs --no-color --tail=150 api web grafana grafana-db-setup
-  echo "Deployment health verification failed. Inspect API/web/Grafana logs and schema compatibility before rollback." >&2
+  compose logs --no-color --tail=150 api web
+  echo "Deployment health verification failed. Inspect logs and schema compatibility before rollback." >&2
   exit 1
 fi
-echo "Application and Grafana containers are healthy."
-echo "Grafana: https://$public_hostname/grafana/ (admin login; password stored in .env.production)."
-echo "Verify Nginx, external HTTPS, WebSocket and gRPC from another network."
+echo "Application containers are healthy. Verify Nginx, external HTTPS, WebSocket and gRPC from another network."
