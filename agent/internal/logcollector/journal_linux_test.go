@@ -14,7 +14,7 @@ func TestNormalizeRecordRedactsSecretsAndPreservesSystemdAttribution(t *testing.
 	now := time.Now().UTC()
 	record := journalRecord{
 		Cursor: "s=cursor-1", RealtimeTimestamp: "1795524000123456",
-		Message: "login password=hunter2 db_password=\"two words\" api_token=\'quoted-token\' Authorization: Bearer abc.def.ghi",
+		Message: `login password=hunter2 db_password="two words" api_token='quoted-token' Authorization: Bearer abc.def.ghi`,
 		Priority: "4", Unit: "payments-api.service", Comm: "payments-api", PID: "321", Hostname: "node-1",
 	}
 	event, ok := normalizeRecord(record, now)
