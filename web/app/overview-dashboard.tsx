@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Activity, ArrowDownToLine, ArrowLeft, ArrowUpFromLine, Cpu, Database, HardDrive, MemoryStick, Network, RefreshCw, Server as ServerIcon, TerminalSquare } from "lucide-react";
+import { Activity, ArrowDown, ArrowLeft, ArrowUp, Cpu, Database, FileText, HardDrive, Network, RefreshCw, Server as ServerIcon } from "lucide-react";
 import { apiRequest } from "@/lib/client-api";
 import { formatByteRate } from "@/lib/format";
 
@@ -67,14 +67,14 @@ const timeWindowMs = 60 * 60 * 1000;
 const metricPanels: MetricDefinition[] = [
   { key: "cpu", title: "CPU utilization", metric: "host.cpu.utilization", unit: "percent", detail: "Total processor usage", icon: Cpu },
   { key: "cores", title: "Processor cores", metric: "host.cpu.core.utilization", unit: "percent", detail: "Average across reported cores", icon: Activity },
-  { key: "memory-used", title: "Memory used", metric: "host.memory.used", unit: "bytes", detail: "Physical memory in use", icon: MemoryStick },
+  { key: "memory-used", title: "Memory used", metric: "host.memory.used", unit: "bytes", detail: "Physical memory in use", icon: Database },
   { key: "memory-free", title: "Memory available", metric: "host.memory.available", unit: "bytes", detail: "Memory available to the host", icon: Database },
   { key: "storage", title: "Storage usage", metric: "host.disk.used.percent", unit: "percent", detail: "Average mounted-volume usage", icon: HardDrive },
-  { key: "disk-read", title: "Disk read", metric: "host.disk.read.bytes_per_second", unit: "bytes/second", detail: "Read throughput across devices", icon: ArrowDownToLine },
-  { key: "disk-write", title: "Disk write", metric: "host.disk.write.bytes_per_second", unit: "bytes/second", detail: "Write throughput across devices", icon: ArrowUpFromLine },
+  { key: "disk-read", title: "Disk read", metric: "host.disk.read.bytes_per_second", unit: "bytes/second", detail: "Read throughput across devices", icon: ArrowDown },
+  { key: "disk-write", title: "Disk write", metric: "host.disk.write.bytes_per_second", unit: "bytes/second", detail: "Write throughput across devices", icon: ArrowUp },
   { key: "network-in", title: "Network receive", metric: "host.network.receive.bytes_per_second", unit: "bytes/second", detail: "Incoming traffic across interfaces", icon: Network },
   { key: "network-out", title: "Network transmit", metric: "host.network.transmit.bytes_per_second", unit: "bytes/second", detail: "Outgoing traffic across interfaces", icon: Network },
-  { key: "processes", title: "Processes", metric: "host.process.count", unit: "count", detail: "Processes in the latest host sample", icon: TerminalSquare },
+  { key: "processes", title: "Processes", metric: "host.process.count", unit: "count", detail: "Processes in the latest host sample", icon: FileText },
 ];
 
 function healthLabel(status: string): string {
@@ -357,7 +357,7 @@ export default function OverviewDashboard({ servers }: { servers: Server[] }) {
           ))}
           <article className="overview-metric-card overview-logs-card">
             <div className="overview-metric-heading">
-              <span className="overview-metric-icon"><TerminalSquare size={15} /></span>
+              <span className="overview-metric-icon"><FileText size={15} /></span>
               <div><h3>Host logs</h3><p>Latest real events · last hour</p></div>
             </div>
             {data?.logsError ? (
