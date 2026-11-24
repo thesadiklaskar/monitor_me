@@ -112,7 +112,12 @@ fi
 
 valid_domain "$PUBLIC_HOSTNAME" || fail "PUBLIC_HOSTNAME in .env.production must be a valid FQDN."
 valid_cidr "$ADMIN_CIDR" || fail "ADMIN_CIDR in .env.production is invalid or unrestricted."
-if [[ -z "$LE_EMAIL" ]]; then LE_EMAIL="$(prompt 'Email for TLS certificate expiry notices' '')"; fi
+if [[ -z "$LE_EMAIL" ]]; then
+  LE_EMAIL="$(prompt 'Email for TLS certificate expiry notices' '')"
+  [[ "$LE_EMAIL" == *@*.* ]] || fail "Enter a valid LE_EMAIL in .env.production."
+  printf '\nLE_EMAIL=%s\n' "$LE_EMAIL" >> "$ENV_FILE"
+  chmod 600 "$ENV_FILE"
+fi
 [[ "$LE_EMAIL" == *@*.* ]] || fail "Enter a valid LE_EMAIL in .env.production."
 if [[ -n "$PUBLIC_IPV4" ]]; then
   RESOLVED_IPV4="$(getent ahostsv4 "$PUBLIC_HOSTNAME" | awk 'NR==1 {print $1}' || true)"
@@ -148,9 +153,10 @@ nginx -t
 systemctl reload nginx
 
 log "Configuring UFW safely."
-SSH_PORT="$(sshd -T 2>/dev/null | awk '$1 == "port" {print $2; exit}')"
+SSH_PORT="$(sshd -T 2>/dev/null | awk '$1 == "port" {print $2; exit}' || true)"
 if [[ -z "$SSH_PORT" ]]; then SSH_PORT=22; fi
 if ufw status 2>/dev/null | grep -q '^Status: active'; then
+  ufw allow 80/tcp
   log "UFW is already active; deployment will add only required Monitor Me rules."
 else
   printf 'UFW is inactive. It will be enabled with inbound deny, outbound allow and SSH restricted to %s.\n' "$ADMIN_CIDR"
