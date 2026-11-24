@@ -54,7 +54,7 @@ The complete product contract, architecture boundaries and acceptance targets ar
 | Local platform stack | **Runtime verified** | PostgreSQL, Redis, migration runner, API, and web services start through Docker Compose |
 | Database and cache integration | **Runtime verified** | PostgreSQL remains durable; Redis and PostgreSQL dependency outage/readiness recovery are tested |
 | Agent protocol and ingestion | **Phase 3 verified** | TLS enrollment, persisted session, heartbeat, reconnect/backoff, streaming batches, post-commit ACK, and idempotent PostgreSQL persistence pass end-to-end CI |
-| Native host agent | **Linux verified; Windows initial slice in progress** | Linux and Windows report OS/platform/architecture plus available virtualization metadata. Windows CPU, memory/swap, disk, network, uptime and process RSS collection is present; Windows runtime acceptance, Windows Service lifecycle and signed remote installers remain pending |
+| Native host agent | **Linux verified; Windows implementation pending runtime acceptance** | Compose builds Linux amd64/arm64 and Windows x64 bundles; source-independent installers verify SHA-256 and install Linux systemd / Windows Service lifecycle code. Host metadata reports OS/architecture and available VM hints. Runtime acceptance, publisher signing, macOS and broader Windows metric parity remain pending |
 | Telemetry history and live transport | **Phase 3 verified** | Bounded PostgreSQL range query, 30-day raw retention, 90-day idempotency retention, one-use session-bound WebSocket tickets, cross-tenant isolation, and bounded subscriber queues pass CI |
 | Project/workload attribution | **Phase 3 verified (Linux mapping path)** | cgroup/Systemd/container selectors, exact server/project mappings, and explicit host-total/unclassified/shared attribution pass database integration tests; full Docker Engine discovery remains later work |
 | Monitoring dashboard | **In Progress** | Operator shell polish, responsive collapse, vector icons, no-login local mode and host detail telemetry are implemented; professional fleet overview, log explorer, global selectors and complete UI acceptance remain |
@@ -286,18 +286,18 @@ The initial collection target is configurable in the 100ms–500ms range where h
 
 ## Security Principles
 
-The default local Compose profile is no-login and is published only on loopback. The production profile keeps no-login opt-in; deploy refuses to enable it until the HTTPS certificate, Nginx administrator allowlist and host-firewall checks succeed. See ADR 0004.
+The default local Compose profile is no-login and is published only on loopback. The production Compose profile defaults to no-login; deploy fails closed unless ADMIN_CIDR is configured and Nginx applies the allowlist to dashboard/API/WebSocket paths. Public installer/CA/artifact routes remain reachable over HTTPS. See ADR 0004.
 
 - TLS-protected agent communication with short-lived, single-use, revocable enrollment credentials.
 - Default single-install operation removes the signup/login workflow; the workspace identity is created internally.
-- Local no-login access is loopback-bound. Remote no-login access must be gated by HTTPS and an administrator CIDR/VPN boundary before it is enabled.
+- Local no-login access is loopback-bound. Production no-login relies on HTTPS plus an Nginx administrator CIDR/VPN allowlist for the dashboard/API/WebSocket; only dedicated node bootstrap, CA and artifact paths are public.
 - Keep operator dashboard access separate from agent gRPC enrollment. A node token never authenticates a browser session.
 - Keep PostgreSQL, Redis, ClickHouse (when implemented), API HTTP and internal web ports private.
 - Internal installation/server isolation remains mandatory even when the operator UI is single-tenant.
 - Least-privilege host collection and Docker access.
 - Explicit allowlists and audit records for remote actions.
 - No unrestricted remote shell feature.
-- Signed and verified installer artifacts before execution.
+- Installer artifacts are SHA-256 verified before installation. Publisher code-signing and signature enforcement are still release requirements; checksum integrity alone is not publisher identity.
 - Secrets are never committed to the repository or written to logs.
 - Production deployment uses a least-privilege host firewall: expose only intended HTTPS/gRPC entry points, restrict SSH to administrators, and keep database/cache ports private.
 
