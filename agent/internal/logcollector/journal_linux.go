@@ -138,7 +138,7 @@ func (j *Journal) collect(ctx context.Context, cursor string, limit int) ([]logs
 }
 
 func normalizeRecord(record journalRecord, observedAt time.Time) (logspool.Event, bool) {
-	if record.Cursor == "" || record.Message == "" {
+	if record.Cursor == "" {
 		return logspool.Event{}, false
 	}
 	eventTime := observedAt
@@ -163,10 +163,13 @@ func normalizeRecord(record journalRecord, observedAt time.Time) (logspool.Event
 		source = source[:128]
 	}
 	body := strings.ReplaceAll(record.Message, "\x00", "")
+	if body == "" {
+		body = "[journal record without MESSAGE]"
+	}
 	body = bearerSecret.ReplaceAllString(body, "Bearer [REDACTED]")
 	body = assignmentSecret.ReplaceAllString(body, "$1$2[REDACTED]")
 	if len(body) > 16<<10 {
-		body = body[:16<<10]
+		body = strings.ToValidUTF8(body[:16<<10], "")
 	}
 
 	attributes := make(map[string]string, 4)
@@ -224,7 +227,7 @@ func bounded(value string, limit int) string {
 		return r
 	}, value)
 	if len(value) > limit {
-		return value[:limit]
+		value = strings.ToValidUTF8(value[:limit], "")
 	}
 	return value
 }

@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"runtime"
 	"time"
 
 	"example.com/monitor-me/agent/internal/collector"
@@ -100,16 +101,7 @@ func run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 			if !journal.Available() || cfg.GRPCAddress == "" {
 				continue
 			}
-			pending, pendingErr := logStore.Peek(1)
-			if pendingErr != nil {
-				logger.Error("could not inspect durable log queue", "error", pendingErr)
-				continue
-			}
-			if len(pending) > 0 {
-				// Do not advance the journal cursor while an older batch is unacknowledged.
-				continue
-			}
-			cursor, cursorErr := logStore.Cursor()
+			cursor, cursorErr := logStore.QueuedCursor()
 			if cursorErr != nil {
 				logger.Error("could not read acknowledged journal cursor", "error", cursorErr)
 				continue
@@ -236,7 +228,6 @@ func runRemote(ctx context.Context, cfg config.Config, capabilities []string, st
 			case <-deliveryTicker.C:
 				callContext, cancel := context.WithTimeout(ctx, 30*time.Second)
 				sent, sendErr := client.SendPending(callContext, session, store, cfg.AllowedSystemdUnits)
-				cancel()
 				if sent > 0 {
 					healthState.MarkSuccessfulSend(time.Now().UTC())
 					logger.Debug("telemetry batches acknowledged by control plane", "batch_count", sent)

@@ -103,6 +103,26 @@ func NewBatch(events []Event, cursor string, collectedAtUnixNanos int64) (Batch,
 func (s *Store) Cursor() (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	return s.readCursorLocked()
+}
+
+// QueuedCursor returns the most advanced cursor represented by a durable batch.
+// It lets journald continue filling the bounded local WAL during outages. The
+// acknowledged cursor is used only when no batches remain in the queue.
+func (s *Store) QueuedCursor() (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	batches, err := s.readLocked(0)
+	if err != nil {
+		return "", err
+	}
+	if len(batches) > 0 {
+		return batches[len(batches)-1].Cursor, nil
+	}
+	return s.readCursorLocked()
+}
+
+func (s *Store) readCursorLocked() (string, error) {
 	data, err := os.ReadFile(s.cursorPath)
 	if errors.Is(err, os.ErrNotExist) {
 		return "", nil
