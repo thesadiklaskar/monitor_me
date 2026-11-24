@@ -75,11 +75,12 @@ func BenchmarkPublishCommittedBatch(b *testing.B) {
 	}
 }
 
-func TestPublishCommittedBatchKeepsProjectScopesDistinct(t *testing.T) {
+
+func TestPublishCommittedBatchKeepsDistinctMetricLabels(t *testing.T) {
 	publisher := &capturedPublisher{}
 	samples := []LiveSample{
-		{MetricName: "process.memory.rss", Value: 10, Unit: "bytes", ProjectID: "project-a", Labels: map[string]string{"pid": "1"}},
-		{MetricName: "process.memory.rss", Value: 20, Unit: "bytes", ProjectID: "project-b", Labels: map[string]string{"pid": "1"}},
+		{MetricName: "process.memory.rss", Value: 10, Unit: "bytes", Labels: map[string]string{"pid": "1"}},
+		{MetricName: "process.memory.rss", Value: 20, Unit: "bytes", Labels: map[string]string{"pid": "2"}},
 	}
 	if err := PublishCommittedBatch(context.Background(), publisher, "org", "server", "agent",
 		"0123456789abcdef0123456789abcdef", samples); err != nil {
@@ -90,13 +91,13 @@ func TestPublishCommittedBatchKeepsProjectScopesDistinct(t *testing.T) {
 		t.Fatalf("decode live event: %v", err)
 	}
 	if len(event.Samples) != 2 {
-		t.Fatalf("different project scopes must remain separate: %+v", event.Samples)
+		t.Fatalf("different process labels must remain separate: %+v", event.Samples)
 	}
 	seen := map[string]bool{}
 	for _, sample := range event.Samples {
-		seen[sample.ProjectID] = true
+		seen[sample.Labels["pid"]] = true
 	}
-	if !seen["project-a"] || !seen["project-b"] {
-		t.Fatalf("project scopes were not preserved in live payload: %+v", event.Samples)
+	if !seen["1"] || !seen["2"] {
+		t.Fatalf("process label identities were not preserved: %+v", event.Samples)
 	}
 }
