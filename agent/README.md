@@ -9,6 +9,7 @@ Monitor Me's native Go agent runs on each monitored machine. It collects real ho
 - Aggregate and per-core CPU utilisation.
 - Memory used/available/cache and swap.
 - Disk capacity, read/write throughput and IOPS.
+- Mounted filesystem total/used/free capacity and usage percentage are sampled once per minute per readable mount; samples include mountpoint, device and filesystem labels.
 - Network bytes, packets and errors per second.
 - Host uptime, process count, top readable processes by RSS.
 - TCP connection state and listening-port metadata.

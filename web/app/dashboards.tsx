@@ -586,8 +586,8 @@ export default function DashboardsView({ servers }: { servers: Server[] }) {
       metric_name: panelVisualization === "logs" ? "host.logs.events" : panelMetric,
       time_range: panelRange,
       grid_width: panelGridWidth,
-      label_key: panelLabelKey.trim(),
-      label_value: panelLabelValue,
+      label_key: panelVisualization === "logs" ? "" : panelLabelKey.trim(),
+      label_value: panelVisualization === "logs" ? "" : panelLabelValue,
       ...(editingPanel ? {} : { position: selectedDashboard.panels.length }),
     };
     setBusy(true);
@@ -762,8 +762,8 @@ export default function DashboardsView({ servers }: { servers: Server[] }) {
                       <label className="field"><span>Visualization</span><select value={panelVisualization} onChange={(event) => setPanelVisualization(event.target.value as Visualization)}><option value="timeseries">Time series</option><option value="area">Area</option><option value="bar">Bar</option><option value="stat">Stat</option><option value="gauge">Gauge</option><option value="heatmap">Heatmap</option><option value="table">Table</option><option value="logs">Host logs</option></select></label>
                       <label className="field"><span>Default time range</span><select value={panelRange} onChange={(event) => setPanelRange(event.target.value as TimeRange)}>{Object.entries(rangeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
                       <label className="field"><span>Panel width</span><select value={panelGridWidth} onChange={(event) => setPanelGridWidth(Number(event.target.value) as GridWidth)}><option value={4}>Compact · ⅓</option><option value={6}>Half · ½</option><option value={8}>Wide · ⅔</option><option value={12}>Full width</option></select></label>
-                      <label className="field"><span>Label key (optional)</span><input value={panelLabelKey} onChange={(event) => setPanelLabelKey(event.target.value)} maxLength={64} placeholder="mountpoint or interface" disabled={panelVisualization === "logs"} /></label>
-                      <label className="field"><span>Label value (optional)</span><input value={panelLabelValue} onChange={(event) => setPanelLabelValue(event.target.value)} maxLength={256} placeholder="/ or eth0" disabled={panelVisualization === "logs"} /></label>
+                      <label className="field"><span>Label key (optional)</span><input value={panelLabelKey} onChange={(event) => setPanelLabelKey(event.target.value)} maxLength={64} placeholder="mountpoint or interface" required={panelLabelValue.trim().length > 0 && panelVisualization !== "logs"} disabled={panelVisualization === "logs"} /></label>
+                      <label className="field"><span>Label value (optional)</span><input value={panelLabelValue} onChange={(event) => setPanelLabelValue(event.target.value)} maxLength={256} placeholder="/ or eth0" required={panelLabelKey.trim().length > 0 && panelVisualization !== "logs"} disabled={panelVisualization === "logs"} /></label>
 
                       <div className="dashboard-builder-actions">
                         <Button variant="secondary" type="button" onClick={() => { setShowPanelForm(false); setEditingPanel(null); }}>Cancel</Button>
