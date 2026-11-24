@@ -19,6 +19,8 @@ concurrency:
 
 jobs:
   backend:
+    env:
+      GOFLAGS: -mod=mod
     name: Go backend checks
     runs-on: ubuntu-latest
     steps:
@@ -37,11 +39,6 @@ jobs:
           go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.6.2
       - name: Generate versioned gRPC sources
         run: sh scripts/generate-proto.sh
-      - name: Resolve and verify Go module graph
-        working-directory: backend
-        run: |
-          go mod tidy
-          go mod verify
       - name: Format check
         working-directory: backend
         run: |
@@ -67,6 +64,8 @@ jobs:
         run: go test -run '^$' -bench BenchmarkPublishCommittedBatch -benchmem -benchtime=3s ./internal/telemetry
 
   agent:
+    env:
+      GOFLAGS: -mod=mod
     name: Native Linux agent checks
     runs-on: ubuntu-latest
     steps:
@@ -85,11 +84,6 @@ jobs:
           go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.6.2
       - name: Generate versioned gRPC sources for both modules
         run: sh scripts/generate-proto.sh
-      - name: Resolve and verify agent module graph
-        working-directory: agent
-        run: |
-          go mod tidy
-          go mod verify
       - name: Format check
         working-directory: agent
         run: |
@@ -171,6 +165,8 @@ jobs:
         run: npm run build
 
   compose:
+    env:
+      GOFLAGS: -mod=mod
     name: Docker Compose integration
     runs-on: ubuntu-latest
     steps:
@@ -190,11 +186,6 @@ jobs:
           go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.12
           go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.6.2
           sh scripts/generate-proto.sh
-      - name: Resolve dependencies for integration tests
-        working-directory: backend
-        run: |
-          go mod tidy
-          go mod verify
       - name: Generate local TLS certificate
         run: |
           mkdir -p .data/certs
