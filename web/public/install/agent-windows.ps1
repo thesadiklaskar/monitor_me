@@ -73,6 +73,7 @@ try {
         }
         Remove-Item -LiteralPath $stateFile -Force -ErrorAction SilentlyContinue
     }
+    $service = Get-Service -Name "MonitorMeAgent" -ErrorAction SilentlyContinue
 
     $token = ""
     if (-not (Test-Path $stateFile)) {
