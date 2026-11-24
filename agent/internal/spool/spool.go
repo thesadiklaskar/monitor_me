@@ -15,7 +15,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/WorkRCS/monitor_me/agent/internal/collector"
+	"example.com/monitor-me/agent/internal/collector"
 )
 
 var ErrSpoolFull = errors.New("agent spool quota exceeded")

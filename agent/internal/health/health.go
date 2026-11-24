@@ -4,7 +4,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/WorkRCS/monitor_me/agent/internal/collector"
+	"example.com/monitor-me/agent/internal/collector"
 )
 
 // State stores process-lifetime delivery state shared by collection and

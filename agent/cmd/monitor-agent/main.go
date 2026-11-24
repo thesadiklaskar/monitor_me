@@ -6,12 +6,12 @@ import (
 	"os"
 	"time"
 
-	"github.com/WorkRCS/monitor_me/agent/internal/collector"
-	"github.com/WorkRCS/monitor_me/agent/internal/config"
-	"github.com/WorkRCS/monitor_me/agent/internal/health"
-	"github.com/WorkRCS/monitor_me/agent/internal/spool"
-	"github.com/WorkRCS/monitor_me/agent/internal/state"
-	"github.com/WorkRCS/monitor_me/agent/internal/transport"
+	"example.com/monitor-me/agent/internal/collector"
+	"example.com/monitor-me/agent/internal/config"
+	"example.com/monitor-me/agent/internal/health"
+	"example.com/monitor-me/agent/internal/spool"
+	"example.com/monitor-me/agent/internal/state"
+	"example.com/monitor-me/agent/internal/transport"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )

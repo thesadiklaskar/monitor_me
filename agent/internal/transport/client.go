@@ -11,11 +11,11 @@ import (
 	"runtime"
 	"time"
 
-	monitorv1 "github.com/WorkRCS/monitor_me/agent/gen/monitor/v1"
-	"github.com/WorkRCS/monitor_me/agent/internal/config"
-	"github.com/WorkRCS/monitor_me/agent/internal/operations"
-	"github.com/WorkRCS/monitor_me/agent/internal/spool"
-	"github.com/WorkRCS/monitor_me/agent/internal/state"
+	monitorv1 "example.com/monitor-me/agent/gen/monitor/v1"
+	"example.com/monitor-me/agent/internal/config"
+	"example.com/monitor-me/agent/internal/operations"
+	"example.com/monitor-me/agent/internal/spool"
+	"example.com/monitor-me/agent/internal/state"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 )

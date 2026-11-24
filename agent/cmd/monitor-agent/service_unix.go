@@ -9,7 +9,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/WorkRCS/monitor_me/agent/internal/config"
+	"example.com/monitor-me/agent/internal/config"
 )
 
 func runPlatformService(cfg config.Config, logger *slog.Logger) error {
