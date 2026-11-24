@@ -4,8 +4,10 @@ This directory provides a single-node production-oriented Compose topology and o
 
 ## Network layout
 
-- Host Nginx terminates HTTPS on TCP 443 and proxies Next.js to 127.0.0.1:13000.
-- Nginx proxies only /v1/live/ws to API HTTP on 127.0.0.1:18080 for browser live telemetry.
+- Host Nginx terminates HTTPS on TCP 443.
+- Nginx exposes only the Linux/Windows installer scripts, public agent CA, and checksum-verified artifact endpoints to monitored nodes.
+- The dashboard, its normal API routes and /v1/live/ws are restricted by a generated administrator/VPN allowlist when the no-login profile is enabled.
+- Nginx proxies /v1/live/ws to API HTTP on 127.0.0.1:18080 for browser live telemetry.
 - The API exposes TLS gRPC on TCP 8443 for enrolled agents.
 - PostgreSQL and Redis have no host-published ports and are reachable only on the Compose network.
 - API HTTP and Next.js are loopback-bound. Do not change them to 0.0.0.0.
@@ -41,9 +43,11 @@ After the initial certificate is issued and the API-readable key copy is created
     ./deploy/production/firewall.sh --role control-plane --admin-cidr 203.0.113.10/32
     ./deploy/production/firewall.sh --role agent-only
 
-Dry-run is default. Control-plane mode adds source-restricted SSH and HTTPS from the administrator CIDRs, plus gRPC (optional HTTP-01). This is the intended access boundary for the no-login dashboard. You can use repeated --admin-cidr arguments for dual-stack SSH administrator ranges. For a private/VPN agent fleet, repeated --grpc-cidr arguments can restrict gRPC ingress to known agent source ranges; omit that option only when public gRPC ingress is intended. The helper detects active UFW/firewalld and refuses to enable an inactive firewall or choose between competing managers.
+Dry-run is default. Control-plane mode adds source-restricted SSH, public TCP 443 for TLS, and gRPC (source-restricted when --grpc-cidr is supplied; otherwise public for roaming agents). Port 443 must reach Nginx because remote nodes fetch the public installer/CA/artifact routes there. The no-login dashboard is protected at the Nginx layer, not by closing the entire HTTPS port. The deployment script writes /etc/nginx/snippets/monitor-me-admin-allowlist.conf from ADMIN_CIDR and verifies that Nginx includes it in both the dashboard and live-WebSocket locations, while the four public bootstrap routes remain available.
 
-The helper restricts new HTTPS rules to the same administrator CIDRs as SSH; agent gRPC remains public unless --grpc-cidr is supplied. Existing broad port-443 rules must be reviewed and reconciled separately because the helper is additive. It never changes default policies, removes existing rules, flushes firewall state or disables a firewall. Because it is additive, it does not remove broad pre-existing SSH/service rules; inspect and reconcile them manually before claiming least-privilege. --rollback removes only additions recorded by this helper; it cannot revert manual or cloud security-group changes. Agent-only hosts need no inbound Monitor Me port. Restricted outbound environments need TCP gRPC only to the control-plane address.
+You can use repeated --admin-cidr arguments for SSH administrator ranges. For a private/VPN agent fleet, repeated --grpc-cidr arguments can restrict gRPC ingress to known source ranges; omit that option only when public gRPC ingress is intended. The helper detects active UFW/firewalld and refuses to enable an inactive firewall or choose between competing managers. It does not automatically configure cloud security groups.
+
+The helper never changes default policies, removes rules, flushes firewall state or disables a firewall. Existing broad rules and Docker/cloud forwarding paths still require external review. --rollback removes only additions recorded by this helper; it cannot revert manual or cloud security-group changes. Agent-only hosts need no inbound Monitor Me port. Restricted outbound environments need TCP gRPC to the control-plane address plus HTTPS to download installers/agent updates.
 
 Never publish PostgreSQL 5432, Redis 6379, API 8080 or web 3000. Docker bridge NAT can bypass simplistic UFW assumptions; this topology avoids public container publishing for those services.
 
