@@ -37,7 +37,7 @@ func (api *API) installationPrincipal(ctx context.Context) (identity.Principal, 
 		return api.localPrincipal, nil
 	}
 
-	principal, expiresAt, err := api.identities.CreateLocalPrincipal(ctx)
+	principal, expiresAt, err := api.identities.CreateInstallationPrincipal(ctx)
 	if err != nil {
 		return identity.Principal{}, err
 	}
