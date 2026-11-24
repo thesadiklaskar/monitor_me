@@ -104,6 +104,8 @@ func (api *API) createDashboardPanel(writer http.ResponseWriter, request *http.R
 		TimeRange     string `json:"time_range"`
 		Position      int    `json:"position"`
 		GridWidth     int    `json:"grid_width"`
+		LabelKey      string `json:"label_key"`
+		LabelValue    string `json:"label_value"`
 	}
 	if !decodeJSON(writer, request, &input) {
 		return
@@ -113,6 +115,7 @@ func (api *API) createDashboardPanel(writer http.ResponseWriter, request *http.R
 		identity.DashboardPanelInput{
 			Title: input.Title, Visualization: input.Visualization, ServerID: input.ServerID,
 			MetricName: input.MetricName, TimeRange: input.TimeRange, Position: input.Position, GridWidth: input.GridWidth,
+			LabelKey: input.LabelKey, LabelValue: input.LabelValue,
 		},
 	)
 	switch {
@@ -137,6 +140,8 @@ func (api *API) updateDashboardPanel(writer http.ResponseWriter, request *http.R
 		MetricName    string `json:"metric_name"`
 		TimeRange     string `json:"time_range"`
 		GridWidth     int    `json:"grid_width"`
+		LabelKey      string `json:"label_key"`
+		LabelValue    string `json:"label_value"`
 	}
 	if !decodeJSON(writer, request, &input) {
 		return
@@ -146,6 +151,7 @@ func (api *API) updateDashboardPanel(writer http.ResponseWriter, request *http.R
 		identity.DashboardPanelInput{
 			Title: input.Title, Visualization: input.Visualization, ServerID: input.ServerID,
 			MetricName: input.MetricName, TimeRange: input.TimeRange, GridWidth: input.GridWidth,
+			LabelKey: input.LabelKey, LabelValue: input.LabelValue,
 		},
 	)
 	switch {

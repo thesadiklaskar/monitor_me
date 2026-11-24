@@ -3,6 +3,7 @@ package httpapi
 import (
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"monitor-me.internal/backend/internal/telemetry"
@@ -38,6 +39,8 @@ func (api *API) metrics(writer http.ResponseWriter, request *http.Request) {
 		OrganizationID: principal.OrganizationID,
 		ServerID:       request.PathValue("serverID"),
 		MetricName:     queryValues.Get("metric"),
+		LabelKey:       strings.TrimSpace(queryValues.Get("label_key")),
+		LabelValue:     queryValues.Get("label_value"),
 		From:           from,
 		To:             to,
 		Step:           step,

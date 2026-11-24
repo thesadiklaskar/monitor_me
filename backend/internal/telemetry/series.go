@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"strings"
 	"time"
 )
 
@@ -19,12 +20,15 @@ const (
 var (
 	seriesUUID       = regexp.MustCompile("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$")
 	seriesMetricName = regexp.MustCompile("^[a-zA-Z][a-zA-Z0-9_.-]{0,127}$")
+	seriesLabelKey  = regexp.MustCompile("^[a-zA-Z][a-zA-Z0-9_.-]{0,63}$")
 )
 
 type RangeQuery struct {
 	OrganizationID string
 	ServerID       string
 	MetricName     string
+	LabelKey       string
+	LabelValue     string
 	From           time.Time
 	To             time.Time
 	Step           time.Duration
@@ -42,6 +46,11 @@ type SeriesPoint struct {
 func ValidateRangeQuery(query RangeQuery, now time.Time) error {
 	if query.OrganizationID == "" || !seriesUUID.MatchString(query.ServerID) || !seriesMetricName.MatchString(query.MetricName) {
 		return errors.New("organization, server, and valid metric name are required")
+	}
+	if (query.LabelKey == "") != (query.LabelValue == "") ||
+		(query.LabelKey != "" && (!seriesLabelKey.MatchString(query.LabelKey) ||
+			len(query.LabelValue) > 256 || strings.ContainsAny(query.LabelValue, "\\r\\n\\x00"))) {
+		return errors.New("metric label filters require a valid key and a bounded single-line value")
 	}
 	if query.From.IsZero() || query.To.IsZero() || !query.From.Before(query.To) ||
 		query.To.After(now.Add(time.Minute)) || query.To.Sub(query.From) > maximumSeriesRange {
@@ -95,11 +104,12 @@ func QueryRange(ctx context.Context, db *sql.DB, query RangeQuery) ([]SeriesPoin
 		  AND metric_name = $4
 		  AND observed_at >= $5
 		  AND observed_at < $6
+		  AND ($7 = '' OR labels ->> $7 = $8)
 		GROUP BY bucket
 		ORDER BY bucket
-		LIMIT $7
+		LIMIT $9
 	`, interval, query.OrganizationID, query.ServerID, query.MetricName,
-		query.From.UTC(), query.To.UTC(), query.Limit)
+		query.From.UTC(), query.To.UTC(), query.LabelKey, query.LabelValue, query.Limit)
 	if err != nil {
 		return nil, fmt.Errorf("query aggregated telemetry series: %w", err)
 	}

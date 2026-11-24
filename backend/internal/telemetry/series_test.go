@@ -98,3 +98,29 @@ func TestSeriesBucketCountUsesEpochAlignedBoundaries(t *testing.T) {
 	}
 }
 
+
+func TestValidateRangeQueryLabelFilters(t *testing.T) {
+	now := time.Date(2026, 11, 24, 12, 0, 0, 0, time.UTC)
+	base := RangeQuery{
+		OrganizationID: "org", ServerID: "00000000-0000-4000-8000-000000000001",
+		MetricName: "host.disk.used.percent", From: now.Add(-time.Hour), To: now,
+		Step: time.Minute, Limit: 120,
+	}
+	valid := base
+	valid.LabelKey = "mountpoint"
+	valid.LabelValue = "/"
+	if err := ValidateRangeQuery(valid, now); err != nil {
+		t.Fatalf("valid label filter rejected: %v", err)
+	}
+	invalid := []RangeQuery{
+		{OrganizationID: base.OrganizationID, ServerID: base.ServerID, MetricName: base.MetricName, From: base.From, To: base.To, Step: base.Step, Limit: base.Limit, LabelKey: "mountpoint"},
+		{OrganizationID: base.OrganizationID, ServerID: base.ServerID, MetricName: base.MetricName, From: base.From, To: base.To, Step: base.Step, Limit: base.Limit, LabelValue: "/"},
+		{OrganizationID: base.OrganizationID, ServerID: base.ServerID, MetricName: base.MetricName, From: base.From, To: base.To, Step: base.Step, Limit: base.Limit, LabelKey: "mountpoint = 'x'", LabelValue: "/"},
+		{OrganizationID: base.OrganizationID, ServerID: base.ServerID, MetricName: base.MetricName, From: base.From, To: base.To, Step: base.Step, Limit: base.Limit, LabelKey: "mountpoint", LabelValue: "line1\nline2"},
+	}
+	for index, query := range invalid {
+		if err := ValidateRangeQuery(query, now); err == nil {
+			t.Errorf("invalid label filter %d was accepted", index)
+		}
+	}
+}
