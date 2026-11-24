@@ -14,7 +14,7 @@ func TestNormalizeRecordRedactsSecretsAndPreservesSystemdAttribution(t *testing.
 	now := time.Now().UTC()
 	record := journalRecord{
 		Cursor: "s=cursor-1", RealtimeTimestamp: "1795524000123456",
-		Message: "login password=hunter2 Authorization: Bearer abc.def.ghi",
+		Message: "login password=hunter2 db_password=\"two words\" api_token=\'quoted-token\' Authorization: Bearer abc.def.ghi",
 		Priority: "4", Unit: "payments-api.service", Comm: "payments-api", PID: "321", Hostname: "node-1",
 	}
 	event, ok := normalizeRecord(record, now)
@@ -22,7 +22,7 @@ func TestNormalizeRecordRedactsSecretsAndPreservesSystemdAttribution(t *testing.
 	if event.Severity != "warning" || event.Source != "payments-api.service" {
 		t.Fatalf("source/severity = %s/%s", event.Source, event.Severity)
 	}
-	if event.Body == record.Message || containsSecret(event.Body, "hunter2") || containsSecret(event.Body, "abc.def.ghi") {
+	if event.Body == record.Message || containsSecret(event.Body, "hunter2") || containsSecret(event.Body, "abc.def.ghi") || containsSecret(event.Body, "two words") || containsSecret(event.Body, "quoted-token") {
 		t.Fatalf("sensitive values were not redacted: %q", event.Body)
 	}
 	if event.Attributes["systemd_unit"] != "payments-api.service" {

@@ -23,7 +23,7 @@ import (
 const maxJournalLine = 512 << 10
 
 var (
-	assignmentSecret = regexp.MustCompile(`(?i)\b(password|passwd|token|secret|api[_-]?key|authorization)\b(\s*[:=]\s*)([^\s,;]+)`)
+	assignmentSecret = regexp.MustCompile(`(?i)\b(password|passwd|token|secret|api[_-]?key|authorization)\b(\s*[:=]\s*)(?:"[^"]*"|'[^']*'|[^\s,;]+)`)
 	bearerSecret = regexp.MustCompile(`(?i)\bBearer\s+[A-Za-z0-9._~+/=-]+`)
 )
 

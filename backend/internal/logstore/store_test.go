@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -99,8 +100,10 @@ func TestQueryAlwaysScopesOrganizationAndServerAndBindsFilters(t *testing.T) {
 			t.Errorf("unexpected ClickHouse basic auth: %q / %v", username, ok)
 		}
 		receivedParams = request.URL.Query()
-		body := make([]byte, request.ContentLength)
-		_, _ = request.Body.Read(body)
+		body, readErr := io.ReadAll(request.Body)
+		if readErr != nil {
+			t.Errorf("read ClickHouse query body: %v", readErr)
+		}
 		receivedQuery = string(body)
 		_, _ = fmt.Fprintln(writer, `{"event_id":"`+strings.Repeat("a", 64)+`","event_time_unix_nanos":1795524000000000000,"source":"sshd.service","severity":"warning","body":"authentication failed","attributes":{"systemd_unit":"sshd.service"},"project_id":"`+testProjectID+`"}`)
 	}))
