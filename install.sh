@@ -161,8 +161,16 @@ fi
 
 CERT_GROUP_ID="$(sed -n 's/^CERT_GROUP_ID=//p' "$ENV_FILE" | tail -n 1)"
 [[ "$CERT_GROUP_ID" =~ ^[0-9]+$ ]] || fail "CERT_GROUP_ID in .env.production must be numeric."
-if ! getent group "$CERT_GROUP_ID" >/dev/null 2>&1; then groupadd --system --gid "$CERT_GROUP_ID" monitor-me-cert; fi
-CERT_GROUP_ID="$(getent group "$CERT_GROUP_ID" | cut -d: -f3)"
+existing_group_name="$(getent group "$CERT_GROUP_ID" | cut -d: -f1 || true)"
+existing_monitor_group_id="$(getent group monitor-me-cert | cut -d: -f3 || true)"
+if [[ -n "$existing_group_name" && "$existing_group_name" != "monitor-me-cert" ]]; then
+  fail "CERT_GROUP_ID $CERT_GROUP_ID is already assigned to the unrelated system group $existing_group_name. Choose an unused ID or repair .env.production."
+fi
+if [[ -n "$existing_monitor_group_id" && "$existing_monitor_group_id" != "$CERT_GROUP_ID" ]]; then
+  fail "The monitor-me-cert group already exists with GID $existing_monitor_group_id, but .env.production requests $CERT_GROUP_ID."
+fi
+if [[ -z "$existing_group_name" ]]; then groupadd --system --gid "$CERT_GROUP_ID" monitor-me-cert; fi
+CERT_GROUP_ID="$(getent group monitor-me-cert | cut -d: -f3)"
 install -d -o root -g "$CERT_GROUP_ID" -m 0750 "$CERT_DIR"
 install -d -m 0755 /var/www/certbot /etc/nginx/snippets
 
