@@ -8,11 +8,10 @@ import (
 
 func TestLoadConfigFileArgument(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "agent.env")
-	if err := os.WriteFile(path, []byte(
-		"MONITOR_GRPC_ADDRESS="control.example:8443"\n"+
-			"MONITOR_AGENT_STATE_FILE="C:\\\\ProgramData\\\\MonitorMe\\\\agent-state.json"\n"+
-			"MONITOR_ENROLLMENT_TOKEN="token-value"\n",
-	), 0o600); err != nil {
+	content := "MONITOR_GRPC_ADDRESS=\"control.example:8443\"\n" +
+		"MONITOR_AGENT_STATE_FILE=\"C:\\\\ProgramData\\\\MonitorMe\\\\agent-state.json\"\n" +
+		"MONITOR_ENROLLMENT_TOKEN=\"token-value\"\n"
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -43,7 +42,7 @@ func TestLoadConfigFileArgument(t *testing.T) {
 	if got := os.Getenv("MONITOR_GRPC_ADDRESS"); got != "control.example:8443" {
 		t.Fatalf("MONITOR_GRPC_ADDRESS = %q", got)
 	}
-	if got := os.Getenv("MONITOR_AGENT_STATE_FILE"); got != `C:\ProgramData\MonitorMe\agent-state.json` {
+	if got := os.Getenv("MONITOR_AGENT_STATE_FILE"); got != "C:\\ProgramData\\MonitorMe\\agent-state.json" {
 		t.Fatalf("MONITOR_AGENT_STATE_FILE = %q", got)
 	}
 	if got := os.Getenv("MONITOR_ENROLLMENT_TOKEN"); got != "token-value" {
