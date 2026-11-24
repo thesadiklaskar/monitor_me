@@ -31,8 +31,8 @@ function formatTime(value: string) {
   return Number.isNaN(date.getTime()) ? "Unknown time" : date.toLocaleString();
 }
 
-export default function AlertsView({ servers, role }: {
-  servers: Server[]; role: string;
+export default function AlertsView({ servers }: {
+  servers: Server[];
 }) {
   const [rules, setRules] = useState<Rule[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
@@ -45,7 +45,7 @@ export default function AlertsView({ servers, role }: {
   const [operator, setOperator] = useState<Rule["operator"]>("gt");
   const [threshold, setThreshold] = useState("85");
   const [serverId, setServerId] = useState("");
-  const canAdminister = role === "owner" || role === "admin";
+  const canAdminister = true;
   const unreadCount = useMemo(() => notifications.filter((item) => !item.read_at).length, [notifications]);
 
   const load = useCallback(async () => {
