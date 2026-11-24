@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { backendResponse, callBackend, errorResponse } from "@/lib/server-api";
+import { backendResponse, callBackend } from "@/lib/server-api";
 
 export const dynamic = "force-dynamic";
 
