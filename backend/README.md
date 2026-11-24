@@ -11,7 +11,7 @@ This folder contains the Monitor Me control-plane API and SQL migration runner.
 - Store structured host logs in ClickHouse and expose bounded, time-range log search.
 - Expose readiness/liveness endpoints and same-install operator APIs.
 
-The operator product is single-install and has no browser account flow. The database and internal Go implementation still contain legacy organization/user/session/project compatibility fields and routes. These are migration debt, not product features; remove them through forward migrations that preserve machine, metric, log, dashboard and alert data. Never wipe Compose volumes to simplify a migration.
+The operator product is single-install and has no browser login, signup, organization membership or role-based operator gates. Installation-local APIs are protected at the network boundary (Nginx allowlist/firewall), and agent enrollment remains machine-scoped. The current database/store still carries legacy organization/user/session columns internally as a compatibility scope; these are not exposed as customer or UI concepts. Removing that final schema compatibility layer is a separate forward-migration task and must preserve machine, metric, log, dashboard and alert data. Never wipe Compose volumes to simplify a migration.
 
 ## Storage boundaries
 
