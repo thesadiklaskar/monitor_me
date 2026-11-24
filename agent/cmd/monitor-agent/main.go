@@ -69,7 +69,7 @@ func run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		capabilities = append(capabilities, journal.Capability())
 		logger.Info("native event log collection enabled", "capability", journal.Capability(), "log_spool_directory", cfg.LogSpoolDirectory)
 	} else if runtime.GOOS == "linux" {
-		logger.Warn("journalctl not found; host metrics remain active but journald collection is unavailable")
+		logger.Warn("native event log source is unavailable; host metrics remain active but log collection is unavailable")
 	} else if runtime.GOOS == "windows" {
 		logger.Warn("PowerShell event-log reader not found; host metrics remain active but Windows Event Log collection is unavailable")
 	}
