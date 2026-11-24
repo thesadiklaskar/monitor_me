@@ -41,6 +41,7 @@
 
 ## 4. Grafana-style real-time logs
 
+- [x] Improve the Log Explorer table to show timestamp, severity, source, structured labels and an event-detail JSON view; make the 10-second polling control explicitly say auto-refresh rather than implying a push stream. Source change is committed; browser acceptance is pending.
 - [ ] Complete native sources: Linux journald plus configured syslog/file tail (inode/offset checkpoints and rotation); Windows Application/System Event Logs plus configurable file tail. Security Event Log requires a separately documented permission/privacy policy. Current Windows Application/System reader source exists but has not passed runtime acceptance; file tail is still missing.
 - [ ] Preserve source event time and observed/ingest time separately. Keep source precision where available; expose UTC and selected local timezone clearly. Do not claim microsecond precision when the source only provides milliseconds.
 - [ ] Replace the Log Explorer's current 10-second polling toggle with an authenticated server-push stream (WebSocket or SSE) with reconnect, cursor replay, bounded queues, back-pressure, pause/resume and explicit dropped-event counters. The current log UI is bounded/keyset-paginated, but logs are not yet pushed natively in real time.
@@ -49,6 +50,8 @@
 
 ## 5. Grafana-style metrics and dashboards
 
+- [x] Improve saved-dashboard time-series panels with timestamp-scaled x-axis, average line, min/max band, y-axis labels, visible gaps and latest-point tooltip. Expand the panel metric catalog to include currently defined host metrics. Browser/runtime acceptance is pending.
+- [x] Replace the compressed icon-only navigation with full menu labels, and refresh the UI to a calmer slate/periwinkle palette with keyboard focus indicators. Source change is committed; owner visual acceptance is pending.
 - [ ] Deliver a global node selector, time range, timezone, live/pause state and explicit refresh interval.
 - [ ] Add low-latency metric push/update without manual page refresh, reconnect and stale-data indicators. Choose a default refresh cadence only after CPU/network/storage profiling.
 - [ ] Add a dashboard/panel editor with resize/reorder, stat, time-series, table and logs panels; query editor, units, legends, thresholds, variables/templates, saved dashboards and annotations.
@@ -76,6 +79,8 @@
 
 ## Current implementation snapshot (not a release claim)
 
+- The monitoring UI source now uses a calmer dark slate/periwinkle palette, expanded full-name navigation, time-aware average/min-max charts and structured log labels. This has not yet passed owner browser acceptance or a frontend build.
+- The new [platform support matrix](PLATFORM_SUPPORT_MATRIX.md) separates Linux control-plane hosting from Linux/Windows agent build targets and records the pending runtime acceptance gates.
 - No-login single-install dashboard/API shell is present; local Compose dashboard/API/database ports are loopback-bound.
 - Host metric agent, durable telemetry spool, TLS gRPC delivery and the initial metrics/alerts/dashboard/operations slices exist.
 - Linux journald → bounded log spool → TLS gRPC → ClickHouse ingestion, bounded 200-row keyset search and initial Log Explorer exist.
