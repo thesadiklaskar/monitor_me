@@ -1,0 +1,3 @@
+BEGIN;
+DROP TABLE IF EXISTS agent_log_batches;
+COMMIT;
