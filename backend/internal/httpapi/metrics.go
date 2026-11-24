@@ -52,12 +52,12 @@ func (api *API) metrics(writer http.ResponseWriter, request *http.Request) {
 		return
 	}
 	writeJSON(writer, http.StatusOK, map[string]any{
-		"server_id":  query.ServerID,
-		"metric":     query.MetricName,
-		"from":       query.From,
-		"to":         query.To,
-		"step":       query.Step.String(),
-		"points":     points,
+		"server_id": query.ServerID,
+		"metric":    query.MetricName,
+		"from":      query.From,
+		"to":        query.To,
+		"step":      query.Step.String(),
+		"points":    points,
 	})
 }
 
