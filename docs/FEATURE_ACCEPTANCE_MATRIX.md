@@ -15,7 +15,7 @@ No item may be marked Verified based only on a code stub, mock UI, or documentat
 
 | ID | Feature | Priority | Acceptance evidence | Current status |
 | --- | --- | --- | --- | --- |
-| F-001 | Add Server and scoped enrollment token | P0 | Server creation UI, one-time token display/copy/expiry, token revoke and reissue UI implemented; full reproducible one-command install workflow remains | In Progress |
+| F-001 | Add Server and scoped enrollment token | P0 | Server creation UI, one-time token display/copy/expiry, token revoke/reissue, Windows/Linux target guidance and copyable source-based native-agent setup commands implemented; signed downloadable remote installers and end-to-end acceptance remain | In Progress |
 | F-002 | Native Go host agent lifecycle | P0 | Native foreground process, validated configuration, JSON logs, signal shutdown, process CPU/collector/WAL health telemetry, and Linux systemd unit validation pass race-enabled CI checks | Verified |
 | F-003 | Host CPU and per-core metrics | P0 | Linux /proc/stat counter fixtures, reset tests, and documented source semantics | Verified |
 | F-004 | Host memory, swap, cache metrics | P0 | Unit and OS-specific semantics tests | Verified |
@@ -41,7 +41,7 @@ No item may be marked Verified based only on a code stub, mock UI, or documentat
 | F-024 | Alert evaluation and recovery | P1 | Alert rule/evaluation and recovery workflows plus dashboard views are implemented; current deterministic end-to-end verification remains | In Progress |
 | F-025 | Notifications | P1 | Persisted in-app firing/recovery notifications and read-state UI are present; external provider delivery/retry is not implemented | In Progress |
 | F-026 | Secure remote restart/stop | P1 | Backend and native agent support allowlisted systemd restart/stop with owner/admin authorization, expiry and audit; operator UI added; full agent end-to-end acceptance remains | In Progress |
-| F-027 | Windows agent | P1 | Initial Windows collector for CPU, memory/swap, disk capacity and I/O, network throughput, uptime, host identity and process RSS; Docker-based x64 build/run helpers and Windows runtime acceptance tests added; Windows CI/runtime verification, service installation and signed installer remain | In Progress |
+| F-027 | Windows agent | P1 | Initial Windows collector for CPU, memory/swap, disk capacity/I/O, network throughput, uptime, process inventory/RSS and OS/virtualization metadata; Docker-based x64 build/run helper plus CI cross-compile step configured; owner runtime acceptance, Windows service lifecycle, signed installer and metric parity remain | In Progress |
 | F-028 | macOS agent | P1 | OS-version-specific collector and installer test suite | Planned |
 | F-029 | Signed installers and upgrades | P1 | Signature validation, install, upgrade, rollback, and uninstall tests | Planned |
 | F-030 | Role-based access and tenant isolation | P1 | API, WebSocket, and cross-tenant denial tests | Verified |
