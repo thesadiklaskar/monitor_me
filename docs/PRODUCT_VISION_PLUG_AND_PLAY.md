@@ -7,7 +7,7 @@
 
 Monitor Me is a self-hosted, single-install observability control plane intended to replace the normal day-to-day Grafana-style host monitoring and log exploration workflow. An operator installs one control plane, opens one dashboard, creates a short-lived node enrollment token, and runs a single bootstrap command on each target machine. The node installer detects the target OS and architecture itself, installs the matching native collector, enables its platform service, enrolls with the control plane and starts telemetry delivery.
 
-The operator must not need to create a user, sign in, create an organization, choose the target OS in a wizard, install Go/Node/protoc, hand-edit service environment files, generate certificates manually, or configure per-node collector settings for the supported default path.
+The operator must not need to create a user, sign in, create an organization, project or workspace, choose the target OS in a wizard, install Go/Node/protoc, hand-edit service environment files, generate certificates manually, or configure per-node collector settings for the supported default path.
 
 ## Non-negotiable operator experience
 
@@ -28,6 +28,8 @@ The operator must not need to create a user, sign in, create an organization, ch
 - The token is used once to exchange for a device-bound session credential. Never place a reusable credential in shell history, process arguments, URLs or logs. Support revocation, rotation, uninstall and upgrade.
 
 ### No-login single-install access
+
+The product has four primary navigation areas only: **Servers**, **Logs**, **Dashboards** and **Alerts**. There is no Project entity, Project Mapping screen, customer workspace or organization selector. Host context such as process, systemd unit, container, cgroup and filesystem is shown as machine metadata or labels; it does not create a separate project or access boundary.
 
 - Do not show login, signup, create-organization or user-management screens in the default single-install UI.
 - The installation descriptor is generated automatically at first boot; it is not a user, profile, organization, or hosted tenant.
@@ -76,7 +78,7 @@ ClickHouse is installed in the Compose profiles and an initial MergeTree schema 
 
 ## Professional monitoring-console UI
 
-- A collapsible/expandable icon-led sidebar with accessible tooltips and persisted preference.
+- A simple, stable sidebar with full menu labels always visible; do not collapse labels into unexplained icons or initials.
 - Consistent icon system, compact typography, clear information hierarchy, precise units, timestamps and timezone.
 - Global node selector, time-range picker, refresh/live state, health indicators and search.
 - Purpose-built overview, node details, metrics, processes, network, services, alerts, operations, log explorer and settings pages. Remove placeholder menu items and irrelevant phase/status copy.
@@ -99,7 +101,7 @@ ClickHouse is installed in the Compose profiles and an initial MergeTree schema 
 
 1. Remove browser-OS selection and make Add Node issue one token plus OS-agnostic instructions; show PowerShell and POSIX launcher options only.
 2. Replace source-checkout/Docker-based node helpers with versioned, signed native artifacts and universal target-side discovery/bootstrap. Add Windows Service lifecycle and Linux service lifecycle, upgrade/uninstall/rollback.
-3. Convert the product to an implicit single-install workspace and remove login/signup/organization UI. Add safe network-only operator access for remote deployments; keep local no-login loopback-only.
+3. Convert the product to a single-install data model and remove login/signup/organization/project/workspace UI and backend dependencies. Add safe network-only operator access for remote deployments; keep local no-login loopback-only.
 4. Implement automatic control-plane bootstrap, secrets/TLS generation, migrations, readiness, supported Linux host firewall profiles and diagnostics. Document where cloud-provider APIs cannot be configured automatically without IAM.
 5. Implement ClickHouse-backed durable log ingestion, native Linux/Windows log collection, indexing, filtering, live tail, retention and backup.
 6. Replace the prototype dashboard shell with the complete monitoring-console design and a virtualized Log Explorer.
@@ -108,8 +110,8 @@ ClickHouse is installed in the Compose profiles and an initial MergeTree schema 
 
 ## Strict single-install architecture clarification — 2026-11-24
 
-This clarification supersedes any earlier wording that allowed organization tenancy keys to remain indefinitely as an invisible implementation detail. One installation is one owner's isolated product boundary and datastore. Monitor Me is not a hosted service and does not ask an operator to create a customer profile, user, company, organization, or workspace. Servers, metrics, logs, dashboards, alerts and operations belong directly to that installation. Optional grouping may exist only as a non-security label, never as a tenant or access-control boundary.
+This clarification supersedes any earlier wording that allowed organization tenancy keys to remain indefinitely as an invisible implementation detail. One installation is one owner's isolated product boundary and datastore. Monitor Me is not a hosted service and does not ask an operator to create a customer profile, user, company, organization, project, or workspace. Servers, metrics, logs, dashboards and alerts belong directly to that installation. There is no separate project/grouping entity or project selector. Technical workload context remains attached to the machine as labels (for example process name, systemd unit, container ID or cgroup), never as a customer/project scope.
 
-The current source still contains legacy user/organization tables and organization_id query, key and foreign-key paths because the original relational schema and dependent resource tables rely on them. These are migration debt, not an accepted final design. Removal requires a numbered forward migration covering every dependent table, index, query, API payload, test fixture and retention path. It must preserve existing servers, agent identities, metric history, alert history, dashboards, audit rows and log idempotency records. It must stop safely on ambiguous legacy data instead of silently selecting an organization or deleting records. Do not use destructive volume resets as a migration strategy.
+The current source still contains legacy user/organization tables, organization_id query/key/foreign-key paths, and project/project_id tables and selectors because the original relational schema and dependent resource tables rely on them. These are migration debt, not an accepted final design. Removal requires numbered forward migrations covering every dependent table, index, query, API payload, test fixture and retention path. Preserve existing servers, agent identities, metric history, alert history, dashboards, audit rows and log idempotency records. Convert any still-needed workload attribution into host-local labels before removing project mappings. Stop safely on ambiguous legacy data; never choose an arbitrary organization, drop records, or reset Compose volumes to force a clean schema.
 
 A move to a different GitHub owner or repository name must not require source edits. Go module paths are stable internal import namespaces, not published repository URLs. Artifact origins, release channels and public download bases must be operator-configurable; source must not bake in a personal account, repository URL, deployment hostname or example customer URL.
