@@ -3,7 +3,7 @@
 server {
     listen 80;
     listen [::]:80;
-    server_name monitor.example.com;
+    server_name REPLACE_WITH_PUBLIC_HOSTNAME;
 
     location ^~ /.well-known/acme-challenge/ {
         root /var/www/certbot;

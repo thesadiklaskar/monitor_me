@@ -14,11 +14,21 @@ compose() { docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" "$@"; }
 compose config --quiet
 
 admin_cidr="$(sed -n 's/^ADMIN_CIDR=//p' "$ENV_FILE" | tail -n 1 | tr -d '"' | tr -d '\r')"
+public_hostname="$(sed -n 's/^PUBLIC_HOSTNAME=//p' "$ENV_FILE" | tail -n 1 | tr -d '"' | tr -d '\r')"
+agent_grpc_public_address="$(sed -n 's/^AGENT_GRPC_PUBLIC_ADDRESS=//p' "$ENV_FILE" | tail -n 1 | tr -d '"' | tr -d '\r')"
 access_file="/etc/nginx/snippets/monitor-me-admin-allowlist.conf"
 access_directory="$(dirname "$access_file")"
 access_tmp="$(mktemp)"
 access_backup=""
 
+if [[ -z "$public_hostname" || "$public_hostname" == *REPLACE* ]]; then
+  echo "Set PUBLIC_HOSTNAME to the actual DNS name or IP used by the HTTPS certificate." >&2
+  exit 2
+fi
+if [[ -z "$agent_grpc_public_address" || "$agent_grpc_public_address" == *REPLACE* ]]; then
+  echo "Set AGENT_GRPC_PUBLIC_ADDRESS to the reachable control-plane host and gRPC port." >&2
+  exit 2
+fi
 if [[ -z "$admin_cidr" || "$admin_cidr" == *REPLACE* ]]; then
   echo "Refusing no-login production deployment: set ADMIN_CIDR to the trusted administrator/VPN source range." >&2
   exit 2

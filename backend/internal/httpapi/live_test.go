@@ -26,7 +26,7 @@ func TestLiveOriginAllowlistSeparatesAllowedAndUntrustedOrigins(t *testing.T) {
 		{name: "configured dashboard origin", origin: "http://localhost:3000", want: true},
 		{name: "same origin", origin: "http://localhost:8080", want: true},
 		{name: "scheme mismatch", origin: "https://localhost:8080", want: false},
-		{name: "untrusted host", origin: "https://attacker.example", want: false},
+		{name: "untrusted host", origin: "https://127.0.0.2:8443", want: false},
 		{name: "missing origin", origin: "", want: false},
 		{name: "origin path rejected", origin: "http://localhost:3000/evil", want: false},
 	}
@@ -46,8 +46,8 @@ func TestLiveOriginAllowlistSeparatesAllowedAndUntrustedOrigins(t *testing.T) {
 func TestLiveOriginUsesForwardedHTTPSOrigin(t *testing.T) {
 	api := &API{}
 	request := httptest.NewRequest(http.MethodGet, "http://api:8080/v1/live/ws", nil)
-	request.Host = "monitor.example.com"
-	request.Header.Set("Origin", "https://monitor.example.com")
+	request.Host = "127.0.0.1:8443"
+	request.Header.Set("Origin", "https://127.0.0.1:8443")
 	request.Header.Set("X-Forwarded-Proto", "https")
 	if !api.liveOriginAllowed(request) {
 		t.Fatal("the reverse-proxy public HTTPS origin should be accepted")

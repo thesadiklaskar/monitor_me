@@ -27,7 +27,7 @@ After issuing the HTTPS certificate and creating the API-readable certificate co
 
     sudo install -d -m 0755 /etc/nginx/snippets
     sudo cp deploy/production/nginx.conf.example /etc/nginx/conf.d/monitor-me.conf
-    # Replace monitor.example.com and verify certificate paths in the file.
+    # Replace REPLACE_WITH_PUBLIC_HOSTNAME and verify certificate paths in the file.
     sudo nginx -t
     sudo systemctl reload nginx
 

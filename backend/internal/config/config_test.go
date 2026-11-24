@@ -37,9 +37,9 @@ func TestParseWebAllowedOrigins(t *testing.T) {
 		wantErr bool
 	}{
 		{name: "one origin", raw: "http://localhost:3000", want: []string{"http://localhost:3000"}},
-		{name: "multiple origins", raw: "https://monitor.example.com, http://localhost:3000", want: []string{"https://monitor.example.com", "http://localhost:3000"}},
+		{name: "multiple origins", raw: "https://127.0.0.1:8443, http://localhost:3000", want: []string{"https://127.0.0.1:8443", "http://localhost:3000"}},
 		{name: "duplicates removed", raw: "http://localhost:3000,http://localhost:3000", want: []string{"http://localhost:3000"}},
-		{name: "path rejected", raw: "https://monitor.example.com/dashboard", wantErr: true},
+		{name: "path rejected", raw: "https://127.0.0.1:8443/dashboard", wantErr: true},
 		{name: "credentials rejected", raw: "https://user:pass@monitor.example.com", wantErr: true},
 		{name: "non-http scheme rejected", raw: "ftp://monitor.example.com", wantErr: true},
 		{name: "empty list rejected", raw: " , ", wantErr: true},
