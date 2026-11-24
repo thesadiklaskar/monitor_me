@@ -14,6 +14,12 @@ compose() { docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" "$@"; }
 compose config --quiet
 
 auth_disabled="$(sed -n 's/^MONITOR_ME_AUTH_DISABLED=//p' "$ENV_FILE" | tail -n 1 | tr -d '"' | tr -d '\r')"
+access_file="/etc/nginx/snippets/monitor-me-admin-allowlist.conf"
+access_directory="$(dirname "$access_file")"
+access_tmp="$(mktemp)"
+access_backup=""
+mkdir -p "$access_directory"
+
 if [[ "$auth_disabled" == "true" ]]; then
   admin_cidr="$(sed -n 's/^ADMIN_CIDR=//p' "$ENV_FILE" | tail -n 1 | tr -d '"' | tr -d '\r')"
   if [[ -z "$admin_cidr" ]]; then
@@ -28,37 +34,35 @@ if [[ "$auth_disabled" == "true" ]]; then
     echo "ADMIN_CIDR must be a specific IPv4/IPv6 source range, not a default route." >&2
     exit 2
   }
-
-  # Generate the Nginx L7 access boundary. The dashboard and live WebSocket
-  # are admin-only, while the separate installer/CA/artifact routes stay public
-  # so remote hosts can bootstrap without joining the operator VPN.
-  access_file="/etc/nginx/snippets/monitor-me-admin-allowlist.conf"
-  access_directory="$(dirname "$access_file")"
-  access_tmp="$(mktemp)"
-  access_backup=""
-  mkdir -p "$access_directory"
   printf 'allow %s;\ndeny all;\n' "$admin_cidr" > "$access_tmp"
-  chmod 0644 "$access_tmp"
-  if [[ -f "$access_file" ]]; then
-    access_backup="$(mktemp)"
-    cp -p "$access_file" "$access_backup"
-  fi
-  install -m 0644 "$access_tmp" "$access_file"
-  rm -f "$access_tmp"
+else
+  # In authenticated mode, the application enforces browser/API credentials.
+  # Keep the Nginx include present but do not add IP filtering.
+  printf '# Application authentication is enabled; Nginx does not add an IP allowlist.\n' > "$access_tmp"
+fi
 
-  if ! nginx -t; then
-    echo "Nginx validation failed; restoring the previous administrator access file." >&2
-    if [[ -n "$access_backup" ]]; then
-      install -m 0644 "$access_backup" "$access_file"
-    else
-      rm -f "$access_file"
-    fi
-    rm -f "$access_backup"
-    exit 2
+chmod 0644 "$access_tmp"
+if [[ -f "$access_file" ]]; then
+  access_backup="$(mktemp)"
+  cp -p "$access_file" "$access_backup"
+fi
+install -m 0644 "$access_tmp" "$access_file"
+rm -f "$access_tmp"
+
+if ! nginx -t; then
+  echo "Nginx validation failed; restoring the previous administrator access file." >&2
+  if [[ -n "$access_backup" ]]; then
+    install -m 0644 "$access_backup" "$access_file"
+  else
+    rm -f "$access_file"
   fi
   rm -f "$access_backup"
-  systemctl reload nginx
+  exit 2
+fi
+rm -f "$access_backup"
+systemctl reload nginx
 
+if [[ "$auth_disabled" == "true" ]]; then
   firewall_args=(--role control-plane --admin-cidr "$admin_cidr" --verify-admin-ui-allowlist)
   # Verify the reverse-proxy boundary before opening public HTTPS for the
   # installer/artifact paths.
