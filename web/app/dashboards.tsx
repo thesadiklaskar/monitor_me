@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
-import { Activity, LayoutDashboard, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { Activity, ArrowDown, ArrowUp, LayoutDashboard, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { apiRequest } from "@/lib/client-api";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -191,12 +191,18 @@ function DashboardPanelCard({
   series,
   serverName,
   canEdit,
+  panelIndex,
+  panelCount,
+  onMove,
   onDelete,
 }: {
   panel: DashboardPanel;
   series: PanelSeries | undefined;
   serverName: string;
   canEdit: boolean;
+  panelIndex: number;
+  panelCount: number;
+  onMove: (direction: -1 | 1) => void;
   onDelete: () => void;
 }) {
   const metric = metricCatalog.find((item) => item.value === panel.metric_name);
@@ -212,7 +218,11 @@ function DashboardPanelCard({
         </div>
         <div className="dashboard-panel-actions">
           <Badge variant={panel.visualization === "stat" ? "secondary" : "default"}>{panel.visualization === "stat" ? "Stat" : "Time series"}</Badge>
-          {canEdit && <Button variant="ghost" size="icon" aria-label={"Remove " + panel.title} title="Remove panel" onClick={onDelete}><Trash2 size={14} /></Button>}
+          {canEdit && <>
+            <Button variant="ghost" size="icon" aria-label={"Move " + panel.title + " up"} title="Move panel up" disabled={panelIndex === 0} onClick={() => onMove(-1)}><ArrowUp size={14} /></Button>
+            <Button variant="ghost" size="icon" aria-label={"Move " + panel.title + " down"} title="Move panel down" disabled={panelIndex === panelCount - 1} onClick={() => onMove(1)}><ArrowDown size={14} /></Button>
+            <Button variant="ghost" size="icon" aria-label={"Remove " + panel.title} title="Remove panel" onClick={onDelete}><Trash2 size={14} /></Button>
+          </>}
         </div>
       </CardHeader>
       <CardContent className="dashboard-panel-content">
@@ -425,6 +435,30 @@ export default function DashboardsView({ servers }: {
     }
   }
 
+  async function movePanel(panel: DashboardPanel, direction: -1 | 1) {
+    if (!selectedDashboard || busy) return;
+    const ordered = [...selectedDashboard.panels].sort((a, b) => a.position - b.position);
+    const currentIndex = ordered.findIndex((item) => item.id === panel.id);
+    const nextPosition = currentIndex + direction;
+    if (currentIndex < 0 || nextPosition < 0 || nextPosition >= ordered.length) return;
+
+    setBusy(true);
+    setError("");
+    setNotice("");
+    try {
+      await apiRequest<null>("/api/dashboard-panels/" + encodeURIComponent(panel.id) + "/position", {
+        method: "PATCH",
+        body: JSON.stringify({ position: nextPosition }),
+      });
+      await loadDashboards();
+      setNotice("Panel order saved.");
+    } catch (moveError) {
+      setError(moveError instanceof Error ? moveError.message : "Panel order could not be saved.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function deletePanel(panel: DashboardPanel) {
     if (!window.confirm("Remove panel \"" + panel.title + "\"?")) return;
     setError("");
@@ -544,6 +578,9 @@ export default function DashboardsView({ servers }: {
                       series={seriesByPanel[panel.id]}
                       serverName={serverLabel(panel.server_id)}
                       canEdit={canEdit}
+                      panelIndex={[...selectedDashboard.panels].sort((a, b) => a.position - b.position).findIndex((item) => item.id === panel.id)}
+                      panelCount={selectedDashboard.panels.length}
+                      onMove={(direction) => void movePanel(panel, direction)}
                       onDelete={() => void deletePanel(panel)}
                     />
                   ))}
