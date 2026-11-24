@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { apiRequest } from "@/lib/client-api";
+import { formatByteRate } from "@/lib/format";
 
 type Server = {
   id: string;
@@ -124,7 +125,7 @@ function formatValue(value: number, unit: string): string {
   if (!Number.isFinite(value)) return "Unavailable";
   if (unit === "percent") return `${value.toFixed(1)}%`;
   if (unit === "bytes") return formatBytes(value);
-  if (unit === "bytes/second") return `${formatBytes(value)}/s`;
+  if (unit === "bytes/second") return formatByteRate(value);
   return `${value.toFixed(2)} ${unit}`;
 }
 
