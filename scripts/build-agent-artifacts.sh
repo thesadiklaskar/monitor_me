@@ -3,6 +3,9 @@ set -eu
 
 VERSION="${MONITOR_AGENT_VERSION-}"
 [ -n "$VERSION" ] || VERSION="0.1.0-dev"
+case "$VERSION" in
+  *[!A-Za-z0-9._+-]*) echo "MONITOR_AGENT_VERSION contains unsupported characters." >&2; exit 1 ;;
+esac
 OUT="${MONITOR_AGENT_ARTIFACT_DIR-}"
 [ -n "$OUT" ] || OUT="/out"
 mkdir -p "$OUT"
