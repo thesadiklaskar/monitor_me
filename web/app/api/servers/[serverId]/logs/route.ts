@@ -9,7 +9,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
   if (!/^[0-9a-f-]{36}$/i.test(serverId)) {
     return errorResponse(400, "invalid_server_id", "The server identifier is invalid.");
   }
-  const allowed = ["from", "to", "project_id", "search", "severity", "source", "limit", "before_time", "before_id"];
+  const allowed = ["from", "to", "search", "severity", "source", "limit", "before_time", "before_id"];
   const query = new URLSearchParams();
   for (const key of allowed) {
     const value = request.nextUrl.searchParams.get(key);
