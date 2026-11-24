@@ -560,7 +560,7 @@ func (s *Store) ListServers(ctx context.Context, principal Principal) ([]Server,
 		       CASE
 		           WHEN s.status = 'disabled' THEN 'disabled'
 		           WHEN a.status = 'pending' THEN 'pending'
-           WHEN a.status IN ('revoked', 'offline') THEN 'offline'
+		           WHEN a.status IN ('revoked', 'offline') THEN 'offline'
 		           WHEN a.status = 'stale' THEN 'stale'
 		           WHEN a.last_seen_at IS NULL THEN s.status
 		           WHEN a.last_seen_at <= now() - interval '90 seconds' THEN 'offline'
