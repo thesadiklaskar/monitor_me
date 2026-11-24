@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"runtime"
 	"time"
 
 	monitorv1 "monitor-me.internal/agent/gen/monitor/v1"
