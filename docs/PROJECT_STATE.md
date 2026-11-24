@@ -7,7 +7,8 @@ This file is the authoritative resume point for Monitor Me. Read it before makin
 | Field | Value |
 | --- | --- |
 | Project | Monitor Me |
-| Repository | operator-configured Git remote |
+| Current development repository | `WorkRCS/monitor_me` (private; work remains on `main`) |
+| Final public distribution repository | `thesadiklaskar/monitor_me` (public and currently empty; transfer after release acceptance) |
 | Default branch | main |
 | Working branch | main |
 | Branch policy | All work and commits are made directly on main; do not create another branch |
@@ -18,9 +19,9 @@ This file is the authoritative resume point for Monitor Me. Read it before makin
 | MVP status | No-login single-install shell and first metrics/log pipeline exist, but release-blocking builds/runtime acceptance remain open. Strict removal of legacy user/organization schema, Windows runtime acceptance, file logs, push-based live logs, Grafana-style panel editing, sustained-load tests and production bootstrap remain unfinished |
 | Implementation status | One self-hosted installation per owner is the target; no hosted SaaS, login, customer profile or organization workflow. Browser/API no-login shell exists, but SQL tables, FKs and backend query paths still retain legacy users/organizations/organization_id and need a safe data-preserving forward migration. Linux metrics and journald → bounded spool → TLS gRPC → ClickHouse search exist. Windows Application/System Event Log source exists but Windows runtime acceptance is pending; arbitrary file/syslog tail is missing. Log Explorer polls every 10 seconds; native push/replay is not implemented. Linux amd64/arm64 and Windows amd64 agent builds are targeted, but clean-host acceptance is pending; macOS logs are explicitly unsupported. Startup scripts check main/origin, dirty tree, Compose config, build images before start, start with --no-build and verify readiness. Backend Docker build no longer runs go mod tidy, builds only shipped binaries with -mod=mod, creates /out, and uses Go HTTP/1.1 transport with checksum verification still enabled. backend/go.sum and web/package-lock.json are absent and must be committed for reproducible builds. Go import namespace and installer sample-host cleanup were completed; source portability does not yet equal release certification. |
 | Last source commit covered by latest successful CI run | 9685e115113123d5f9f8e8a1b222804752f5a283 (Go, frontend and native-agent jobs passed in run #45203706343; Compose integration failed at the web proxy login probe; later commits are not covered) |
-| Latest CI run | #581 — four jobs created but every job had runner_id 0, empty runner_name and zero steps; no build/test command ran. No fresh green CI evidence exists and the runner-allocation cause is unknown |
-| Latest implementation commit | 9b729ade3971363aebbd4313e5a4fee26f2f4557 — native agent artifact image uses HTTP/1.1 for Go module downloads; related build fixes are 0374d115... (backend no tidy, -mod=mod, explicit /out), 5d814b74... (backend HTTP/1.1) and c4c9be83... (CI module/build updates). Subsequent commits remove sample monitor.example installer/doc hosts and publish the release-readiness audit |
-| Next action | Pull exact latest main with git pull --ff-only origin main and confirm the local revision matches origin/main. Run .\scripts\start-local.ps1. The backend image should no longer run go mod tidy; if the build still shows that command or example.com/monitor-me, the local checkout/build context is stale. Keep Docker volumes/data intact and do not run docker compose down -v. Once startup passes, generate/commit backend/go.sum and web/package-lock.json, run Go/frontend/Compose acceptance, and validate Linux plus Windows agents. Do not begin real-time log and panel upgrades until this gate passes. |
+| Latest CI run | #583 — four jobs created but every job had runner_id 0, empty runner_name and zero steps; no build/test command ran. No fresh green CI evidence exists; runner-allocation cause is unknown |
+| Latest source commit | `97e24898010e5e106c11c06dadd966f641c3842b` restores `slugPattern` to match the PostgreSQL 3–64 character lowercase slug constraint; `2c874c4a725a44ce569159b2e40a7d618b32c882` adds regression coverage. Source fix is committed; neither local Docker build nor CI tests have passed yet |
+| Next action | On the owner Windows checkout, run `git pull --ff-only origin main`, confirm the source revision, then rerun `scripts/start-local.ps1`. The reported `undefined: slugPattern` is fixed in source and covered by a regression test. Keep Docker volumes/data intact; do not run `docker compose down -v`. Record the next actual build/test result before starting dashboard/log feature upgrades. |
 
 
 
@@ -29,7 +30,8 @@ This file is the authoritative resume point for Monitor Me. Read it before makin
 
 ## Current engineering checkpoint — 2026-11-24
 
-- The three previously reported compile blockers are absent from current `main`: unused `encoding/hex` import removed, `EnrollmentDialog` restored without login UI, and unsupported Windows `svc.AcceptInterrogate` flag removed. This is source inspection only; no new runtime pass is claimed.
+- The three earlier compile blockers remain source-fixed: unused `encoding/hex` import removed, `EnrollmentDialog` restored without login UI, and unsupported Windows `svc.AcceptInterrogate` flag removed.
+- Fixed the newly reported `backend/internal/identity/store.go:684: undefined: slugPattern` by restoring the exact regex required by the initial SQL migration (`^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$`); added `validation_test.go` for valid/invalid boundaries. This is source-level evidence only; the user's next Docker rebuild and a real CI runner must verify it.
 - Local startup now refuses a stale/diverged `main` checkout when Git/origin are available, builds all images before changing running services, avoids showing stale container logs for an image-build failure, then checks API and web readiness. This change itself still needs Windows PowerShell and Docker Desktop execution.
 - CI Compose workflow now separates image build from service startup. Recent Actions jobs have not been assigned runners, so no tests executed.
 - The strict single-install goal supersedes older multi-organization notes below. Existing SQL/Go organization logic is still present and remains unfinished migration work; do not interpret the removal of browser login screens as full schema removal.
