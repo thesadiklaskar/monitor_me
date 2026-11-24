@@ -84,7 +84,7 @@ func TestSeriesBucketCountUsesEpochAlignedBoundaries(t *testing.T) {
 	}
 
 	query := RangeQuery{
-		OrganizationID: "org", ServerID: "server", MetricName: "host.cpu.utilization",
+		OrganizationID: "org", ServerID: "2b6a8d10-9b4d-4e40-9a9c-0c8fc3af3b7f", MetricName: "host.cpu.utilization",
 		From: time.Unix(0, 100_000_000),
 		To:   time.Unix(1, 100_000_000),
 		Step: step, Limit: 1,
