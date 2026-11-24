@@ -554,3 +554,13 @@ td { padding-top: 15px; padding-bottom: 15px; }
   .modal-backdrop { padding: 12px; }
   .modal-card { max-height: calc(100vh - 24px); padding: 19px; }
 }
+
+.install-command-row { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+.install-command-row .install-command { min-width:0; flex:1; }
+.detail-inventory-panel .summary-grid { grid-template-columns:repeat(4,minmax(0,1fr)); }
+@media(max-width:1050px) { .detail-inventory-panel .summary-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media(max-width:520px) {
+  .install-command-row { align-items:stretch; flex-direction:column; }
+  .install-command-row .button { width:100%; }
+  .detail-inventory-panel .summary-grid { grid-template-columns:1fr; }
+}
