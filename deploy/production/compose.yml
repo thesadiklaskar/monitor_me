@@ -92,7 +92,7 @@ services:
       POSTGRES_DB: "${POSTGRES_DB:?Set POSTGRES_DB}"
       GRAFANA_DB_PASSWORD: "${GRAFANA_DB_PASSWORD:?Set GRAFANA_DB_PASSWORD}"
     ports:
-      - "127.0.0.1:${GRAFANA_BIND_PORT:-13001}:3000"
+      - "127.0.0.1:13001:3000"
     volumes:
       - grafana_data:/var/lib/grafana
       - ../../deploy/grafana/provisioning:/etc/grafana/provisioning:ro
