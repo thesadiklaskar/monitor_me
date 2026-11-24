@@ -6,6 +6,13 @@ set -eu
 : "${GRAFANA_CLICKHOUSE_PASSWORD:?GRAFANA_CLICKHOUSE_PASSWORD is required}"
 : "${CLICKHOUSE_DB:?CLICKHOUSE_DB is required}"
 
+case "$CLICKHOUSE_DB" in
+  ''|[!A-Za-z_]*|*[!A-Za-z0-9_]*)
+    echo "CLICKHOUSE_DB must be a simple SQL identifier." >&2
+    exit 2
+    ;;
+esac
+
 case "$GRAFANA_CLICKHOUSE_PASSWORD" in
   ''|*[!A-Fa-f0-9]*)
     echo "GRAFANA_CLICKHOUSE_PASSWORD must contain only hexadecimal characters." >&2
