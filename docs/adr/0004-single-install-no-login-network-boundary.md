@@ -31,7 +31,7 @@ The repository already has a local-only anonymous Compose mode, but the producti
 
 - [ ] Default local Compose access works without login and remains bound to loopback.
 - [ ] Production no-login mode is blocked from starting until HTTPS operator CIDRs/VPN access policy is configured and applied.
-- [ ] Firewall dry-run/apply/rollback tests prove HTTPS is source-restricted and preserve SSH.
+- [ ] Firewall dry-run/apply/rollback tests prove public HTTPS reaches only the intended Nginx routes, dashboard/API/WebSocket paths enforce the admin allowlist, and SSH remains source-restricted.
 - [ ] External IPv4/IPv6 tests confirm the dashboard is unavailable outside the admin network while agent enrollment is reachable on the intended gRPC network.
 - [ ] Existing broad firewall and cloud security-group rules are detected or explicitly reported as operator review items.
 - [ ] Enrollment tokens are single-use, expire, are not logged and cannot authenticate the dashboard.
