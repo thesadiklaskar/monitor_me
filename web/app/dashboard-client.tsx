@@ -477,27 +477,32 @@ export default function DashboardClient() {
 
         <section className="inventory-panel">
           <div className="panel-heading">
-            <div><h2>Servers</h2><p>Machines connected to this installation.</p></div>
-            {canCreate && <button className="button button-secondary" type="button" onClick={() => setShowAdd(true)}>Register a host</button>}
+            <div><h2>Machine inventory</h2><p>Every enrolled VPS, VM, cloud instance and dedicated server connected to this installation.</p></div>
+            {canCreate && <button className="button button-secondary" type="button" onClick={() => setShowAdd(true)}><Plus size={15} /> Add machine</button>}
           </div>
           {inventoryBusy && servers.length === 0 ? (
             <div className="empty-state"><span className="loading-indicator" aria-hidden="true" /><h3>Loading server inventory</h3><p>Retrieving connected machines.</p></div>
           ) : servers.length === 0 ? (
-            <div className="empty-state">
-              <div className="empty-icon">+</div><h3>No servers enrolled yet</h3>
-              <p>Add a machine to receive a short-lived, single-use enrollment token. Its native agent reports the host operating system and available environment metadata automatically.</p>
-              {canCreate && <button className="button button-primary" type="button" onClick={() => setShowAdd(true)}>Add your first server</button>}
+            <div className="empty-state empty-state-guide">
+              <div className="empty-icon"><ServerIcon size={21} /></div>
+              <h3>Start monitoring your first machine</h3>
+              <p>Connect a Linux VPS, VM, cloud instance or dedicated server. Monitor Me installs a lightweight native agent; the machine sends its own real metrics and supported logs to this installation.</p>
+              <ol className="setup-steps">
+                <li><span>1</span><div><strong>Add a machine</strong><small>Create a short-lived, one-time enrolment token.</small></div></li>
+                <li><span>2</span><div><strong>Run the install command</strong><small>Paste it into a root or administrator terminal on the machine.</small></div></li>
+                <li><span>3</span><div><strong>Watch real telemetry</strong><small>Open the machine to view CPU, memory, storage, network and available logs.</small></div></li>
+              </ol>
+              {canCreate && <button className="button button-primary" type="button" onClick={() => setShowAdd(true)}><Plus size={16} /> Add your first machine</button>}
             </div>
           ) : (
             <div className="table-wrap">
               <table>
-                <thead><tr><th>Server</th><th>Status</th><th>Last heartbeat</th><th>Added</th><th aria-label="Actions" /></tr></thead>
+                <thead><tr><th>Machine</th><th>Health</th><th>Last seen</th><th>Enrolled</th><th aria-label="Actions" /></tr></thead>
                 <tbody>{servers.map((server) => <ServerRow key={server.id} server={server} canRotate={canCreate} onRotate={rotateToken} onOpen={setSelectedServer} />)}</tbody>
               </table>
             </div>
           )}
         </section>
-        <footer className="dashboard-footer"><span>Monitor Me · Custom infrastructure monitoring</span><span>Linux agent · Telemetry API · Single-install access</span></footer>
         </>}
       </main>
 
