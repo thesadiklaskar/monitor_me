@@ -141,7 +141,7 @@ for ($attempt = 0; $attempt -lt 40; $attempt++) {
         $webReady = $webResponse.StatusCode -eq 200
     } catch {}
     try {
-        $grafanaResponse = Invoke-WebRequest -UseBasicParsing -Uri "http://localhost:3001/api/health" -TimeoutSec 3
+        $grafanaResponse = Invoke-WebRequest -UseBasicParsing -Uri "http://localhost:3000/grafana/api/health" -TimeoutSec 3
         $grafanaReady = $grafanaResponse.StatusCode -eq 200
     } catch {}
     if ($apiReady -and $webReady -and $grafanaReady) {
