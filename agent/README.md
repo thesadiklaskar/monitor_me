@@ -119,7 +119,7 @@ Follow logs with `journalctl -u monitor-me-agent -f`. Use `systemctl restart mon
 
 ## Windows local acceptance
 
-1. Start the control plane with `.` scripts\\start-local.ps1` from PowerShell, or use an existing local Compose stack.
+1. Start the control plane with `.` + `scripts/start-local.ps1` from PowerShell, or use an existing local Compose stack.
 2. Choose **Add Server**, select Windows, create the host record and copy its one-time enrollment token.
 3. From the repository root on the monitored Windows host, run:
 
