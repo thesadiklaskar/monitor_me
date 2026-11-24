@@ -115,10 +115,9 @@ fi
 compose up -d --no-build api web grafana
 api_port="$(sed -n 's/^API_HTTP_BIND_PORT=//p' "$ENV_FILE" | tail -n 1)"
 web_port="$(sed -n 's/^WEB_BIND_PORT=//p' "$ENV_FILE" | tail -n 1)"
-grafana_port="$(sed -n 's/^GRAFANA_BIND_PORT=//p' "$ENV_FILE" | tail -n 1)"
 api_port="${api_port:-18080}"
 web_port="${web_port:-13000}"
-grafana_port="${grafana_port:-13001}"
+grafana_port=13001
 ready=0
 for attempt in $(seq 1 45); do
   if curl --connect-timeout 2 --max-time 5 -fsS "http://127.0.0.1:$api_port/health/ready" >/dev/null &&
