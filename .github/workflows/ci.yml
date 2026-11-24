@@ -149,6 +149,8 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@v4
+      - name: Validate install and demo shell syntax
+        run: bash -n install.sh scripts/demo-load.sh
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
