@@ -14,6 +14,7 @@ compose() { docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" "$@"; }
 compose config --quiet
 
 admin_cidr="$(sed -n 's/^ADMIN_CIDR=//p' "$ENV_FILE" | tail -n 1 | tr -d '"' | tr -d '\r')"
+agent_grpc_cidr="$(sed -n 's/^AGENT_GRPC_CIDR=//p' "$ENV_FILE" | tail -n 1 | tr -d '"' | tr -d '\r')"
 public_hostname="$(sed -n 's/^PUBLIC_HOSTNAME=//p' "$ENV_FILE" | tail -n 1 | tr -d '"' | tr -d '\r')"
 agent_grpc_public_address="$(sed -n 's/^AGENT_GRPC_PUBLIC_ADDRESS=//p' "$ENV_FILE" | tail -n 1 | tr -d '"' | tr -d '\r')"
 access_file="/etc/nginx/snippets/monitor-me-admin-allowlist.conf"
@@ -65,6 +66,13 @@ rm -f "$access_backup"
 systemctl reload nginx
 
 firewall_args=(--role control-plane --admin-cidr "$admin_cidr" --verify-admin-ui-allowlist)
+if [[ -n "$agent_grpc_cidr" ]]; then
+  python3 -c 'import ipaddress,sys; n=ipaddress.ip_network(sys.argv[1], strict=False); sys.exit(1 if n.prefixlen == 0 else 0)' "$agent_grpc_cidr" || {
+    echo "AGENT_GRPC_CIDR must be a specific IPv4/IPv6 source range, not a default route." >&2
+    exit 2
+  }
+  firewall_args+=(--grpc-cidr "$agent_grpc_cidr")
+fi
 # The dashboard has no user login: install and verify its network boundary
 # before exposing HTTPS routes used by remote agent bootstrap.
 "$ROOT/deploy/production/firewall.sh" "${firewall_args[@]}"

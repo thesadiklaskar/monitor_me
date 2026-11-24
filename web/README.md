@@ -6,7 +6,7 @@ This folder contains the Monitor Me operator interface. It is a self-hosted Next
 
 The navigation is intentionally limited to five areas:
 
-- **Dashboard** — fleet cards for every enrolled machine; select a machine to view its live health, real CPU/core, memory, storage, disk, network and process graphs together with recent host logs.
+- **Monitoring** — fleet cards for every enrolled machine; select a machine to view its health, CPU/core, memory, per-volume storage capacity/history, disk, network and process charts together with recent host logs.
 - **Servers** — machine inventory, enrollment and the existing per-machine detail view.
 - **Logs** — time-bounded search, severity/source filters, event details and paged results.
 - **Dashboards** — editable saved views with persisted default machine/time filters, panel editor, responsive grid, drag/drop ordering, metrics visualizations and host-log panels.
@@ -58,7 +58,7 @@ A committed npm lockfile is a release requirement; until it exists, `npm install
 ## Main source files
 
 - `app/dashboard-client.tsx` — application shell, sidebar, machine inventory and enrollment.
-- `app/overview-dashboard.tsx` — fleet health cards, per-host metric history and recent logs in one scrollable view.
+- `app/overview-dashboard.tsx` — fleet health cards, detailed per-volume capacity/history, per-host metric charts and recent logs in one scrollable view.
 - `app/server-detail.tsx` — host metrics, historical/live charts and process/socket inventory.
 - `app/log-explorer.tsx` — searchable log explorer.
 - `app/dashboards.tsx` — dashboard settings, saved filters, panel editor, saved dashboard defaults, metric/log renderers, alert markers and custom visualizations.

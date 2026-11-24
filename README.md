@@ -1,40 +1,55 @@
 # Monitor Me
 
-A self-hosted infrastructure monitoring product for a VPS, VM, cloud VM, VPC-hosted Linux machine, dedicated server or a small fleet. Every installation runs independently on infrastructure controlled by its owner. Monitoring data stays with that installation.
+**Self-hosted infrastructure monitoring for the servers you own.**
 
-Monitor Me is an independently implemented monitoring product with a native web interface, native query builder and native visualization engine.
+Monitor Me brings server health, host metrics, system logs and threshold alerts into one installation that runs on infrastructure you control. Deploy one control plane on a supported Linux server, enrol the machines you want to monitor, and inspect their real telemetry from a browser.
 
-> **Release status:** this is the development `main` branch, not a certified public release. The API, database, migration runner, agent-artifact builder and base web dashboard previously started successfully in one Windows Docker Desktop environment. The fleet overview dashboard and saved dashboard editor still require a fresh local production build, browser acceptance and real telemetry review. Clean-host production install, multiple Linux distributions, ARM hardware, backup/restore and load limits remain unverified.
+<p align="center">
+  <img src="https://ik.imagekit.io/xvqovhmcyr/monitor_me/Monitor%20Me%20-%20Google%20Chrome%2011_24_2026%206_40_07%20PM.png" alt="Monitor Me application screenshot" width="92%" />
+</p>
 
-## Product principles
+<p align="center">
+  <img src="https://ik.imagekit.io/xvqovhmcyr/monitor_me/Docker%20Compose%20%E0%A6%B8%E0%A6%AE%E0%A6%B8%E0%A7%8D%E0%A6%AF%E0%A6%BE%20%282%29%20-%20Google%20Chrome%2011_24_2026%206_40_21%20PM.png" alt="Monitor Me deployment screenshot 1" width="48%" />
+  <img src="https://ik.imagekit.io/xvqovhmcyr/monitor_me/Docker%20Compose%20%E0%A6%B8%E0%A6%AE%E0%A6%B8%E0%A7%8D%E0%A6%AF%E0%A6%BE%20%282%29%20-%20Google%20Chrome%2011_24_2026%206_40_25%20PM.png" alt="Monitor Me deployment screenshot 2" width="48%" />
+  <img src="https://ik.imagekit.io/xvqovhmcyr/monitor_me/Docker%20Compose%20%E0%A6%B8%E0%A6%AE%E0%A6%B8%E0%A7%8D%E0%A6%AF%E0%A6%BE%20%282%29%20-%20Google%20Chrome%2011_24_2026%206_40_32%20PM.png" alt="Monitor Me deployment screenshot 3" width="48%" />
+</p>
 
-- One installation, one operator boundary and one local data store.
-- No browser login/signup, customer profile, organization, workspace, project or project mapping.
-- No remote shell, stop/restart or host-control operations. This is a monitoring tool.
-- Five clear UI areas: **Dashboard**, **Servers**, **Logs**, **Dashboards** and **Alerts**.
-- Real host telemetry only. Missing or unsupported metrics are shown as unavailable, never as fabricated zeroes.
-- Native Go agent on monitored hosts; Docker is needed for the Linux control plane, not on monitored machines.
-- Keep the product easy to install, understand, operate and modify.
+## What it does
 
-## Current capabilities
+Monitor Me is designed for an individual operator or infrastructure team that wants visibility into VPS instances, virtual machines, cloud VMs, VPC-connected Linux machines and dedicated servers without sending monitoring data to a hosted monitoring service.
 
-| Area | Implemented path | Known limits |
-|---|---|---|
-| Machine inventory | Enrolment tokens, machine status, agent heartbeat and credential rotation | The owner must keep the dashboard protected by the configured network allowlist |
-| Host metrics | CPU, memory, swap, mounted filesystem total/used/free capacity and percentage, disk/network throughput, uptime, process count and selected process/socket metadata | Mounted filesystem capacity is sampled once per minute per readable mount; optional `mountpoint`/`interface` label selectors isolate a volume or NIC. Metric availability differs by OS; no eBPF or HTTP request tracing |
-| Metric dashboards | Fleet dashboard with clickable server health cards and one per-host scrollable view for real CPU/core, memory, storage, disk, network, process and recent log data; native query builder for machine, metric and time range; saved panels with time-series, area, bar, stat, gauge, heatmap, table and host-log views; optional `mountpoint`/`interface` label filters; per-panel width settings; drag/drop and keyboard reorder; panel editing; saved dashboard name/default status and default machine/time filters | The saved machine/time defaults are one installation-wide setting per dashboard, not an arbitrary variable/templating system. Log panels show the latest 50 events from the last 7 days. Alert firing/resolved markers are overlaid on matching metric panels; markers refresh with alert events. Multi-metric expressions and pointer-based resize are not implemented yet |
-| Live metrics | Authenticated agent stream, bounded WebSocket updates and historical catch-up | Live freshness depends on agent sampling, storage and network; no zero-latency guarantee |
-| Logs | Linux journald ingestion through bounded local spool and ClickHouse search; time/severity/source filters and paged results | The UI's 10-second auto-refresh is HTTP polling, not push-based live tail. General file/syslog tail and rotation support are not delivered. Windows Event Log source code needs runtime acceptance |
-| Alerts | Metric threshold rules with create/edit/pause/resume/delete, firing/recovered events and in-app notifications; changing a rule condition closes stale firing events and records recovery; matching metric charts show firing/resolved markers | External email/chat notification providers are not implemented |
-| Deployment | Linux production Compose stack, health checks, migration runner, backup/restore for PostgreSQL and rollback of application images | ClickHouse backup/restore, automated upgrades and clean-host acceptance remain release work |
+A single control-plane installation manages its own machine inventory and data. A small native agent runs on each monitored host. The agent collects host measurements and supported system logs, then sends them securely to the control plane. The web interface turns those stored measurements into fleet health, host detail, searchable logs, saved dashboards and alert events.
 
-The fleet dashboard and saved dashboard builder are in-house implementations. The fleet overview graphs and log list use the same bounded telemetry and log APIs as the detailed machine views; no synthetic readings are inserted. Treat the feature matrix and release gates below as the current truth; do not claim capabilities that have not passed local acceptance.
+**Monitoring is read-only.** It observes hosts; it does not provide remote shell access or commands to stop processes, restart services or change host configuration.
+
+## Features
+
+| Area | What is available |
+|---|---|
+| **Monitoring** | Fleet cards for every enrolled machine, connected-first sorting, hostname, health state and heartbeat. Select a machine to open one scrollable detail view with CPU, per-core CPU, memory, swap, mounted-volume capacity, disk I/O, network, process count and recent host logs. Charts use stored host samples only. |
+| **Servers** | Enrolment, machine inventory, agent connectivity, host metadata, detailed metrics and process/socket inventory. |
+| **Logs** | Searchable Linux system journal events with time range, severity and source filters, event details and paginated results. |
+| **Dashboards** | Build and save installation-local dashboards with metric and host-log panels. Available visualisations include time series, area, bar, stat, gauge, heatmap and table. Panels support editing, reordering and machine/time defaults. |
+| **Alerts** | Metric-threshold rules with create, edit, pause, resume and delete actions. Firing and recovered events appear in the interface and on matching metric charts. |
+| **Agent reliability** | Machine-scoped enrolment, TLS gRPC transport, bounded local write-ahead spool, retry with backoff and acknowledgement after durable backend acceptance. |
+
+### Collected host data
+
+On supported Linux hosts, the agent reports:
+
+- CPU utilisation, per-core utilisation, user/system time and I/O wait.
+- Physical memory, available memory, cache and swap.
+- Mounted filesystem total, used, free and percentage, with mountpoint, device and filesystem labels.
+- Disk read/write throughput and operations per second.
+- Network receive/transmit throughput, packets and errors per second, per interface.
+- Uptime, process count, selected process memory metadata and TCP connection/listening-port inventory.
+- systemd journal events when the agent has permission to read the system journal.
+
+Filesystem capacity is sampled approximately once per minute. A metric that is missing, unsupported or unreadable remains unavailable; Monitor Me does not replace it with a fabricated zero or demo value.
 
 ## Install the control plane
 
-### Intended one-command setup
-
-After the final public repository transfer, the public install flow will be:
+The public setup command is intended to run from this repository after the project has been uploaded to the account shown below.
 
 ```bash
 git clone https://github.com/thesadiklaskar/monitor_me.git
@@ -42,158 +57,166 @@ cd monitor_me
 sudo ./install.sh
 ```
 
-The development repository is currently `WorkRCS/monitor_me`; the public target is `thesadiklaskar/monitor_me`. Do not use the public clone URL until the final code and release have actually been transferred there.
+The installer configures the control-plane host, installs Docker Engine and Compose when needed, installs the web reverse proxy and certificate renewal tooling, generates private database/cache secrets, configures the administrator network allowlist, obtains HTTPS, starts the application containers, runs SQL migrations and checks service readiness.
 
-The root `install.sh` is a guided Ubuntu/Debian Linux x86-64 bootstrap. It installs Docker/Compose, Nginx, Certbot and UFW when no host firewall is active (or uses an already-active firewalld); generates database/cache secrets; requests a Let's Encrypt certificate; enables automatic certificate renewal (including Nginx reload and gRPC API restart); applies an administrator CIDR boundary; builds the stack; runs migrations; and checks API/web readiness. The development `main` branch now stores `install.sh` as an executable file (`100755`), so the intended command is `sudo ./install.sh`. Preserve this executable mode when transferring the final source to `thesadiklaskar/monitor_me`.
+### Before running the command
 
-The installer asks for:
-1. A DNS hostname whose A record routes to the control plane or its public HTTPS load balancer.
-2. The administrator public IP/CIDR (it suggests the SSH client IP when available).
-3. An email address for certificate expiry notices.
-4. Confirmation before enabling UFW if the host firewall is inactive.
+Use a clean **Ubuntu or Debian x86-64 (amd64) Linux host** with:
 
-Before starting, the VPS/provider firewall must allow TCP 80, 443 and 8443, plus SSH from the administrator network. The script cannot edit cloud security groups/VPC ACLs without the provider's IAM credentials. The management UI has no application login; do not expose it publicly. Nginx and the host firewall restrict it to `ADMIN_CIDR`.
+1. Root/sudo access, systemd and working outbound internet access.
+2. A DNS hostname with an A record pointing to the control-plane server's public IPv4 address.
+3. Provider/network ingress rules ready for the ports below. Provider security groups and VPC firewall rules must be set in the provider console; the installer cannot change those without your cloud credentials.
+4. The public IP or CIDR range from which the administrator will open the web interface.
+5. An email address for HTTPS certificate registration and renewal notices.
 
-### Add monitored machines
+The installer asks for the hostname, administrator CIDR and certificate email. It can suggest the SSH client's IP as the administrator CIDR. Keep that value accurate; the web interface has no application login.
 
-After the dashboard opens, choose **Add machine** and copy the generated Linux or Windows command to the target host. The installer detects the supported OS/architecture, downloads the matching native agent and CA, verifies the artifact checksum, installs the service and enrols the machine using a short-lived token.
+### Network access
 
-A monitored host needs outbound HTTPS for the installer/artifact and outbound TLS gRPC to the control plane (default TCP 8443). It does not need a public inbound Monitor Me port.
+| Port | Direction | Source | Purpose |
+|---|---|---|---|
+| TCP 22 | Inbound | Administrator IP/CIDR only | SSH administration |
+| TCP 80 | Inbound | Public internet | HTTPS certificate challenge and HTTP-to-HTTPS redirect |
+| TCP 443 | Inbound | Public internet; the operator UI is restricted by the host allowlist | HTTPS UI and rate-limited agent installer/artifact/CA downloads |
+| TCP 8443 | Inbound | Monitored host networks; can be restricted to a known agent CIDR | Agent telemetry over TLS gRPC |
 
-## Supported platform targets
+The installer configures the host firewall when it is safe to do so and applies the Nginx administrator allowlist. It does not expose PostgreSQL, Redis, ClickHouse or the private API directly. Do not create public inbound rules for database ports 5432, 6379, 8123, 9000 or the internal API/web ports.
 
-| Role | Platform | Status |
+During a first install, the installer asks for an optional agent source CIDR. Enter the trusted VPC/subnet range when monitored machines connect from a known network; the value is saved as `AGENT_GRPC_CIDR` and used to restrict TCP 8443. Leave it blank when agents connect from changing or unrelated addresses; their machine-scoped TLS credentials are still required. Review existing host-firewall rules before changing an already deployed installation, because the firewall helper adds rules and does not remove earlier broad allow rules.
+
+### Deploying on a VPS, VM, VPC or dedicated server
+
+The hosting provider does not determine compatibility; the control-plane operating system and CPU architecture do.
+
+| Environment | Deployment guidance |
+|---|---|
+| **VPS / public cloud VM** | Supported when the instance runs Ubuntu/Debian amd64, has the required DNS and network access, and meets the same prerequisites above. |
+| **Cloud VM inside a VPC** | Supported when the VPC routes administrator HTTPS traffic and agent TCP 8443 traffic to the control plane, and the control plane can complete the public HTTPS certificate challenge. Configure the provider's security rules yourself. |
+| **Private-only VPC with no public HTTP ingress** | Not supported by the current one-command installer. It uses an HTTP-based public certificate challenge and publishes HTTPS bootstrap routes for agents; private-CA and DNS-based certificate provisioning are not implemented. |
+| **Dedicated server / own data centre** | Supported on Ubuntu/Debian amd64 with a routable DNS name, the same ports and a working outbound connection. |
+| **Other cloud providers** | The same VM requirements apply. No provider-specific account, IAM or VPC API integration is required or configured by Monitor Me. |
+
+A load balancer can be used only when it forwards the required traffic correctly. Port 80 must reach the host's certificate-challenge endpoint, HTTPS must preserve the administrator source address used by the allowlist, and TCP 8443 must pass the agent's TLS gRPC connection to the control plane. The current Nginx setup does not consume proxy-supplied client IP headers as a trusted identity source.
+
+
+### Cloud-provider examples
+
+The same operating-system and network requirements apply on both platforms:
+
+- **AWS:** create an x86-64 Ubuntu/Debian VM in your VPC. Attach a public IPv4 address or a correctly routed public HTTPS endpoint, point the DNS A record at it, and configure the VM's security group for SSH from the administrator CIDR, TCP 80/443 for the public certificate and HTTPS endpoints, and TCP 8443 from the monitored-agent networks. Use a dedicated agent CIDR when the VPC layout has stable source ranges.
+- **Google Cloud:** create an x86-64 Ubuntu/Debian VM in the selected VPC. Point the DNS A record at its reachable public IPv4 endpoint and add targeted VPC firewall ingress rules for SSH from the administrator CIDR, TCP 80/443, and TCP 8443 from the monitored-agent networks. Keep database and internal application ports private.
+
+For either provider, the one-command installer configures the guest operating system; it does not create the VM, reserve addresses, edit cloud firewall rules, configure IAM, or create DNS records. Perform those infrastructure steps in your own cloud account before running the installer.
+
+**Not every Linux image or machine architecture is currently a supported control-plane target.** The automated installer is Ubuntu/Debian amd64 only. It does not install the control plane natively on Windows, macOS, BSD, Alpine/OpenRC or ARM64 hosts.
+
+## Enrol monitored machines
+
+1. Open the HTTPS address printed by the installer from the administrator network.
+2. In **Servers**, choose **Add machine**.
+3. Select the target operating system and copy its generated enrolment command.
+4. Run the command on the target host with administrator/root privileges.
+5. Return to **Monitoring** and confirm that the machine is connected and real samples are appearing.
+
+The Linux agent is a native service; Docker is not required on monitored machines. It downloads the matching agent artifact and CA over HTTPS, checks the artifact checksum, enrols with a short-lived one-use token and sends telemetry to TCP 8443. Monitored machines need outbound HTTPS and outbound TLS gRPC; they do not need an inbound Monitor Me port.
+
+The supported Linux agent target is a systemd-based Linux host with readable procfs and journal permissions. Linux amd64 is the primary target; Linux arm64/aarch64 builds exist but require real hardware runtime acceptance before being treated as certified. Windows x64 service and collection code is present but still requires end-to-end runtime acceptance. macOS, Windows ARM64 and BSD are not released agent targets.
+
+## System design
+
+The deployment is the same whether the control plane is hosted on a VPS, a cloud VM, a VPC-routed VM, a dedicated machine or in your own data centre. Install one control plane on the supported Linux host; install agents on the machines to monitor.
+
+```mermaid
+flowchart TB
+    ADMIN["Administrator browser\nTrusted IP or VPN"] -->|"HTTPS 443"| EDGE["Public DNS + Nginx\nTLS and ADMIN_CIDR allowlist"]
+    subgraph CP["One Monitor Me control plane\nUbuntu / Debian amd64"]
+      WEB["Next.js web interface"]
+      API["Go API + TLS gRPC receiver\nTCP 8443"]
+      PG[("PostgreSQL\nDurable machine, metric, alert and dashboard data")]
+      REDIS[("Redis\nEphemeral latest-value fan-out")]
+      CH[("ClickHouse\nStructured host logs")]
+      WEB <-->|"Private API"| API
+      API --> PG
+      API --> REDIS
+      API --> CH
+      EDGE -->|"HTTPS proxy"| WEB
+    end
+    subgraph HOSTS["Your monitored infrastructure"]
+      A1["Linux VPS / VM / cloud VM\nNative Go agent"]
+      A2["VPC-connected Linux host\nNative Go agent"]
+      A3["Dedicated server / data centre\nNative Go agent"]
+    end
+    A1 -->|"TLS gRPC 8443"| API
+    A2 -->|"TLS gRPC 8443"| API
+    A3 -->|"TLS gRPC 8443"| API
+    EDGE -.->|"HTTPS 443 bootstrap, CA and agent artifacts"| A1
+    EDGE -.->|"HTTPS 443 bootstrap, CA and agent artifacts"| A2
+    EDGE -.->|"HTTPS 443 bootstrap, CA and agent artifacts"| A3
+```
+
+### Telemetry flow
+
+1. The agent reads host counters and supported operating-system logs.
+2. Unacknowledged telemetry is placed in a bounded local write-ahead spool.
+3. The agent sends authenticated batches over TLS gRPC on TCP 8443.
+4. The Go API validates the machine credential, bounds and stores the data, and acknowledges only after durable acceptance.
+5. PostgreSQL stores metric history and installation state. Redis carries ephemeral latest-value notifications; it is not the durable source of truth. ClickHouse stores structured host log events.
+6. The web interface requests bounded metric ranges and log pages from the private API through same-origin routes. Live updates use bounded WebSocket delivery; the Monitoring detail view refreshes its summary, charts and logs periodically.
+
+An editable system-design canvas is available in [monitor-me-architecture.excalidraw](docs/monitor-me-architecture.excalidraw). Download it and import the file into [Excalidraw](https://excalidraw.com/) to inspect or modify the diagram.
+
+## Technology and components
+
+| Layer | Technology | Responsibility |
 |---|---|---|
-| Control plane | Ubuntu/Debian Linux amd64 | Automated installer target; clean-host/release certification remains pending |
-| Agent | systemd-based Linux amd64 | Native agent target; clean-host runtime acceptance is required per distribution |
-| Agent | systemd-based Linux arm64/aarch64 | Native agent target; real ARM hardware runtime acceptance is required |
-| Agent | Windows x64 | Service and metrics/Event Log code exists; Windows runtime acceptance required |
-| Control plane | Native Windows Server | Unsupported |
-| Agent/control plane | macOS, Windows ARM64, BSD | Not currently supported as released targets |
+| Web | Next.js 16, React 19, TypeScript | Operator UI, same-origin API proxy routes, fleet view, log explorer and saved dashboards |
+| API | Go 1.27.4, HTTP and gRPC, Protocol Buffers | Machine enrolment, authenticated ingestion, queries, alert rules and migrations |
+| Agent | Go 1.27.4 | Native Linux host collection, journald reader, bounded spool and TLS telemetry delivery |
+| Durable metrics and state | PostgreSQL 18.7 | Machines, credentials, metric history, dashboard and alert state |
+| Live fan-out | Redis 8.10.3 | Ephemeral latest-value cache/pub-sub |
+| Logs | ClickHouse 26.8.44.3 | Structured host log storage and time-bounded search |
+| Production runtime | Docker Compose v2 | Isolated control-plane services and persistent data volumes |
+| Edge and certificates | Nginx, TLS 1.2/1.3, automated certificate renewal | HTTPS termination, request routing and administrator source allowlist |
+| Host security | UFW or firewalld | Host ingress rules; cloud/VPC firewall rules remain provider-managed |
 
-VPS, VM, cloud VM, VPC and bare metal are hosting types, not operating systems. For monitored hosts, the current Linux agent installer requires systemd, readable procfs counters, curl and SHA-256 tooling; journald collection additionally requires readable system journals. Non-systemd distributions such as Alpine/OpenRC are not current supported agent targets. The Linux control-plane installer is narrower: Ubuntu/Debian amd64 only. The read-only preflight checks these assumptions before installation:
+Monitor Me includes its own operator interface, query APIs and visualisation components. No external monitoring dashboard or metrics service is required.
 
-```bash
-sudo bash ./scripts/linux-preflight.sh --control-plane
-# On each monitored Linux host:
-sudo bash ./scripts/linux-preflight.sh --agent
-``
+## Security and data boundaries
 
-A passing preflight checks prerequisites only; it does not replace a clean install, runtime, upgrade, backup/restore or hardware acceptance test. Provider security groups/VPC ACLs must be configured separately.
+- The browser interface has **no application login**. Access is restricted by Nginx to the configured administrator CIDR. Use a trusted static address or VPN and never allow the whole internet to access the operator UI.
+- Agent telemetry uses TLS gRPC and machine-scoped credentials. Initial enrolment uses a short-lived, one-use token; the downloaded artifact checksum is verified.
+- HTTPS certificates are renewed automatically. The gRPC service reads the restricted certificate copy managed by the installer.
+- Database/cache secrets are randomly generated and stored in the root-only `.env.production` file (mode 0600). Do not upload that file or the certificate directory to source control.
+- PostgreSQL, Redis and ClickHouse stay on the private Compose network. Public provider rules should expose only the required ingress ports.
+- Agents are monitoring-only. The product does not offer remote command execution or process/service control.
 
-## Real-data demo and README screenshots
+## Logs and operations
 
-Use a Linux test VM or non-production host that has already enrolled in Monitor Me. Do not run load tests on a critical production service.
+**Host logs in the UI:** Linux journald events collected by the enrolled agent and searched from **Logs** or the selected machine's Monitoring view. The available event details include timestamp, severity, source and message body.
 
-Install the bounded workload generator:
+General file tailing for arbitrary `/var/log` files, generic syslog-file ingestion and log rotation tracking are not implemented. Windows Event Log collection is not yet runtime-certified.
 
-```bash
-sudo apt-get update
-sudo apt-get install -y stress-ng
-```
-
-Generate real journald events:
-
-```bash
-logger -p user.info -t monitor-me-demo "Monitor Me demo: application started"
-logger -p user.warning -t monitor-me-demo "Monitor Me demo: cache latency above normal"
-```
-
-Generate bounded real CPU, memory and disk activity for two minutes:
+**Control-plane container logs:**
 
 ```bash
-bash ./scripts/demo-load.sh --duration 120
+docker compose --env-file .env.production -f deploy/production/compose.yml ps
+docker compose --env-file .env.production -f deploy/production/compose.yml logs --tail=100 api web migrate postgres redis clickhouse
 ```
 
-The script asks for confirmation, runs `stress-ng` with bounded defaults and exits after the requested duration. Open **Dashboard** to inspect the machine cards and combined per-host graphs/logs. Open **Servers** for the detailed host view. In **Logs**, search for `monitor-me-demo`. In **Dashboards**, create a dashboard and add CPU, memory, disk and network panels. In **Alerts**, create a temporary CPU threshold rule if you want to demonstrate a firing/recovery cycle; remove the rule after the demo.
-
-Capture screenshots from the browser after actual data has arrived:
-1. Servers inventory showing the enrolled machine and online status.
-2. Machine detail showing real CPU, memory, storage and network charts.
-3. A saved dashboard with several metric panels and clear time ranges.
-4. Logs with the `monitor-me-demo` journald events and event details.
-5. Alerts showing the test rule and its actual event state.
-
-On Windows use `Win+Shift+S`; on Linux use the desktop screenshot shortcut/tool. Save reviewed PNGs in `screenshots/` with descriptive names and add them to this README only after confirming machine names, timestamps and values are real. Do not put API tokens, IP addresses, secrets or private log content in public screenshots. No fake/demo telemetry is bundled in the product.
-
-## Local development
-
-Toolchain versions are pinned by the project manifests:
-- Go 1.27.4.
-- Node.js 26.13.x.
-- Docker Engine with Docker Compose v2.
-
-Windows developers can use Docker Desktop with Linux containers for local development; that does not make Windows a certified production control-plane host.
-
-PowerShell:
-
-```powershell
-git pull --ff-only origin main
-.\scripts\start-local.ps1
-```
-
-For direct Go package tests on Windows, generate both modules' Protocol Buffer sources first:
-
-```powershell
-.\scripts\generate-proto.ps1
-$env:GOFLAGS = "-mod=mod"
-Push-Location .\backend
-go test ./...
-Pop-Location
-Push-Location .\agent
-go test ./...
-Pop-Location
-Remove-Item Env:GOFLAGS
-```
-
-The agent gRPC source directory is generated and intentionally ignored by Git. The module update flag matches the repository's Go check environment and populates missing checksum entries. Before running frontend lint or type checks directly, run `npm install` from `web/`.
-
-Linux/macOS development shell (the control plane still targets Linux containers):
+**Readiness checks on the control-plane host:**
 
 ```bash
-git pull --ff-only origin main
-./scripts/start-local.sh
+curl -fsS http://127.0.0.1:18080/health/ready
+curl -fsS http://127.0.0.1:13000/api/config
 ```
 
-The startup scripts validate source freshness/working tree, Compose configuration, build before replacing services and check readiness. Never run `docker compose down -v` as a routine troubleshooting step; it deletes persistent data.
+Persistent application data is held in named Compose volumes. PostgreSQL backup and restore scripts are provided under `deploy/production/`. A complete ClickHouse log backup/restore workflow and automated application upgrade workflow are not yet provided; do not treat the PostgreSQL backup alone as a full installation backup.
 
-## Architecture
+## Current scope
 
-```text
-Monitored Linux / Windows hosts
-  native Go agent
-  ├─ CPU, memory, disk, network, process and host metadata
-  ├─ journald / supported Windows Event Log source
-  ├─ bounded local WAL and retry
-  └─ TLS gRPC
-          |
-          v
-Self-hosted Linux control plane (Docker Compose)
-  Go API + migration runner
-  ├─ PostgreSQL: durable metrics and operator state
-  ├─ Redis: ephemeral latest-value fan-out
-  └─ ClickHouse: structured log events
-          |
-          v
-Next.js dashboard
-  Servers | Logs | Dashboards | Alerts
-```
+- The production bootstrap target is Ubuntu/Debian amd64; clean-host certification across every supported release and provider is still required.
+- No certified minimum CPU/RAM sizing, maximum fleet size or load limit has been published. Size the control-plane host from the number of enrolled machines, sampling volume, log volume and retention requirements, then load-test before production expansion.
+- External email/chat alert delivery, arbitrary file-log tailing, private-CA/DNS-based installer certificate provisioning, fully private VPC installation and automated upgrades are not implemented.
+- ARM64 Linux agent runtime, Windows x64 service/runtime and full log-store backup/restore need acceptance before being described as production-certified.
 
-The backend is the source of truth for telemetry; Redis messages are notifications only. The agent removes a queued batch only after durable backend acknowledgement.
-
-## Configuration, data and security
-
-- Production settings and secrets live in `.env.production` (mode 0600); never commit it.
-- Dashboard/API/WebSocket access is network-restricted by Nginx to `ADMIN_CIDR`; agents use their own short-lived credentials.
-- PostgreSQL, Redis and ClickHouse are private to the Compose network. Do not publish ports 5432, 6379, 8080, 8123 or 9000.
-- PostgreSQL backups are provided by `deploy/production/backup.sh` and `restore.sh`. ClickHouse backup/restore must be designed and tested before a production retention commitment.
-- The current schema still contains legacy organization/user/session compatibility plumbing used internally for installation-local ownership and live tickets. It is not a customer account system and is not exposed in the UI; removing it fully requires a separate data-preserving schema refactor.
-- `scripts/demo-load.sh` creates load only when explicitly confirmed. It does not write fabricated telemetry.
-
-## Repository map
-
-- `web/README.md` — frontend architecture, UI rules and npm commands.
-- `backend/README.md` — Go API, storage boundaries, migrations and tests.
-- `agent/README.md` — native agent capabilities, OS support and configuration.
-
-Keep product documentation to these four Markdown entry points. Add source comments near the code for implementation details; do not create another layer of stale roadmaps, audit notes or historical phase documents.
+For frontend, API and agent implementation notes, see [web/README.md](web/README.md), [backend/README.md](backend/README.md) and [agent/README.md](agent/README.md).

@@ -99,6 +99,7 @@ if [[ -f "$ENV_FILE" ]]; then
   PUBLIC_HOSTNAME="$(sed -n 's/^PUBLIC_HOSTNAME=//p' "$ENV_FILE" | tail -n 1 | tr -d '"' | tr -d '\r')"
   ADMIN_CIDR="$(sed -n 's/^ADMIN_CIDR=//p' "$ENV_FILE" | tail -n 1 | tr -d '"' | tr -d '\r')"
   LE_EMAIL="$(sed -n 's/^LE_EMAIL=//p' "$ENV_FILE" | tail -n 1 | tr -d '"' | tr -d '\r')"
+  AGENT_GRPC_CIDR="$(sed -n 's/^AGENT_GRPC_CIDR=//p' "$ENV_FILE" | tail -n 1 | tr -d '"' | tr -d '\r' || true)"
   [[ -n "$PUBLIC_HOSTNAME" && -n "$ADMIN_CIDR" ]] || fail "Existing .env.production must define PUBLIC_HOSTNAME and ADMIN_CIDR."
 else
   printf '\nA DNS hostname with an A record pointing to this VPS is required for trusted HTTPS.\n'
@@ -107,6 +108,8 @@ else
   valid_domain "$PUBLIC_HOSTNAME" || fail "Enter a valid fully-qualified DNS hostname."
   ADMIN_CIDR="$(prompt 'Administrator public IP/CIDR' "$DEFAULT_ADMIN")"
   valid_cidr "$ADMIN_CIDR" || fail "ADMIN_CIDR must be a specific IPv4/IPv6 CIDR, not a default route."
+  AGENT_GRPC_CIDR="$(prompt 'Optional agent source CIDR for TCP 8443 (blank allows any agent IP)' '')"
+  if [[ -n "$AGENT_GRPC_CIDR" ]]; then valid_cidr "$AGENT_GRPC_CIDR" || fail "AGENT_GRPC_CIDR must be a specific IPv4/IPv6 CIDR, not a default route."; fi
   LE_EMAIL="$(prompt 'Email for TLS certificate expiry notices' '')"
   [[ "$LE_EMAIL" == *@*.* ]] || fail "Enter a valid email address."
   if [[ -n "$PUBLIC_IPV4" ]]; then
@@ -127,6 +130,7 @@ PUBLIC_HOSTNAME=$PUBLIC_HOSTNAME
 LE_EMAIL=$LE_EMAIL
 AGENT_GRPC_PUBLIC_ADDRESS=$PUBLIC_HOSTNAME:8443
 ADMIN_CIDR=$ADMIN_CIDR
+AGENT_GRPC_CIDR=$AGENT_GRPC_CIDR
 AGENT_GRPC_BIND_ADDRESS=0.0.0.0
 AGENT_GRPC_PORT=8443
 API_HTTP_BIND_PORT=18080
@@ -146,6 +150,8 @@ fi
 
 valid_domain "$PUBLIC_HOSTNAME" || fail "PUBLIC_HOSTNAME in .env.production must be a valid FQDN."
 valid_cidr "$ADMIN_CIDR" || fail "ADMIN_CIDR in .env.production is invalid or unrestricted."
+if [[ -n "$AGENT_GRPC_CIDR" ]]; then valid_cidr "$AGENT_GRPC_CIDR" || fail "AGENT_GRPC_CIDR in .env.production is invalid or unrestricted."; fi
+if ! grep -q '^AGENT_GRPC_CIDR=' "$ENV_FILE"; then printf '\nAGENT_GRPC_CIDR=%s\n' "$AGENT_GRPC_CIDR" >> "$ENV_FILE"; chmod 600 "$ENV_FILE"; fi
 if [[ -z "$LE_EMAIL" ]]; then
   LE_EMAIL="$(prompt 'Email for TLS certificate expiry notices' '')"
   [[ "$LE_EMAIL" == *@*.* ]] || fail "Enter a valid LE_EMAIL in .env.production."
@@ -252,7 +258,11 @@ else
   ufw allow from "$ADMIN_CIDR" to any port "$SSH_PORT" proto tcp
   ufw allow 80/tcp
   ufw allow 443/tcp
-  ufw allow 8443/tcp
+  if [[ -n "$AGENT_GRPC_CIDR" ]]; then
+    ufw allow from "$AGENT_GRPC_CIDR" to any port 8443 proto tcp
+  else
+    ufw allow 8443/tcp
+  fi
   ufw --force enable
 fi
 
@@ -267,6 +277,7 @@ Monitor Me is installed.
 Dashboard: https://$PUBLIC_HOSTNAME
 Admin network: $ADMIN_CIDR
 Agent gRPC endpoint: $PUBLIC_HOSTNAME:8443
+Agent source network: ${AGENT_GRPC_CIDR:-any authenticated agent address}
 Data: persistent PostgreSQL, Redis and ClickHouse Docker volumes.
 
 The dashboard has no application login. Access is restricted by Nginx/UFW to ADMIN_CIDR.

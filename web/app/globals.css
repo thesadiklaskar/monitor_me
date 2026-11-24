@@ -1052,3 +1052,48 @@ td { font-size: 13px; }
   .overview-server-card { min-height:172px; }
   .overview-section-heading { align-items:flex-start; flex-direction:column; }
 }
+
+
+/* Detailed Monitoring charts: axis, observed range and storage capacity. */
+.overview-metric-card { min-height: 306px; }
+.overview-chart { min-width: 0; margin-top: 7px; }
+.overview-chart svg { display: block; width: 100%; height: auto; aspect-ratio: 440 / 164; overflow: visible; }
+.overview-chart-gridline { stroke: rgba(122,147,171,.2); stroke-width: 1; stroke-dasharray: 3 4; }
+.overview-chart-axis-line { stroke: rgba(122,147,171,.42); stroke-width: 1; }
+.overview-chart-axis-label { fill: #8295ab; font-size: 9px; font-family: ui-sans-serif,system-ui,sans-serif; }
+.overview-chart-range-band { fill: rgba(142,205,196,.14); stroke: rgba(142,205,196,.12); stroke-width: .7; }
+.overview-chart-area { fill: rgba(142,205,196,.09); stroke: none; }
+.overview-chart-line { fill: none; stroke: #8ecdc4; stroke-width: 2.1; stroke-linecap: round; stroke-linejoin: round; }
+.overview-chart-dot { fill: #a4d9cf; stroke: #1c3040; stroke-width: 1.1; }
+.overview-chart-dot-current { fill: #e5f9f3; stroke: #4d9188; stroke-width: 1.5; }
+.overview-chart-stats { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 12px; margin-top: 3px; color: #8497ac; font-size: 9px; }
+.overview-chart-stats strong { margin-left: 3px; color: #d5e2ed; font-weight: 650; font-variant-numeric: tabular-nums; }
+.overview-chart-range { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px; margin-top: 6px; color: #71869c; font-size: 8px; font-variant-numeric: tabular-nums; }
+
+.overview-storage-section { display: flex; flex-direction: column; gap: 13px; }
+.overview-storage-count { display: inline-flex; min-height: 27px; align-items: center; padding: 5px 9px; border: 1px solid rgba(65,88,116,.48); border-radius: 8px; color: #aebfd0; background: rgba(16,27,41,.7); font-size: 10px; white-space: nowrap; }
+.overview-storage-empty { display: grid; min-height: 110px; place-items: center; padding: 20px; border: 1px dashed rgba(100,125,150,.5); border-radius: 12px; color: #8fa2b8; font-size: 11px; text-align: center; }
+.overview-storage-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
+.overview-storage-card { display: flex; min-width: 0; flex-direction: column; gap: 12px; padding: 15px; border: 1px solid rgba(65,88,116,.57); border-radius: 12px; background: linear-gradient(145deg,rgba(20,32,49,.97),rgba(12,21,34,.97)); }
+.overview-storage-card-heading { display: flex; min-width: 0; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.overview-storage-card-heading > div { min-width: 0; }
+.overview-storage-card-heading h3 { overflow: hidden; margin: 0; color: #e4edf6; font-size: 13px; font-weight: 720; text-overflow: ellipsis; white-space: nowrap; }
+.overview-storage-card-heading p { overflow: hidden; margin: 5px 0 0; color: #8296ad; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.overview-storage-card-heading > strong { flex: 0 0 auto; color: #e5f3f0; font-size: 19px; font-weight: 760; font-variant-numeric: tabular-nums; }
+.overview-storage-track { height: 9px; overflow: hidden; border: 1px solid rgba(142,205,196,.15); border-radius: 99px; background: #111c29; }
+.overview-storage-track span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg,#397d76,#8ecdc4); }
+.overview-storage-capacity { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; }
+.overview-storage-capacity > div { display: flex; min-width: 0; flex-direction: column; gap: 5px; }
+.overview-storage-capacity span { color: #7f93a9; font-size: 9px; }
+.overview-storage-capacity strong { overflow: hidden; color: #d8e3ed; font-size: 11px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.overview-storage-history { display: flex; flex-direction: column; gap: 5px; padding-top: 10px; border-top: 1px solid rgba(65,88,116,.3); }
+.overview-storage-history > span { color: #92a6bb; font-size: 9px; font-weight: 650; }
+.overview-storage-history .overview-chart svg { max-height: 126px; }
+.overview-storage-history > small { color: #d1a4a8; font-size: 9px; }
+.overview-storage-card footer { padding-top: 8px; border-top: 1px solid rgba(65,88,116,.24); color: #71869c; font-size: 9px; }
+.overview-storage-note { margin: 0; color: #71869c; font-size: 9px; line-height: 1.5; }
+@media(max-width:760px) {
+  .overview-metric-card { min-height: 0; }
+  .overview-storage-grid { grid-template-columns: 1fr; }
+  .overview-storage-capacity { gap: 5px; }
+}
