@@ -19,15 +19,20 @@ func (api *API) listDashboards(writer http.ResponseWriter, request *http.Request
 
 func (api *API) createDashboard(writer http.ResponseWriter, request *http.Request) {
 	var input struct {
-		Name        string `json:"name"`
-		Description string `json:"description"`
-		IsDefault   bool   `json:"is_default"`
+		Name             string  `json:"name"`
+		Description      string  `json:"description"`
+		IsDefault        bool    `json:"is_default"`
+		DefaultServerID  *string `json:"default_server_id"`
+		DefaultTimeRange string  `json:"default_time_range"`
 	}
 	if !decodeJSON(writer, request, &input) {
 		return
 	}
 	dashboard, err := api.identities.CreateDashboard(
-		request.Context(), principalFromRequest(request), input.Name, input.Description, input.IsDefault,
+		request.Context(), principalFromRequest(request), identity.DashboardInput{
+			Name: input.Name, Description: input.Description, IsDefault: input.IsDefault,
+			DefaultServerID: input.DefaultServerID, DefaultTimeRange: input.DefaultTimeRange,
+		},
 	)
 	switch {
 	case errors.Is(err, identity.ErrForbidden):
@@ -38,6 +43,38 @@ func (api *API) createDashboard(writer http.ResponseWriter, request *http.Reques
 		writeAPIError(writer, http.StatusInternalServerError, "dashboard_create_failed", "The dashboard could not be created.")
 	default:
 		writeJSON(writer, http.StatusCreated, map[string]any{"dashboard": dashboard})
+	}
+}
+
+func (api *API) updateDashboard(writer http.ResponseWriter, request *http.Request) {
+	var input struct {
+		Name             string  `json:"name"`
+		Description      string  `json:"description"`
+		IsDefault        bool    `json:"is_default"`
+		DefaultServerID  *string `json:"default_server_id"`
+		DefaultTimeRange string  `json:"default_time_range"`
+	}
+	if !decodeJSON(writer, request, &input) {
+		return
+	}
+	dashboard, err := api.identities.UpdateDashboard(
+		request.Context(), principalFromRequest(request), strings.TrimSpace(request.PathValue("dashboardID")),
+		identity.DashboardInput{
+			Name: input.Name, Description: input.Description, IsDefault: input.IsDefault,
+			DefaultServerID: input.DefaultServerID, DefaultTimeRange: input.DefaultTimeRange,
+		},
+	)
+	switch {
+	case errors.Is(err, identity.ErrForbidden):
+		writeAPIError(writer, http.StatusForbidden, "forbidden", "Dashboard changes are not permitted.")
+	case errors.Is(err, identity.ErrInvalidInput):
+		writeAPIError(writer, http.StatusBadRequest, "invalid_dashboard", "Dashboard details or saved filters are invalid.")
+	case errors.Is(err, identity.ErrNotFound):
+		writeAPIError(writer, http.StatusNotFound, "not_found", "The dashboard or selected machine was not found.")
+	case err != nil:
+		writeAPIError(writer, http.StatusInternalServerError, "dashboard_update_failed", "The dashboard could not be updated.")
+	default:
+		writeJSON(writer, http.StatusOK, map[string]any{"dashboard": dashboard})
 	}
 }
 

@@ -68,13 +68,23 @@ type Server struct {
 }
 
 type Dashboard struct {
-	ID          string           `json:"id"`
-	Name        string           `json:"name"`
-	Description string           `json:"description"`
-	IsDefault   bool             `json:"is_default"`
-	CreatedAt   time.Time        `json:"created_at"`
-	UpdatedAt   time.Time        `json:"updated_at"`
-	Panels      []DashboardPanel `json:"panels"`
+	ID               string           `json:"id"`
+	Name             string           `json:"name"`
+	Description      string           `json:"description"`
+	IsDefault        bool             `json:"is_default"`
+	DefaultServerID  *string          `json:"default_server_id,omitempty"`
+	DefaultTimeRange string           `json:"default_time_range"`
+	CreatedAt        time.Time        `json:"created_at"`
+	UpdatedAt        time.Time        `json:"updated_at"`
+	Panels           []DashboardPanel `json:"panels"`
+}
+
+type DashboardInput struct {
+	Name             string
+	Description      string
+	IsDefault        bool
+	DefaultServerID  *string
+	DefaultTimeRange string
 }
 
 type DashboardPanel struct {
@@ -592,6 +602,7 @@ func (s *Store) RevokeAgent(ctx context.Context, principal Principal, agentID st
 func (s *Store) ListDashboards(ctx context.Context, principal Principal) ([]Dashboard, error) {
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT d.id::text, d.name, d.description, d.is_default,
+		       d.default_server_id::text, d.default_time_range,
 		       d.created_at, d.updated_at,
 		       panel.id::text, panel.title, panel.visualization, panel.server_id::text,
 		       panel.metric_name, panel.time_range, panel.position, panel.grid_width,
@@ -612,12 +623,14 @@ func (s *Store) ListDashboards(ctx context.Context, principal Principal) ([]Dash
 	indexByID := make(map[string]int)
 	for rows.Next() {
 		var dashboard Dashboard
+		var defaultServerID sql.NullString
+		var defaultTimeRange string
 		var panelID, panelTitle, visualization, serverID, metricName, timeRange sql.NullString
 		var position, gridWidth sql.NullInt64
 		var panelCreatedAt, panelUpdatedAt sql.NullTime
 		if err := rows.Scan(
 			&dashboard.ID, &dashboard.Name, &dashboard.Description, &dashboard.IsDefault,
-			&dashboard.CreatedAt, &dashboard.UpdatedAt,
+			&defaultServerID, &defaultTimeRange, &dashboard.CreatedAt, &dashboard.UpdatedAt,
 			&panelID, &panelTitle, &visualization, &serverID,
 			&metricName, &timeRange, &position, &gridWidth, &panelCreatedAt, &panelUpdatedAt,
 		); err != nil {
@@ -626,6 +639,11 @@ func (s *Store) ListDashboards(ctx context.Context, principal Principal) ([]Dash
 		if index, exists := indexByID[dashboard.ID]; exists {
 			dashboard = dashboards[index]
 		} else {
+			if defaultServerID.Valid {
+				value := defaultServerID.String
+				dashboard.DefaultServerID = &value
+			}
+			dashboard.DefaultTimeRange = defaultTimeRange
 			dashboard.Panels = make([]DashboardPanel, 0)
 			indexByID[dashboard.ID] = len(dashboards)
 			dashboards = append(dashboards, dashboard)
@@ -647,42 +665,157 @@ func (s *Store) ListDashboards(ctx context.Context, principal Principal) ([]Dash
 	return dashboards, nil
 }
 
-// CreateDashboard persists a dashboard in the caller's organization.
-func (s *Store) CreateDashboard(ctx context.Context, principal Principal, name, description string, isDefault bool) (Dashboard, error) {
-	name = strings.TrimSpace(name)
-	description = strings.TrimSpace(description)
-	if len(name) < 2 || len(name) > 120 || len(description) > 500 {
+// CreateDashboard persists a dashboard and its saved filter defaults.
+func (s *Store) CreateDashboard(ctx context.Context, principal Principal, input DashboardInput) (Dashboard, error) {
+	input.Name = strings.TrimSpace(input.Name)
+	input.Description = strings.TrimSpace(input.Description)
+	if input.DefaultTimeRange == "" {
+		input.DefaultTimeRange = "panel"
+	}
+	if len(input.Name) < 2 || len(input.Name) > 120 || len(input.Description) > 500 ||
+		!validDashboardTimeRange(input.DefaultTimeRange) {
 		return Dashboard{}, ErrInvalidInput
 	}
+	if input.DefaultServerID != nil && !validUUID(*input.DefaultServerID) {
+		return Dashboard{}, ErrInvalidInput
+	}
+
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return Dashboard{}, fmt.Errorf("begin dashboard creation: %w", err)
 	}
 	defer tx.Rollback()
-	if isDefault {
+
+	if input.DefaultServerID != nil {
+		var exists bool
+		if err := tx.QueryRowContext(ctx,
+			"SELECT EXISTS (SELECT 1 FROM servers WHERE id = $1 AND organization_id = $2)",
+			*input.DefaultServerID, principal.OrganizationID).Scan(&exists); err != nil {
+			return Dashboard{}, fmt.Errorf("validate default dashboard machine: %w", err)
+		}
+		if !exists {
+			return Dashboard{}, ErrNotFound
+		}
+	}
+	if input.IsDefault {
 		if _, err := tx.ExecContext(ctx,
 			"UPDATE dashboards SET is_default = false, updated_at = now() WHERE organization_id = $1 AND is_default = true",
 			principal.OrganizationID); err != nil {
 			return Dashboard{}, fmt.Errorf("clear previous default dashboard: %w", err)
 		}
 	}
+
 	var dashboard Dashboard
+	var defaultServerID sql.NullString
 	err = tx.QueryRowContext(ctx, `
-		INSERT INTO dashboards (organization_id, name, description, is_default, created_by, updated_by)
-		VALUES ($1, $2, $3, $4, $5, $5)
-		RETURNING id::text, name, description, is_default, created_at, updated_at
-	`, principal.OrganizationID, name, description, isDefault, principal.UserID).Scan(
-		&dashboard.ID, &dashboard.Name, &dashboard.Description,
-		&dashboard.IsDefault, &dashboard.CreatedAt, &dashboard.UpdatedAt,
+		INSERT INTO dashboards (
+			organization_id, name, description, is_default, default_server_id,
+			default_time_range, created_by, updated_by
+		)
+		VALUES ($1, $2, $3, $4, $5::uuid, $6, $7, $7)
+		RETURNING id::text, name, description, is_default, default_server_id::text,
+		          default_time_range, created_at, updated_at
+	`, principal.OrganizationID, input.Name, input.Description, input.IsDefault,
+		nullableUUID(input.DefaultServerID), input.DefaultTimeRange, principal.UserID).Scan(
+		&dashboard.ID, &dashboard.Name, &dashboard.Description, &dashboard.IsDefault,
+		&defaultServerID, &dashboard.DefaultTimeRange, &dashboard.CreatedAt, &dashboard.UpdatedAt,
 	)
 	if err != nil {
 		return Dashboard{}, fmt.Errorf("create installation dashboard: %w", err)
+	}
+	if defaultServerID.Valid {
+		value := defaultServerID.String
+		dashboard.DefaultServerID = &value
 	}
 	dashboard.Panels = make([]DashboardPanel, 0)
 	if err := tx.Commit(); err != nil {
 		return Dashboard{}, fmt.Errorf("commit installation dashboard: %w", err)
 	}
 	return dashboard, nil
+}
+
+// UpdateDashboard edits dashboard details, default status and saved machine/time filters.
+func (s *Store) UpdateDashboard(ctx context.Context, principal Principal, dashboardID string, input DashboardInput) (Dashboard, error) {
+	input.Name = strings.TrimSpace(input.Name)
+	input.Description = strings.TrimSpace(input.Description)
+	if !validUUID(dashboardID) {
+		return Dashboard{}, ErrNotFound
+	}
+	if input.DefaultTimeRange == "" {
+		input.DefaultTimeRange = "panel"
+	}
+	if len(input.Name) < 2 || len(input.Name) > 120 || len(input.Description) > 500 ||
+		!validDashboardTimeRange(input.DefaultTimeRange) {
+		return Dashboard{}, ErrInvalidInput
+	}
+	if input.DefaultServerID != nil && !validUUID(*input.DefaultServerID) {
+		return Dashboard{}, ErrInvalidInput
+	}
+
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return Dashboard{}, fmt.Errorf("begin dashboard update: %w", err)
+	}
+	defer tx.Rollback()
+
+	if input.DefaultServerID != nil {
+		var exists bool
+		if err := tx.QueryRowContext(ctx,
+			"SELECT EXISTS (SELECT 1 FROM servers WHERE id = $1 AND organization_id = $2)",
+			*input.DefaultServerID, principal.OrganizationID).Scan(&exists); err != nil {
+			return Dashboard{}, fmt.Errorf("validate dashboard default machine: %w", err)
+		}
+		if !exists {
+			return Dashboard{}, ErrNotFound
+		}
+	}
+	if input.IsDefault {
+		if _, err := tx.ExecContext(ctx,
+			"UPDATE dashboards SET is_default = false, updated_at = now() WHERE organization_id = $1 AND is_default = true AND id <> $2",
+			principal.OrganizationID, dashboardID); err != nil {
+			return Dashboard{}, fmt.Errorf("clear previous default dashboard: %w", err)
+		}
+	}
+
+	var dashboard Dashboard
+	var defaultServerID sql.NullString
+	err = tx.QueryRowContext(ctx, `
+		UPDATE dashboards
+		SET name = $3, description = $4, is_default = $5,
+		    default_server_id = $6::uuid, default_time_range = $7,
+		    updated_by = $8, updated_at = now()
+		WHERE id = $1 AND organization_id = $2
+		RETURNING id::text, name, description, is_default, default_server_id::text,
+		          default_time_range, created_at, updated_at
+	`, dashboardID, principal.OrganizationID, input.Name, input.Description, input.IsDefault,
+		nullableUUID(input.DefaultServerID), input.DefaultTimeRange, principal.UserID).Scan(
+		&dashboard.ID, &dashboard.Name, &dashboard.Description, &dashboard.IsDefault,
+		&defaultServerID, &dashboard.DefaultTimeRange, &dashboard.CreatedAt, &dashboard.UpdatedAt,
+	)
+	if errors.Is(err, sql.ErrNoRows) {
+		return Dashboard{}, ErrNotFound
+	}
+	if err != nil {
+		return Dashboard{}, fmt.Errorf("update installation dashboard: %w", err)
+	}
+	if defaultServerID.Valid {
+		value := defaultServerID.String
+		dashboard.DefaultServerID = &value
+	}
+	dashboard.Panels = make([]DashboardPanel, 0)
+	if err := tx.Commit(); err != nil {
+		return Dashboard{}, fmt.Errorf("commit dashboard update: %w", err)
+	}
+	return dashboard, nil
+}
+
+func validDashboardTimeRange(value string) bool {
+	switch value {
+	case "panel", "1h", "6h", "24h", "7d", "30d":
+		return true
+	default:
+		return false
+	}
 }
 
 // DeleteDashboard removes only a dashboard owned by the caller's organization.

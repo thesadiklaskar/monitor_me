@@ -31,6 +31,8 @@ type Dashboard = {
   name: string;
   description: string;
   is_default: boolean;
+  default_server_id?: string | null;
+  default_time_range: "panel" | TimeRange;
   created_at: string;
   updated_at: string;
   panels: DashboardPanel[];
@@ -332,6 +334,9 @@ export default function DashboardsView({ servers }: { servers: Server[] }) {
   const [dashboardName, setDashboardName] = useState("");
   const [dashboardDescription, setDashboardDescription] = useState("");
   const [dashboardDefault, setDashboardDefault] = useState(false);
+  const [dashboardDefaultServerId, setDashboardDefaultServerId] = useState("");
+  const [dashboardDefaultTimeRange, setDashboardDefaultTimeRange] = useState<"panel" | TimeRange>("panel");
+  const [editingDashboardId, setEditingDashboardId] = useState("");
   const [panelTitle, setPanelTitle] = useState("");
   const [panelServerId, setPanelServerId] = useState("");
   const [panelMetric, setPanelMetric] = useState<string>(metricCatalog[0].value);
@@ -421,6 +426,12 @@ export default function DashboardsView({ servers }: { servers: Server[] }) {
 
   useEffect(() => {
     if (!selectedDashboard) return;
+    setServerFilter(selectedDashboard.default_server_id ?? "all");
+    setRangeOverride(selectedDashboard.default_time_range || "panel");
+  }, [selectedDashboard?.id, selectedDashboard?.default_server_id, selectedDashboard?.default_time_range]);
+
+  useEffect(() => {
+    if (!selectedDashboard) return;
     const initial = window.setTimeout(() => { void refreshSeries(); }, 0);
     const interval = window.setInterval(() => { void refreshSeries(); }, 15000);
     return () => { window.clearTimeout(initial); window.clearInterval(interval); };
@@ -437,25 +448,75 @@ export default function DashboardsView({ servers }: { servers: Server[] }) {
     setShowPanelForm(true);
   }
 
-  async function createDashboard(event: FormEvent<HTMLFormElement>) {
+  function openDashboardForm(dashboard?: Dashboard) {
+    setEditingDashboardId(dashboard?.id ?? "");
+    setDashboardName(dashboard?.name ?? "");
+    setDashboardDescription(dashboard?.description ?? "");
+    setDashboardDefault(dashboard?.is_default ?? false);
+    setDashboardDefaultServerId(dashboard?.default_server_id ?? "");
+    setDashboardDefaultTimeRange(dashboard?.default_time_range ?? "panel");
+    setShowDashboardForm(true);
+  }
+
+  async function saveDashboard(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setBusy(true);
     setError("");
     setNotice("");
+    const body = {
+      name: dashboardName.trim(),
+      description: dashboardDescription.trim(),
+      is_default: dashboardDefault,
+      default_server_id: dashboardDefaultServerId || null,
+      default_time_range: dashboardDefaultTimeRange,
+    };
     try {
-      const result = await apiRequest<{ dashboard: Dashboard }>("/api/dashboards", {
-        method: "POST",
-        body: JSON.stringify({ name: dashboardName.trim(), description: dashboardDescription.trim(), is_default: dashboardDefault }),
-      });
-      setDashboardName("");
-      setDashboardDescription("");
-      setDashboardDefault(false);
+      let dashboardId = editingDashboardId;
+      if (editingDashboardId) {
+        await apiRequest<{ dashboard: Dashboard }>("/api/dashboards/" + encodeURIComponent(editingDashboardId), {
+          method: "PATCH",
+          body: JSON.stringify(body),
+        });
+        setNotice("Dashboard settings saved.");
+      } else {
+        const result = await apiRequest<{ dashboard: Dashboard }>("/api/dashboards", {
+          method: "POST",
+          body: JSON.stringify(body),
+        });
+        dashboardId = result.dashboard.id;
+        setNotice("Dashboard saved to this installation.");
+      }
       setShowDashboardForm(false);
-      setNotice("Dashboard saved to this installation.");
+      setEditingDashboardId("");
       await loadDashboards();
-      setSelectedId(result.dashboard.id);
-    } catch (createError) {
-      setError(createError instanceof Error ? createError.message : "Dashboard could not be created.");
+      setSelectedId(dashboardId);
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : "Dashboard could not be saved.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveViewDefaults() {
+    if (!selectedDashboard || busy) return;
+    setBusy(true);
+    setError("");
+    setNotice("");
+    try {
+      await apiRequest<{ dashboard: Dashboard }>("/api/dashboards/" + encodeURIComponent(selectedDashboard.id), {
+        method: "PATCH",
+        body: JSON.stringify({
+          name: selectedDashboard.name,
+          description: selectedDashboard.description,
+          is_default: selectedDashboard.is_default,
+          default_server_id: serverFilter === "all" ? null : serverFilter,
+          default_time_range: rangeOverride,
+        }),
+      });
+      await loadDashboards();
+      setNotice("Default machine and time filters saved.");
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : "Dashboard defaults could not be saved.");
     } finally {
       setBusy(false);
     }
@@ -570,7 +631,7 @@ export default function DashboardsView({ servers }: { servers: Server[] }) {
         </div>
         <div className="dashboards-header-actions">
           <Button variant="secondary" onClick={() => { void loadDashboards(); void refreshSeries(); }} disabled={loading || busy}><RefreshCw size={14} /> Refresh</Button>
-          <Button onClick={() => setShowDashboardForm((value) => !value)}><Plus size={15} /> New dashboard</Button>
+          <Button onClick={() => openDashboardForm()}><Plus size={15} /> New dashboard</Button>
         </div>
       </header>
 
@@ -579,15 +640,17 @@ export default function DashboardsView({ servers }: { servers: Server[] }) {
 
       {showDashboardForm && (
         <Card className="dashboard-editor-card">
-          <CardHeader><CardTitle>Create dashboard</CardTitle><CardDescription>Saved views belong to this Monitor Me installation.</CardDescription></CardHeader>
+          <CardHeader><CardTitle>{editingDashboardId ? "Edit dashboard" : "Create dashboard"}</CardTitle><CardDescription>Save dashboard details and default machine/time filters for every session.</CardDescription></CardHeader>
           <CardContent>
-            <form className="dashboard-builder-grid" onSubmit={createDashboard}>
+            <form className="dashboard-builder-grid" onSubmit={saveDashboard}>
               <label className="field"><span>Name</span><input value={dashboardName} onChange={(event) => setDashboardName(event.target.value)} required minLength={2} maxLength={120} placeholder="Production overview" /></label>
               <label className="field dashboard-description-field"><span>Description</span><textarea value={dashboardDescription} onChange={(event) => setDashboardDescription(event.target.value)} maxLength={500} rows={2} placeholder="Purpose and audience for this view" /></label>
               <label className="dashboard-default-check"><input type="checkbox" checked={dashboardDefault} onChange={(event) => setDashboardDefault(event.target.checked)} /> Set as the default dashboard</label>
+              <label className="field"><span>Default machine</span><select value={dashboardDefaultServerId} onChange={(event) => setDashboardDefaultServerId(event.target.value)}><option value="">Use each panel's machine</option>{servers.map((server) => <option key={server.id} value={server.id}>{server.name}</option>)}</select></label>
+              <label className="field"><span>Default time range</span><select value={dashboardDefaultTimeRange} onChange={(event) => setDashboardDefaultTimeRange(event.target.value as "panel" | TimeRange)}><option value="panel">Use each panel's range</option>{Object.entries(rangeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
               <div className="dashboard-builder-actions">
                 <Button variant="secondary" type="button" onClick={() => setShowDashboardForm(false)}>Cancel</Button>
-                <Button type="submit" disabled={busy}>{busy ? "Saving…" : "Create dashboard"}</Button>
+                <Button type="submit" disabled={busy}>{busy ? "Saving…" : editingDashboardId ? "Save dashboard" : "Create dashboard"}</Button>
               </div>
             </form>
           </CardContent>
@@ -602,7 +665,7 @@ export default function DashboardsView({ servers }: { servers: Server[] }) {
             <div className="dashboard-empty-icon"><LayoutDashboard size={24} /></div>
             <h2>No dashboards yet</h2>
             <p>Create your first view, then add panels for CPU, memory, storage, network and workload metrics.</p>
-            <Button onClick={() => setShowDashboardForm(true)}><Plus size={15} /> Create your first dashboard</Button>
+            <Button onClick={() => openDashboardForm()}><Plus size={15} /> Create your first dashboard</Button>
           </CardContent>
         </Card>
       ) : (
@@ -622,6 +685,7 @@ export default function DashboardsView({ servers }: { servers: Server[] }) {
               <div className="dashboard-detail-heading">
                 <div><h2>{selectedDashboard.name}</h2><p>{selectedDashboard.description || "Installation-wide monitoring view."}</p></div>
                 <div className="dashboard-detail-actions">
+                  <Button variant="secondary" size="sm" onClick={() => openDashboardForm(selectedDashboard)} disabled={busy}><Activity size={13} /> Edit view</Button>
                   <Button variant="destructive" size="sm" onClick={() => void deleteDashboard()} disabled={busy}><Trash2 size={13} /> Delete</Button>
                   <Button size="sm" onClick={() => resetPanelForm()} disabled={servers.length === 0}><Plus size={14} /> Add panel</Button>
                 </div>
@@ -630,7 +694,7 @@ export default function DashboardsView({ servers }: { servers: Server[] }) {
               <div className="dashboard-variable-bar">
                 <label className="field"><span>Machine filter</span><select value={serverFilter} onChange={(event) => setServerFilter(event.target.value)}><option value="all">Use each panel's machine</option>{servers.map((server) => <option key={server.id} value={server.id}>{server.name}</option>)}</select></label>
                 <label className="field"><span>Time window</span><select value={rangeOverride} onChange={(event) => setRangeOverride(event.target.value as "panel" | TimeRange)}><option value="panel">Use each panel's range</option>{Object.entries(rangeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-                <div className="dashboard-variable-summary"><strong>{orderedPanels.length} panels</strong><span>{activeRangeLabel}</span></div>
+                <div className="dashboard-variable-summary"><strong>{orderedPanels.length} panels</strong><span>{activeRangeLabel}</span><Button variant="secondary" size="sm" onClick={() => void saveViewDefaults()} disabled={busy}>Save view defaults</Button></div>
               </div>
 
               {showPanelForm && (

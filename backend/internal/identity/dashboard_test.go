@@ -29,3 +29,16 @@ func TestValidPanelGridWidth(t *testing.T) {
 		}
 	}
 }
+
+func TestValidDashboardTimeRange(t *testing.T) {
+	for _, value := range []string{"panel", "1h", "6h", "24h", "7d", "30d"} {
+		if !validDashboardTimeRange(value) {
+			t.Errorf("validDashboardTimeRange(%q) = false", value)
+		}
+	}
+	for _, value := range []string{"", "15m", "90d", "all", "invalid"} {
+		if validDashboardTimeRange(value) {
+			t.Errorf("validDashboardTimeRange(%q) = true", value)
+		}
+	}
+}

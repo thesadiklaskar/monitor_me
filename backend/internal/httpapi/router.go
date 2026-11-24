@@ -52,6 +52,7 @@ func NewRouter(version string, dependencies []Dependency, identities *identity.S
 		mux.Handle("POST /v1/notifications/{notificationID}/read", api.requireInstallation(http.HandlerFunc(api.markAlertNotificationRead)))
 		mux.Handle("GET /v1/dashboards", api.requireInstallation(http.HandlerFunc(api.listDashboards)))
 		mux.Handle("POST /v1/dashboards", api.requireInstallation(http.HandlerFunc(api.createDashboard)))
+		mux.Handle("PATCH /v1/dashboards/{dashboardID}", api.requireInstallation(http.HandlerFunc(api.updateDashboard)))
 		mux.Handle("DELETE /v1/dashboards/{dashboardID}", api.requireInstallation(http.HandlerFunc(api.deleteDashboard)))
 		mux.Handle("POST /v1/dashboards/{dashboardID}/panels", api.requireInstallation(http.HandlerFunc(api.createDashboardPanel)))
 		mux.Handle("PATCH /v1/dashboard-panels/{panelID}", api.requireInstallation(http.HandlerFunc(api.updateDashboardPanel)))
