@@ -105,8 +105,6 @@ services:
       dockerfile: deploy/agent-artifacts/Dockerfile
       args:
         MONITOR_AGENT_VERSION: "${MONITOR_ME_RELEASE:?Set MONITOR_ME_RELEASE}"
-    environment:
-      MONITOR_AGENT_VERSION: "${MONITOR_ME_RELEASE}"
     restart: "no"
     volumes:
       - agent_artifacts:/out
