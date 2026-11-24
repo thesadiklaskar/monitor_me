@@ -29,7 +29,7 @@ type API struct {
 
 type principalContextKey struct{}
 
-func (api *API) anonymousLocalPrincipal(ctx context.Context) (identity.Principal, error) {
+func (api *API) installationPrincipal(ctx context.Context) (identity.Principal, error) {
 	api.localPrincipalMu.Lock()
 	defer api.localPrincipalMu.Unlock()
 
@@ -56,11 +56,11 @@ func (api *API) installation(writer http.ResponseWriter, _ *http.Request) {
 	})
 }
 
-// requireAuth binds requests to the one implicit installation principal. It does
+// requireInstallation binds requests to the one implicit installation principal. It does
 // not accept browser credentials; remote access is restricted at the network edge.
 func (api *API) requireAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		principal, err := api.anonymousLocalPrincipal(request.Context())
+		principal, err := api.installationPrincipal(request.Context())
 		if err != nil {
 			writeAPIError(writer, http.StatusServiceUnavailable, "installation_unavailable", "The Monitor Me installation could not be initialized.")
 			return
