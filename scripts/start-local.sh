@@ -105,7 +105,7 @@ echo "Waiting for API and dashboard readiness..."
 for _ in $(seq 1 40); do
   if curl -fsS --connect-timeout 2 --max-time 3 http://localhost:8080/health/ready >/dev/null \
     && curl -fsS --connect-timeout 2 --max-time 3 http://localhost:3000/api/config >/dev/null \
-    && curl -fsS --connect-timeout 2 --max-time 3 http://localhost:3001/api/health >/dev/null; then
+    && curl -fsS --connect-timeout 2 --max-time 3 http://localhost:3000/grafana/api/health >/dev/null; then
     echo "Monitor Me is ready at http://localhost:3000"
     echo "Grafana is ready at http://localhost:3000/grafana/ (also available at http://localhost:3001)."
     exit 0
