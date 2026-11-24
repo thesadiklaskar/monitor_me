@@ -25,7 +25,6 @@ type Config struct {
 	StartupTimeout       time.Duration
 	WebAllowedOrigins      []string
 	RemoteAllowedUnits     []string
-	DisableAuthentication  bool
 	ClickHouseURL          string
 	ClickHouseUsername     string
 	ClickHousePassword     string
@@ -51,12 +50,6 @@ func Load() (Config, error) {
 		DBConnectionLifetime: 30 * time.Minute,
 		StartupTimeout:       10 * time.Second,
 	}
-
-	disableAuthentication := getEnv("MONITOR_ME_AUTH_DISABLED", "false")
-	if disableAuthentication != "true" && disableAuthentication != "false" {
-		return Config{}, fmt.Errorf("MONITOR_ME_AUTH_DISABLED must be true or false")
-	}
-	cfg.DisableAuthentication = disableAuthentication == "true"
 
 	var err error
 	cfg.WebAllowedOrigins, err = parseWebAllowedOrigins(getEnv("WEB_ALLOWED_ORIGINS", "http://localhost:3000"))
