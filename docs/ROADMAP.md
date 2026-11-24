@@ -34,7 +34,7 @@ The product owner's latest direction supersedes the earlier login/organization-f
 
 **Target experience:** one control-plane installer starts the complete supported Docker Compose stack and creates its implicit installation workspace. Add Machine issues one short-lived token and shows shell launchers. The launcher running on the target detects its own OS/architecture/virtualization, downloads the right signed agent, installs the correct service, enrolls and starts it. The operator must not select the OS in a dashboard form or hand-configure collector environment.
 
-**Important current-vs-target distinction:** current local helpers still build from a repository checkout with Docker; Windows agent runs in the foreground; signed downloadable binaries, automatic Windows Service setup, universal target bootstrap and a no-login production gate are not yet shipped. Raw log collection/search is not implemented. The ClickHouse log design is proposed only. No Grafana-replacement or million-log claim is valid until the verification gates pass.
+**Important current-vs-target distinction:** the local control-plane helper uses Docker Compose. The monitored-node bootstrap now downloads checksum-verified Linux amd64/arm64 and Windows x64 binaries without requiring a target-side checkout or Docker; Linux systemd and Windows Service installers are present in code. These installers, service lifecycles, Nginx access gate and production integration have not yet passed owner/runtime acceptance. Artifacts are not publisher-code-signed. Raw log collection/search is not implemented; ClickHouse is proposed only. No Grafana-replacement or million-log claim is valid until tests and benchmarks pass.
 
 ### Updated delivery sequence
 
