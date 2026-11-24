@@ -84,6 +84,7 @@ Interface identity, state, and counter reset behavior must be recorded. Loopback
 
 | Metric / field | Unit / type | Meaning |
 | --- | --- | --- |
+| `host.info` | info sample | Hostname, OS/platform/version, kernel, architecture, optional hypervisor system/role and environment type; Linux may add a best-effort cloud-provider hint from DMI fields |
 | `host.uptime.seconds` | seconds, gauge | Time since host boot |
 | `agent.uptime.seconds` | seconds, gauge | Time since agent process start |
 | `agent.cpu.utilization` | percent | Agent process CPU consumption as a percentage of one logical CPU; multithreaded workloads may exceed 100% |
@@ -94,6 +95,8 @@ Interface identity, state, and counter reset behavior must be recorded. Loopback
 | `agent.last_successful_send` | timestamp | Last successful backend delivery |
 
 Agent health metrics are required to distinguish a quiet host from a malfunctioning collector or disconnected agent.
+
+`environment_type` is one of `container`, `cloud_vm`, `virtual_machine`, or `physical_or_unknown`. Cloud-provider hints are heuristics, not authoritative cloud inventory; absence of a hint does not prove a machine is physical.
 
 ## 8. Workload and Project Metrics
 
