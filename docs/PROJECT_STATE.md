@@ -20,7 +20,7 @@ This file is the authoritative resume point for Monitor Me. Read it before makin
 | Last source commit covered by latest successful CI run | 9685e115113123d5f9f8e8a1b222804752f5a283 (Go, frontend and native-agent jobs passed in run #45203706343; Compose integration failed at the web proxy login probe; later commits are not covered) |
 | Latest CI run | #45336849862 — completed with failure and an empty jobs list; no runner steps or tests executed for these recent changes |
 | Latest implementation commit | 681d4c06bf942200c35553a573d3a415dccaf488 — transactional alert evaluation and reliability fixes; preceding commits add atomic operation audit, heartbeat-derived status, ambiguous-login rejection and repository-independent Go module paths |
-| Next action | On the owner's Windows PC, pull `main`, run `.\scripts\start-local.ps1` in PowerShell, confirm `agent-artifacts` completed and the no-login dashboard opens, then Add Machine and validate the Windows x64 Service installer using a fresh one-time token. Inspect `Get-Service MonitorMeAgent` and `%ProgramData%\\MonitorMe\\agent.log`. Do not expose local anonymous mode beyond loopback. GitHub Actions currently cannot assign runners due quota, so no fresh CI pass is claimed. |
+| Next action | On the owner's Windows PC, pull `main`, run `.\scripts\start-local.ps1` in PowerShell, confirm `agent-artifacts` completed and the no-login dashboard opens, then Add Machine and validate the Windows x64 Service installer using a fresh one-time token. Inspect `Get-Service MonitorMeAgent` and `%ProgramData%\MonitorMe\agent.log`. Do not expose local anonymous mode beyond loopback. Recent Actions runs returned no jobs, so local and CI test evidence is still required. |
 
 
 
