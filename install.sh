@@ -39,12 +39,49 @@ PYTHON
 case "$ID" in ubuntu|debian) ;; *) fail "Automated control-plane installation currently supports Ubuntu/Debian only." ;; esac
 [[ "$(uname -m)" == "x86_64" ]] || fail "Production control plane currently targets Linux x86-64."
 
-log "Installing Docker, Compose, Nginx, Certbot, UFW and utilities."
+log "Installing Docker Engine/Compose when missing, plus Nginx, Certbot, UFW and utilities."
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
-apt-get install -y ca-certificates curl openssl python3 nginx certbot ufw docker.io
+apt-get install -y ca-certificates curl openssl python3 nginx certbot ufw gnupg
+if ! command -v docker >/dev/null 2>&1; then
+  install -m 0755 -d /etc/apt/keyrings
+  case "$ID" in
+    ubuntu)
+      DOCKER_REPO_OS=ubuntu
+      DOCKER_SUITE="${UBUNTU_CODENAME:-$VERSION_CODENAME}"
+      ;;
+    debian)
+      DOCKER_REPO_OS=debian
+      DOCKER_SUITE="$VERSION_CODENAME"
+      ;;
+  esac
+  curl -fsSL "https://download.docker.com/linux/$DOCKER_REPO_OS/gpg" -o /etc/apt/keyrings/docker.asc
+  chmod a+r /etc/apt/keyrings/docker.asc
+  printf 'Types: deb\nURIs: https://download.docker.com/linux/%s\nSuites: %s\nComponents: stable\nArchitectures: %s\nSigned-By: /etc/apt/keyrings/docker.asc\n' "$DOCKER_REPO_OS" "$DOCKER_SUITE" "$(dpkg --print-architecture)" > /etc/apt/sources.list.d/docker.sources
+  apt-get update
+  apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+fi
 if ! docker compose version >/dev/null 2>&1; then
-  apt-get install -y docker-compose-v2 || apt-get install -y docker-compose-plugin || fail "Docker Compose v2 could not be installed."
+  if ! apt-get install -y docker-compose-v2 2>/dev/null; then
+    if ! grep -q '^URIs: https://download.docker.com/' /etc/apt/sources.list.d/docker.sources 2>/dev/null; then
+      install -m 0755 -d /etc/apt/keyrings
+      case "$ID" in
+        ubuntu)
+          DOCKER_REPO_OS=ubuntu
+          DOCKER_SUITE="${UBUNTU_CODENAME:-$VERSION_CODENAME}"
+          ;;
+        debian)
+          DOCKER_REPO_OS=debian
+          DOCKER_SUITE="$VERSION_CODENAME"
+          ;;
+      esac
+      curl -fsSL "https://download.docker.com/linux/$DOCKER_REPO_OS/gpg" -o /etc/apt/keyrings/docker.asc
+      chmod a+r /etc/apt/keyrings/docker.asc
+      printf 'Types: deb\nURIs: https://download.docker.com/linux/%s\nSuites: %s\nComponents: stable\nArchitectures: %s\nSigned-By: /etc/apt/keyrings/docker.asc\n' "$DOCKER_REPO_OS" "$DOCKER_SUITE" "$(dpkg --print-architecture)" > /etc/apt/sources.list.d/docker.sources
+      apt-get update
+    fi
+    apt-get install -y docker-compose-plugin
+  fi
 fi
 systemctl enable --now docker nginx
 docker compose version >/dev/null 2>&1 || fail "Docker Compose v2 is unavailable."
@@ -52,7 +89,6 @@ docker compose version >/dev/null 2>&1 || fail "Docker Compose v2 is unavailable
 PUBLIC_IPV4="$(curl -4 --connect-timeout 5 --max-time 12 -fsS https://api.ipify.org 2>/dev/null || true)"
 SSH_CLIENT_VALUE="$(printenv SSH_CLIENT 2>/dev/null || true)"
 SSH_CLIENT_IP="$(printf '%s\n' "$SSH_CLIENT_VALUE" | awk '{print $1}')"
-if [[ -z "$SSH_CLIENT_IP" ]]; then SSH_CLIENT_IP="$PUBLIC_IPV4"; fi
 DEFAULT_ADMIN=""
 if [[ -n "$SSH_CLIENT_IP" ]]; then
   if [[ "$SSH_CLIENT_IP" == *:* ]]; then DEFAULT_ADMIN="$SSH_CLIENT_IP/128"; else DEFAULT_ADMIN="$SSH_CLIENT_IP/32"; fi
