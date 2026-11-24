@@ -50,75 +50,31 @@ The commands above require Docker only. Go, Node.js, npm and `protoc` are needed
 
 The API readiness endpoint requires PostgreSQL and Redis. Liveness is independent of these dependencies. Compose CI stops each dependency separately, verifies readiness becomes unhealthy, restarts the dependency, and verifies readiness recovers. The dashboard includes server views, historical/live charts, project/mapping administration, alerts/in-app notifications, and allowlisted remote operations. The default local Compose profile enables anonymous access for localhost convenience. Keep the local stack bound to 127.0.0.1; never expose anonymous mode to a LAN, reverse proxy or the public internet.
 
-## First owner and server enrollment
+## Single-install dashboard and machine enrollment
 
-The initial owner is created once per database. Register and log in using the API:
+The default local Compose profile opens without login on `http://localhost:3000`. It creates an internal local workspace on first boot; there is no dashboard signup or organization-creation step in this profile. The API still retains internal tenancy identifiers for data isolation and compatibility.
 
-```sh
-curl -sS http://localhost:8080/v1/auth/register \
-  -H 'Content-Type: application/json' \
-  -d '{"email":"owner@example.com","display_name":"Workspace Owner","password":"replace-with-a-long-password","organization_name":"Example Team","organization_slug":"example-team"}'
+From the dashboard, choose **Add Machine** and create a one-time enrollment token. On the target machine, run the one-command installer for the shell available there. The installer detects the target OS/architecture itself; do not pick Windows/Linux in the browser.
 
-curl -sS http://localhost:8080/v1/auth/login \
-  -H 'Content-Type: application/json' \
-  -d '{"email":"owner@example.com","password":"replace-with-a-long-password"}'
-```
-
-Create a server with the returned bearer token:
-
-```sh
-curl -sS http://localhost:8080/v1/servers \
-  -H "Authorization: Bearer $ACCESS_TOKEN" \
-  -H 'Content-Type: application/json' \
-  -d '{"name":"production-node-01","hostname":"production-node-01"}'
-```
-
-The server creation response contains a scoped, single-use enrollment token with a 15-minute lifetime. Treat it as a secret and do not commit it or expose it in logs.
-
-## Run the native Linux agent
-
-The agent runs directly on the monitored Linux host; Docker is not required on that host.
-
-```sh
-cd agent
-go mod tidy
-go test -race ./...
-go vet ./...
-go build -trimpath ./cmd/monitor-agent
-```
-
-To enroll against the local control plane, build the native binary and use the one-time token and development CA. Run this from the repository root in a second terminal; set ENROLLMENT_TOKEN to the one-time value shown when you add the test server:
-
-```sh
-cd agent
-go build -trimpath -o ./monitor-agent ./cmd/monitor-agent
-MONITOR_GRPC_ADDRESS=localhost:8443 \
-MONITOR_TLS_CA_FILE=../.data/certs/server.crt \
-MONITOR_ENROLLMENT_TOKEN="$ENROLLMENT_TOKEN" \
-MONITOR_SPOOL_DIR=./.monitor-me/spool \
-MONITOR_AGENT_STATE_FILE=./.monitor-me/agent-state.json \
-./monitor-agent
-```
-
-For a supported systemd-based Linux host, the one-command native installer can build and install the agent from the repository checkout:
-
-```sh
-sudo ./scripts/setup-linux-agent.sh --grpc-address <control-plane-host:8443> --ca-file <trusted-control-plane-ca.pem>
-```
-
-It requires Docker for the source-based build and systemd for service lifecycle. It installs the native binary/service, securely prompts for a one-time enrollment token, waits for the persisted session, then removes the token from the service environment.
-
-On Windows, add a server in the dashboard and run the PowerShell helper from a repository checkout on the monitored Windows machine:
+Windows x64 (PowerShell as Administrator):
 
 ```powershell
-.\scripts\setup-windows-agent.ps1 -GrpcAddress <control-plane-host:8443>
+& ([scriptblock]::Create((Invoke-RestMethod -Uri 'https://monitor.example/install/agent-windows.ps1'))) -ServerUrl 'https://monitor.example' -GrpcAddress 'monitor.example:8443'
 ```
 
-It builds the Windows x64 agent with Docker when the binary is absent and runs it in the foreground. The initial Windows helper does not yet install a Windows service or configure automatic start.
+Linux amd64/arm64 (systemd, root shell):
 
-The control plane and agent are separate roles: Compose starts the dashboard/API/data services, while a native agent runs on every host being monitored. `localhost:8443` works only when the agent and control plane share a host. For remote VPS/VMs, the target must reach a configured public/private gRPC endpoint and trust the control-plane CA. Host OS, architecture and available virtualization metadata are collected by the native agent. Hypervisor detection is best-effort; VPS/cloud provider hints may be unavailable, and unknown should remain unknown.
+```sh
+curl -fsSL 'https://monitor.example/install/agent-linux.sh' | sudo bash -s -- --server-url 'https://monitor.example' --grpc-address 'monitor.example:8443'
+```
 
-The agent writes its session credential into a mode-0600 state file within a mode-0700 directory. On restarts it reuses the stored session and does not need the original enrollment token until that session expires or is revoked. If the agent has no valid local session, supply a fresh enrollment token.
+Both installers fetch the matching native artifact and public control-plane CA over HTTPS, verify the artifact SHA-256, prompt for the one-time enrollment token without putting it in shell history, and remove the token from the service configuration after the session is persisted. Linux creates and enables a systemd service; Windows installs an automatic-start Windows Service with restart recovery. Windows agent service diagnostics are written to a bounded rotating log under ProgramData; Linux logs go to journald.
+
+The monitored machine does not need Docker, Go, Node.js or a source checkout. Each target needs outbound reachability to the control plane's HTTPS installer and TLS gRPC endpoint. `localhost:8443` is valid only when the agent shares the control-plane host. The current release supports Linux systemd amd64/arm64 and Windows x64; macOS, non-systemd Linux, code-signing/publisher verification, upgrade rollback and unattended token rotation remain incomplete.
+
+The existing low-level authenticated API is still available for development/integration testing, but it is not the default local operator workflow. The local anonymous profile must remain loopback-bound. Remote no-login deployments are fail-closed behind a separate firewall gate; see the production deployment guide and ADR 0004.
+
+The agent stores a private session credential and bounded local spool. On restart it reuses the persisted session without the original enrollment token; use the Add Machine rotation/re-enrollment workflow only after a session expires or is revoked.
 
 Check local service readiness and logs:
 
