@@ -59,13 +59,13 @@ From the dashboard, choose **Add Machine** and create a one-time enrollment toke
 Windows x64 (PowerShell as Administrator):
 
 ```powershell
-& ([scriptblock]::Create((Invoke-RestMethod -Uri 'https://monitor.example/install/agent-windows.ps1'))) -ServerUrl 'https://monitor.example' -GrpcAddress 'monitor.example:8443'
+& ([scriptblock]::Create((Invoke-RestMethod -Uri 'https://YOUR_MONITOR_HOST/install/agent-windows.ps1'))) -ServerUrl 'https://YOUR_MONITOR_HOST' -GrpcAddress 'YOUR_MONITOR_HOST:8443'
 ```
 
 Linux amd64/arm64 (systemd, root shell):
 
 ```sh
-curl -fsSL 'https://monitor.example/install/agent-linux.sh' | sudo bash -s -- --server-url 'https://monitor.example' --grpc-address 'monitor.example:8443'
+curl -fsSL 'https://YOUR_MONITOR_HOST/install/agent-linux.sh' | sudo bash -s -- --server-url 'https://YOUR_MONITOR_HOST' --grpc-address 'YOUR_MONITOR_HOST:8443'
 ```
 
 Both installers fetch the matching native artifact and public control-plane CA over HTTPS, verify the artifact SHA-256, prompt for the one-time enrollment token without putting it in shell history, and remove the token from the service configuration after the session is persisted. Linux creates and enables a systemd service; Windows installs an automatic-start Windows Service with restart recovery. Windows agent service diagnostics are written to a bounded rotating log under ProgramData; Linux logs go to journald.
