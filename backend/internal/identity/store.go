@@ -22,6 +22,7 @@ var (
 	ErrInvalidCredentials = errors.New("invalid credentials")
 	ErrUnauthorized       = errors.New("authentication required")
 	ErrForbidden          = errors.New("operation is not permitted")
+	ErrOrganizationSelectionRequired = errors.New("account belongs to multiple organizations")
 	ErrNotFound           = errors.New("resource not found")
 	ErrInvalidInput       = errors.New("invalid input")
 )
@@ -323,16 +324,24 @@ func (s *Store) Login(ctx context.Context, email, password string) (AuthSession,
 
 	var user User
 	var passwordHash string
+	var membershipCount int
 	err := s.db.QueryRowContext(ctx, `
-		SELECT u.id::text, u.email, u.display_name, o.id::text, o.name, m.role, u.password_hash
+		SELECT u.id::text, u.email, u.display_name, o.id::text, o.name, m.role, u.password_hash,
+		       (SELECT count(*) FROM organization_memberships membership WHERE membership.user_id = u.id)
 		FROM users u
 		JOIN organization_memberships m ON m.user_id = u.id
 		JOIN organizations o ON o.id = m.organization_id
 		WHERE lower(u.email) = $1
 		ORDER BY m.created_at
 		LIMIT 1
-	`, email).Scan(&user.ID, &user.Email, &user.DisplayName, &user.OrganizationID, &user.OrganizationName, &user.Role, &passwordHash)
+	`, email).Scan(&user.ID, &user.Email, &user.DisplayName, &user.OrganizationID, &user.OrganizationName, &user.Role, &passwordHash, &membershipCount)
 	if err != nil || !security.VerifyPassword(passwordHash, password) {
+		return AuthSession{}, ErrInvalidCredentials
+	}
+	if membershipCount != 1 {
+		if membershipCount > 1 {
+			return AuthSession{}, ErrOrganizationSelectionRequired
+		}
 		return AuthSession{}, ErrInvalidCredentials
 	}
 
@@ -1236,7 +1245,7 @@ func (s *Store) CreateRemoteOperation(
 		  AND server.organization_id = $5
 		  AND server.status = 'online'
 		  AND agent.status = 'online'
-		  AND agent.last_seen_at > now() - interval '90 seconds'
+		  AND agent.last_seen_at > now() - interval '45 seconds'
 		RETURNING id::text, server_id::text, operation, target, status,
 		          created_at, expires_at
 	`, serverID, principal.UserID, operation, target, principal.OrganizationID).Scan(

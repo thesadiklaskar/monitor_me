@@ -124,6 +124,11 @@ func (api *API) login(writer http.ResponseWriter, request *http.Request) {
 
 	session, err := api.identities.Login(request.Context(), input.Email, input.Password)
 	if err != nil {
+		if errors.Is(err, identity.ErrOrganizationSelectionRequired) {
+			writeAPIError(writer, http.StatusConflict, "organization_selection_required",
+				"This account is linked to multiple organizations. Organization switching is not available yet; use a separate account for each organization.")
+			return
+		}
 		if errors.Is(err, identity.ErrInvalidCredentials) {
 			writeAPIError(writer, http.StatusUnauthorized, "invalid_credentials", "Email or password is incorrect.")
 			return

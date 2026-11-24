@@ -21,8 +21,8 @@ import (
 	"time"
 
 	monitorv1 "example.com/monitor-me/backend/gen/monitor/v1"
-	"example.com/monitor-me/backend/internal/security"
 	"example.com/monitor-me/backend/internal/identity"
+	"example.com/monitor-me/backend/internal/security"
 	"github.com/gorilla/websocket"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"google.golang.org/grpc"
@@ -196,6 +196,27 @@ func TestPhase2AuthenticationAndAgentLifecycle(t *testing.T) {
 	`, otherOrganizationID, otherUserID); err != nil {
 		t.Fatalf("create second organization membership: %v", err)
 	}
+	// A user with memberships in two organizations must not be silently
+	// authenticated into whichever organization happens to have the oldest row.
+	if _, err := database.ExecContext(ctx, `
+		INSERT INTO organization_memberships (organization_id, user_id, role)
+		VALUES ($1, $2, 'viewer')
+	`, otherOrganizationID, registered.User.ID); err != nil {
+		t.Fatalf("create second membership for ambiguous-login test: %v", err)
+	}
+	ambiguousLogin := requestJSON(t, ctx, http.MethodPost, baseURL+"/v1/auth/login", "", map[string]any{
+		"email": registerBody["email"], "password": registerBody["password"],
+	})
+	if ambiguousLogin.StatusCode != http.StatusConflict || !strings.Contains(ambiguousLogin.Body, "organization_selection_required") {
+		t.Fatalf("multi-organization login must fail closed with 409: status=%d body=%s",
+			ambiguousLogin.StatusCode, ambiguousLogin.Body)
+	}
+	if _, err := database.ExecContext(ctx, `
+		DELETE FROM organization_memberships WHERE organization_id = $1 AND user_id = $2
+	`, otherOrganizationID, registered.User.ID); err != nil {
+		t.Fatalf("restore single-organization owner membership after test: %v", err)
+	}
+
 	otherLogin := requestJSON(t, ctx, http.MethodPost, baseURL+"/v1/auth/login", "", map[string]any{
 		"email": "second-owner@example.invalid", "password": otherPassword,
 	})
