@@ -13,7 +13,7 @@ compose() { docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" "$@"; }
 
 compose config --quiet
 
-auth_disabled="$(sed -n 's/^MONITOR_ME_AUTH_DISABLED=//p' "$ENV_FILE" | tail -n 1 | tr -d '"' | tr -d '\r')"
+auth_disabled="$(sed -n 's/^MONITOR_ME_AUTH_DISABLED=//p' "$ENV_FILE" | tail -n 1 | tr -d '"' | tr -d '\r' | tr '[:upper:]' '[:lower:]' | xargs)"
 access_file="/etc/nginx/snippets/monitor-me-admin-allowlist.conf"
 access_directory="$(dirname "$access_file")"
 access_tmp="$(mktemp)"
