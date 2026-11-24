@@ -120,7 +120,7 @@ Follow logs with `journalctl -u monitor-me-agent -f`. Use `systemctl restart mon
 ## Windows local acceptance
 
 1. Start the control plane with the local startup helper documented in the repository README, or use an existing local Compose stack.
-2. Choose **Add Server**, select Windows, create the host record and copy its one-time enrollment token.
+2. Choose **Add Machine**, create the node record and copy its one-time enrollment token. Do not choose an OS in the dashboard; target-side installation is the intended detection point.
 3. From the repository root on the monitored Windows host, run:
 
    ```powershell
