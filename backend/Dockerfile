@@ -2,6 +2,10 @@ FROM golang:1.27.4-alpine3.23 AS build
 
 WORKDIR /src
 
+# Use HTTP/1.1 for Go module downloads to avoid flaky HTTP/2 proxy streams.
+# TLS and Go checksum-database verification remain enabled.
+ENV GODEBUG=http2client=0
+
 RUN apk add --no-cache protobuf
 
 COPY backend/go.mod ./
