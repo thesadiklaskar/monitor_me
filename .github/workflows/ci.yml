@@ -21,6 +21,7 @@ jobs:
   backend:
     env:
       GOFLAGS: -mod=mod
+      GODEBUG: http2client=0
     name: Go backend checks
     runs-on: ubuntu-latest
     steps:
@@ -66,6 +67,7 @@ jobs:
   agent:
     env:
       GOFLAGS: -mod=mod
+      GODEBUG: http2client=0
     name: Native Linux agent checks
     runs-on: ubuntu-latest
     steps:
@@ -167,6 +169,7 @@ jobs:
   compose:
     env:
       GOFLAGS: -mod=mod
+      GODEBUG: http2client=0
     name: Docker Compose integration
     runs-on: ubuntu-latest
     steps:
