@@ -378,13 +378,8 @@ function AddServerDialog({
 }) {
   const [name, setName] = useState("");
   const [hostname, setHostname] = useState("");
-  const [targetPlatform, setTargetPlatform] = useState<AgentPlatform>("linux");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-
-  useEffect(() => {
-    setTargetPlatform(detectBrowserPlatform());
-  }, []);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -395,7 +390,7 @@ function AddServerDialog({
         method: "POST",
         body: JSON.stringify({ name, hostname }),
       });
-      onCreated({ ...issued, target_platform: targetPlatform });
+      onCreated(issued);
     } catch (submitError) {
       setError(displayError(submitError));
     } finally {
@@ -408,40 +403,26 @@ function AddServerDialog({
       <section className="modal-card" role="dialog" aria-modal="true" aria-labelledby="add-server-title">
         <div className="modal-heading">
           <div>
-            <div className="eyebrow">New host registration</div>
-            <h2 id="add-server-title">Add a server</h2>
+            <div className="eyebrow">New node enrollment</div>
+            <h2 id="add-server-title">Add a machine</h2>
           </div>
           <button className="icon-button" type="button" onClick={onClose} aria-label="Close">×</button>
         </div>
-        <p className="modal-copy">Create a single-use credential. Choose the target host OS for the matching one-command installer; the agent will report the real OS and virtualization metadata once it connects.</p>
+        <p className="modal-copy">Create a one-time enrollment token. No operating system needs to be selected here; host discovery happens on the target machine.</p>
         <form onSubmit={submit} className="form-stack">
           <label className="field">
-            <span>Server display name</span>
-            <input autoFocus required minLength={2} maxLength={120} value={name} onChange={(event) => setName(event.target.value)} placeholder="Production API" />
+            <span>Node label</span>
+            <input autoFocus required minLength={2} maxLength={120} value={name} onChange={(event) => setName(event.target.value)} placeholder="production-api-01" />
+            <small>A display label only. The agent reports the actual hostname and operating system.</small>
           </label>
           <label className="field">
-            <span>Hostname (optional)</span>
-            <input maxLength={253} value={hostname} onChange={(event) => setHostname(event.target.value)} placeholder="api-01.example.com" />
+            <span>Expected hostname (optional)</span>
+            <input maxLength={253} value={hostname} onChange={(event) => setHostname(event.target.value)} placeholder="Leave empty to discover automatically" />
           </label>
-          <fieldset className="platform-fieldset">
-            <legend>Target operating system</legend>
-            <div className="platform-choice-grid">
-              <button type="button" className={targetPlatform === "windows" ? "platform-choice platform-choice-active" : "platform-choice"} aria-pressed={targetPlatform === "windows"} onClick={() => setTargetPlatform("windows")}>
-                <span className="platform-choice-icon">⊞</span>
-                <span><strong>Windows</strong><small>PowerShell installer</small></span>
-              </button>
-              <button type="button" className={targetPlatform === "linux" ? "platform-choice platform-choice-active" : "platform-choice"} aria-pressed={targetPlatform === "linux"} onClick={() => setTargetPlatform("linux")}>
-                <span className="platform-choice-icon">⌘</span>
-                <span><strong>Linux</strong><small>systemd installer</small></span>
-              </button>
-            </div>
-            <p className="platform-detection-note">Suggested from this browser: {detectBrowserPlatform() === "windows" ? "Windows" : "Linux"}. Change this for a remote host. VM/VPS classification is based on agent-reported host metadata, not the browser.</p>
-          </fieldset>
-
           {error && <div className="notice notice-error" role="alert">{error}</div>}
           <div className="modal-actions">
             <button className="button button-secondary" type="button" onClick={onClose}>Cancel</button>
-            <button className="button button-primary" type="submit" disabled={busy}>{busy ? "Creating…" : "Create server and token"}</button>
+            <button className="button button-primary" type="submit" disabled={busy}>{busy ? "Creating…" : "Create node token"}</button>
           </div>
         </form>
       </section>
