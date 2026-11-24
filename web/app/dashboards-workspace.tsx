@@ -73,17 +73,113 @@ function formatMetric(value: number, unit: string): string {
   return value.toLocaleString(undefined, { maximumFractionDigits: 2 }) + (unit ? " " + unit : "");
 }
 
-function chartPath(points: SeriesPoint[]): string {
-  const values = points.map((point) => point.average).filter(Number.isFinite);
-  if (values.length < 2) return "";
-  const low = Math.min(...values);
-  const high = Math.max(...values);
-  const spread = high - low || Math.max(Math.abs(high) * 0.05, 1);
-  return values.map((value, index) => {
-    const x = (index / (values.length - 1)) * 1000;
-    const y = 210 - ((value - low) / spread) * 180;
-    return (index === 0 ? "M" : "L") + x.toFixed(2) + " " + y.toFixed(2);
-  }).join(" ");
+type ChartPoint = {
+  time: number;
+  x: number;
+  average: number;
+  minimum: number;
+  maximum: number;
+  yAverage: number;
+  yMinimum: number;
+  yMaximum: number;
+  sampleCount: number;
+};
+
+type ChartGeometry = {
+  lineSegments: string[];
+  rangeBands: string[];
+  ticks: { y: number; value: number }[];
+  latest: ChartPoint;
+  average: number;
+  minimum: number;
+  maximum: number;
+  totalSamples: number;
+  startLabel: string;
+  endLabel: string;
+};
+
+function chartGeometry(points: SeriesPoint[], durationMs: number): ChartGeometry | null {
+  const end = Date.now();
+  const start = end - durationMs;
+  const values = points
+    .map((point) => ({
+      time: new Date(point.bucket).getTime(),
+      average: point.average,
+      minimum: point.minimum,
+      maximum: point.maximum,
+      sampleCount: point.sample_count,
+    }))
+    .filter((point) =>
+      Number.isFinite(point.time) && point.time >= start && point.time <= end &&
+      Number.isFinite(point.average) && Number.isFinite(point.minimum) && Number.isFinite(point.maximum),
+    )
+    .sort((left, right) => left.time - right.time);
+  if (values.length === 0) return null;
+
+  const minimum = Math.min(...values.map((point) => point.minimum));
+  const maximum = Math.max(...values.map((point) => point.maximum));
+  const spread = maximum - minimum;
+  const padding = spread > 0 ? spread * 0.1 : Math.max(Math.abs(maximum) * 0.08, 1);
+  const floor = minimum - padding;
+  const ceiling = maximum + padding;
+  const yFor = (value: number) => 22 + ((ceiling - value) / (ceiling - floor || 1)) * 174;
+  const xFor = (time: number) => 70 + ((time - start) / durationMs) * 900;
+
+  const mapped: ChartPoint[] = values.map((point) => ({
+    ...point,
+    x: xFor(point.time),
+    yAverage: yFor(point.average),
+    yMinimum: yFor(point.minimum),
+    yMaximum: yFor(point.maximum),
+  }));
+
+  const gapLimit = (durationMs / 120) * 2.2;
+  const lineSegments: string[] = [];
+  const rangeBands: string[] = [];
+  let segment: ChartPoint[] = [];
+  const finishSegment = () => {
+    if (segment.length === 0) return;
+    const line = segment.map((point, index) =>
+      (index === 0 ? "M " : "L ") + point.x.toFixed(1) + " " + point.yAverage.toFixed(1),
+    ).join(" ");
+    lineSegments.push(line);
+    if (segment.length > 1) {
+      const upper = segment.map((point) => point.x.toFixed(1) + " " + point.yMaximum.toFixed(1));
+      const lower = [...segment].reverse().map((point) => point.x.toFixed(1) + " " + point.yMinimum.toFixed(1));
+      rangeBands.push("M " + upper.join(" L ") + " L " + lower.join(" L ") + " Z");
+    }
+    segment = [];
+  };
+
+  let previousTime: number | null = null;
+  for (const point of mapped) {
+    if (previousTime !== null && point.time - previousTime > gapLimit) finishSegment();
+    segment.push(point);
+    previousTime = point.time;
+  }
+  finishSegment();
+
+  const latest = mapped[mapped.length - 1];
+  const ticks = Array.from({ length: 5 }, (_, index) => ({
+    y: 22 + index * 43.5,
+    value: ceiling - ((ceiling - floor) * index) / 4,
+  }));
+  const rangeLabel = (time: number) => durationMs <= 24 * 60 * 60 * 1000
+    ? new Date(time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+    : new Date(time).toLocaleDateString([], { month: "short", day: "numeric" });
+
+  return {
+    lineSegments,
+    rangeBands,
+    ticks,
+    latest,
+    average: values.reduce((sum, point) => sum + point.average, 0) / values.length,
+    minimum,
+    maximum,
+    totalSamples: values.reduce((sum, point) => sum + Math.max(0, point.sampleCount || 0), 0),
+    startLabel: rangeLabel(start),
+    endLabel: rangeLabel(end),
+  };
 }
 
 function DashboardPanelCard({
@@ -104,8 +200,7 @@ function DashboardPanelCard({
   const metric = metricCatalog.find((item) => item.value === panel.metric_name);
   const points = series?.points;
   const latest = points?.[points.length - 1];
-  const hasData = !!points && points.length > 0;
-  const path = points ? chartPath(points) : "";
+  const chart = points ? chartGeometry(points, rangeMilliseconds[panel.time_range]) : null;
   return (
     <Card className="dashboard-panel-card">
       <CardHeader className="dashboard-panel-heading">
@@ -123,22 +218,35 @@ function DashboardPanelCard({
           <div className="dashboard-chart-loading"><Skeleton className="h-28 w-full" /></div>
         ) : series?.error ? (
           <div className="dashboard-chart-error" role="alert">{series.error}</div>
-        ) : !hasData ? (
-          <div className="dashboard-chart-empty">No metric samples in this time range.</div>
         ) : panel.visualization === "stat" ? (
           <div className="dashboard-stat-value">
             <strong>{formatMetric(latest?.average ?? Number.NaN, metric?.unit ?? "")}</strong>
-            <span>Latest aggregated bucket · {latest ? new Date(latest.bucket).toLocaleTimeString() : "Unavailable"}</span>
+            <span>Latest aggregated bucket · {latest ? new Date(latest.bucket).toLocaleString() : "Unavailable"}</span>
           </div>
+        ) : !chart ? (
+          <div className="dashboard-chart-empty">No valid metric samples in this time range. Missing intervals are not drawn as zero.</div>
         ) : (
           <div className="dashboard-chart-wrap">
-            <svg viewBox="0 0 1000 240" role="img" aria-label={panel.title + " metric history"} preserveAspectRatio="none">
-              <path d="M0 30 H1000 M0 120 H1000 M0 210 H1000" className="dashboard-chart-grid" />
-              {path && <path d={path} className="dashboard-chart-line" />}
+            <svg viewBox="0 0 1000 250" role="img" aria-label={panel.title + " metric history with average and min/max range"} preserveAspectRatio="none">
+              <title>{panel.title}: average line with min/max range and visible data gaps</title>
+              {chart.ticks.map((tick, index) => (
+                <g key={index}>
+                  <path d={"M70 " + tick.y.toFixed(1) + " H970"} className="dashboard-chart-grid" />
+                  <text x="60" y={tick.y + 4} textAnchor="end" className="dashboard-chart-axis-label">{formatMetric(tick.value, metric?.unit ?? "")}</text>
+                </g>
+              ))}
+              {chart.rangeBands.map((band, index) => <path key={"band-" + index} d={band} className="dashboard-chart-range" />)}
+              {chart.lineSegments.map((line, index) => <path key={"line-" + index} d={line} className="dashboard-chart-line" />)}
+              <line x1={chart.latest.x} x2={chart.latest.x} y1="22" y2="196" className="dashboard-chart-latest-guide" />
+              <circle cx={chart.latest.x} cy={chart.latest.yAverage} r="5" className="dashboard-chart-latest-dot">
+                <title>{new Date(chart.latest.time).toLocaleString()} · average {formatMetric(chart.latest.average, metric?.unit ?? "")} · range {formatMetric(chart.latest.minimum, metric?.unit ?? "")} to {formatMetric(chart.latest.maximum, metric?.unit ?? "")}</title>
+              </circle>
+              <text x="70" y="232" textAnchor="start" className="dashboard-chart-axis-label">{chart.startLabel}</text>
+              <text x="970" y="232" textAnchor="end" className="dashboard-chart-axis-label">{chart.endLabel}</text>
             </svg>
             <div className="dashboard-chart-footer">
-              <span>{points.length} buckets</span>
-              <strong>{formatMetric(latest?.average ?? Number.NaN, metric?.unit ?? "")}</strong>
+              <span>{chart.totalSamples.toLocaleString()} samples · {points.length} buckets · min/max range shown</span>
+              <strong>Latest {formatMetric(chart.latest.average, metric?.unit ?? "")}</strong>
             </div>
           </div>
         )}
