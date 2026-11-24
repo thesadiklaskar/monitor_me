@@ -16,12 +16,12 @@ This file is the authoritative resume point for Monitor Me. Read it before makin
 | Completed phases | Phase 1 — Product Specification and Technical Blueprint; Phase 2 — Platform Foundation and Secure Connectivity; Phase 3 — Monitoring Agent and Telemetry Data Engine |
 | Current phase | Phase 4 dashboard acceptance and Phase 5 Linux-MVP / Windows local-agent validation |
 | Current phase status | In Progress — implementation is present; end-to-end acceptance is pending |
-| MVP status | No-login single-install shell and first metrics/log pipeline exist, but release-blocking builds/runtime acceptance remain open. Strict removal of legacy user/organization schema, Windows runtime acceptance, file logs, push-based live logs, Grafana-style panel editing, sustained-load tests and production bootstrap remain unfinished |
-| Implementation status | One self-hosted installation per owner is the target; no hosted SaaS, login, customer profile or organization workflow. Browser/API no-login shell exists, but SQL tables, FKs and backend query paths still retain legacy users/organizations/organization_id and need a safe data-preserving forward migration. Linux metrics and journald → bounded spool → TLS gRPC → ClickHouse search exist. Windows Application/System Event Log source exists but Windows runtime acceptance is pending; arbitrary file/syslog tail is missing. Log Explorer polls every 10 seconds; native push/replay is not implemented. Linux amd64/arm64 and Windows amd64 agent builds are targeted, but clean-host acceptance is pending; macOS logs are explicitly unsupported. Startup scripts check main/origin, dirty tree, Compose config, build images before start, start with --no-build and verify readiness. Backend Docker build no longer runs go mod tidy, builds only shipped binaries with -mod=mod, creates /out, and uses Go HTTP/1.1 transport with checksum verification still enabled. backend/go.sum and web/package-lock.json are absent and must be committed for reproducible builds. Go import namespace and installer sample-host cleanup were completed; source portability does not yet equal release certification. |
+| MVP status | No-login single-install shell and first metrics/log pipeline exist, but release-blocking builds/runtime acceptance remain open. Product UI is being simplified to Servers, Logs, Dashboards and Alerts with no project/workspace navigation; legacy user/organization/project schema and API paths, Windows runtime acceptance, file logs, push-based live logs, advanced dashboard editing, sustained-load tests and production bootstrap remain unfinished |
+| Implementation status | One self-hosted installation per owner is the target; no hosted SaaS, login, customer profile, organization, workspace or project workflow. The browser shell has no login. SQL tables, FKs and backend query paths still retain legacy users/organizations/organization_id plus project tables/project_id filters and need safe data-preserving forward migrations. Linux metrics and journald → bounded spool → TLS gRPC → ClickHouse search exist. Windows Application/System Event Log source exists but Windows runtime acceptance is pending; arbitrary file/syslog tail is missing. Log Explorer polls every 10 seconds; native push/replay is not implemented. Linux amd64/arm64 and Windows amd64 agent builds are targeted, but clean-host acceptance is pending; macOS logs are explicitly unsupported. Startup scripts check main/origin, dirty tree, Compose config, build images before start, start with --no-build and verify readiness. Backend Docker build no longer runs go mod tidy, builds only shipped binaries with -mod=mod, creates /out, and uses Go HTTP/1.1 transport with checksum verification still enabled. backend/go.sum and web/package-lock.json are absent and must be committed for reproducible builds. Go import namespace and installer sample-host cleanup were completed; source portability does not yet equal release certification. |
 | Last source commit covered by latest successful CI run | 9685e115113123d5f9f8e8a1b222804752f5a283 (Go, frontend and native-agent jobs passed in run #45203706343; Compose integration failed at the web proxy login probe; later commits are not covered) |
 | Latest CI run | #597 — all four jobs failed before any step with runner_id 0 and zero steps; no build/test command ran. No fresh green CI evidence; runner allocation cause remains unknown |
-| Latest source commit | `d3ff549d6bc73be469813cfbdd7698fe4d4d14fc` — UX/platform pass: full sidebar labels, slate/periwinkle theme, clearer log source/auto-refresh UI, structured log labels, time-aware dashboard charts with min/max bands and expanded metric panel catalog; OS/hosting matrix at `docs/PLATFORM_SUPPORT_MATRIX.md`. Source changes committed; frontend build/browser and agent OS runtime tests are still pending |
-| Next action | Owner Windows checkout: `git pull --ff-only origin main`, verify HEAD equals origin/main, then run `scripts/start-local.ps1`. Confirm the backend slugPattern compile fix and the latest web build. Review the changed UI in a browser at desktop and mobile widths. Do not run `docker compose down -v`; keep existing data. |
+| Latest source commit | `b73b83dd10bb5ba1f9aab70dde01f3906d3a9af7` — UI palette changed from lavender to calmer slate/teal. Additional UI commits simplified navigation to Servers, Logs, Dashboards and Alerts; removed Project Mapping and Remote Operations from primary navigation; removed project filters from logs, dashboards, alerts and host metric detail. README, product contract and backlog now explicitly reject projects/workspaces. Frontend build/browser and agent OS runtime tests remain pending |
+| Next action | Owner Windows checkout: run `git pull --ff-only origin main`, verify the local hash matches `origin/main`, then run `scripts/start-local.ps1`. Confirm the backend slugPattern compile fix and simplified web build. Review Servers / Logs / Dashboards / Alerts at desktop and mobile widths. Do not run `docker compose down -v`; keep existing data. |
 
 
 
@@ -353,3 +353,42 @@ Phase 1 and Phase 2 implementation/verification history is recorded above. The f
 - The Linux installer help, README and development/agent examples no longer contain monitor.example; real endpoints must be supplied by the operator.
 - A full product-readiness assessment is documented in [RELEASE_READINESS_AUDIT.md](RELEASE_READINESS_AUDIT.md). Current weighted estimate: approximately 35% production readiness, not a release claim.
 - Dependency reproducibility remains incomplete: backend/go.sum and web/package-lock.json are not yet present. Generate and commit them through a successful trusted module install; do not disable checksum verification.
+
+
+## Single-install product scope and UI simplification — 2026-11-24
+
+**Product contract:** One operator, one independent installation, one local datastore. No browser login, user management, organization, customer project, workspace selector or Project Mapping product area. Main navigation is **Servers**, **Logs**, **Dashboards** and **Alerts**. Technical context (process, systemd unit, container, cgroup, mount and interface) remains machine metadata/labels, not a project entity. Public distribution target remains `thesadiklaskar/monitor_me`; development continues on `WorkRCS/monitor_me:main` until release acceptance and transfer.
+
+### UI source changes committed to main
+
+- `d5c33919da9ecda51acddc848386854e5e84a37d`: remove project and remote-operation navigation, project selectors and project metadata fetch from the main dashboard shell; replace workspace-facing copy with installation language.
+- `4529e0671800ab98e7bc9890f73821bc18bd4bba`: remove project filtering from Log Explorer queries and UI.
+- `793d3f6694f9eccd49f70b1737abe846ffc8121d`: make dashboards installation-wide; remove project selectors/scoped metric query payloads.
+- `340fe5366670948e66d6e26a85538141703c9c37`: remove project scope from alert creation and alert UI.
+- `6d237e4050f1e11caaa07a4e88b4441359e60cd8`: make host detail metrics/history/live aggregation cover the whole machine without project filtering.
+- `0d215b5ed9619f1100932ec0596a36ac1780f704`, `14d28af44a2ce16220f35fee0feeea528a5de719`: remove the final legacy prop and simplify menu labels to Servers, Logs, Dashboards and Alerts.
+- `b73b83dd10bb5ba1f9aab70dde01f3906d3a9af7`: apply a muted teal accent to the existing dark slate palette.
+- `e6f5f19e74706b7d7f8f4bbfedb296c38de0ce1b`, `b6f1ff7afce373d21ecc5e2831b0669a44ade8eb`, `0755d9fea4bd2161ca9857e336c741d040614551`: align README, product contract and backlog with this scope.
+
+### Remaining P0/P1 work
+
+- [ ] Build and visually accept the latest frontend. These source edits have not been compiled or browser-tested in this session; do not call the UI pass verified yet.
+- [ ] Remove legacy organization/user/session schema and runtime authorization plumbing with data-preserving forward migrations.
+- [ ] Remove project/project_id tables, mappings, filters and API payloads after converting any required workload attribution into machine-local technical labels; preserve existing monitoring history.
+- [ ] Implement and test the actual root-level `install.sh`. It does not exist yet. Current production deploy still requires preconfigured Docker, Nginx, Certbot/TLS, DNS/hostname, secrets, gRPC address and ADMIN_CIDR.
+- [ ] Add reproducible backend/frontend dependency lockfiles, restore a working CI runner and require a green build/test result.
+- [ ] Finish Linux control-plane clean-host acceptance, Windows x64 agent service/Event Log acceptance, Linux ARM64 agent runtime acceptance and verify other platforms only when a named matrix entry passes.
+- [ ] Complete native file logs and push-based log tail; current log auto-refresh is 10-second HTTP polling, not Grafana-equivalent live tail.
+- [ ] Implement drag/resize/reorder, flexible query/editor/variables/annotations and validated panel types; current dashboards are still a basic saved panel builder.
+
+### OS/hosting truth
+
+- Primary intended control plane: Linux x86-64 (Ubuntu/Debian + Docker Compose v2 + systemd host), not yet clean-host certified.
+- Linux amd64/arm64 agent build targets exist; runtime acceptance is still required.
+- Windows x64 agent/service and Application/System Event Log code exists; runtime acceptance remains pending.
+- Windows native control-plane and macOS remain unsupported.
+- VPS, VM, VPC/cloud and dedicated hardware are deployment locations, not guarantees independent of guest OS, architecture, storage and networking. Cloud provider security groups/ACLs still require owner-side configuration.
+- No supported claim for “any OS/any VPS” or any unbenchmarked capacity profile.
+
+**Verification:** No fresh green CI/browser/runtime test was available for the above source changes. Keep the release state open until the local Docker build and the named acceptance gates pass.
+
