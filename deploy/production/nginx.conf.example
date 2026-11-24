@@ -64,6 +64,27 @@ server {
         add_header Cache-Control "no-store";
     }
 
+    # Grafana is a separately authenticated operator UI. Keep it behind the same
+    # network allowlist as Monitor Me; it also requires its own Grafana login.
+    location = /grafana {
+        include /etc/nginx/snippets/monitor-me-admin-allowlist.conf;
+        return 301 /grafana/;
+    }
+    location ^~ /grafana/ {
+        include /etc/nginx/snippets/monitor-me-admin-allowlist.conf;
+        proxy_pass http://127.0.0.1:13001/;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $monitor_me_connection_upgrade;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_read_timeout 3600s;
+        proxy_send_timeout 3600s;
+        proxy_buffering off;
+    }
+
     # The app UI, normal API routes and live stream have owner-level access
     # in the no-login profile. Only administrators/VPN users may reach them.
     location = /v1/live/ws {
