@@ -39,6 +39,8 @@ func (api *API) createDashboard(writer http.ResponseWriter, request *http.Reques
 		writeAPIError(writer, http.StatusForbidden, "forbidden", "Dashboard changes are not permitted.")
 	case errors.Is(err, identity.ErrInvalidInput):
 		writeAPIError(writer, http.StatusBadRequest, "invalid_dashboard", "Dashboard name or description is invalid.")
+	case errors.Is(err, identity.ErrNotFound):
+		writeAPIError(writer, http.StatusNotFound, "not_found", "The selected machine was not found.")
 	case err != nil:
 		writeAPIError(writer, http.StatusInternalServerError, "dashboard_create_failed", "The dashboard could not be created.")
 	default:

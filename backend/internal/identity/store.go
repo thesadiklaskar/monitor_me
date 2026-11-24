@@ -1249,8 +1249,7 @@ func (s *Store) UpdateAlertRule(ctx context.Context, principal Principal, ruleID
 		}
 	}
 
-	changed := previous.Name != input.Name ||
-		previous.MetricName != input.MetricName ||
+	conditionChanged := previous.MetricName != input.MetricName ||
 		previous.Operator != input.Operator ||
 		previous.Threshold != input.Threshold ||
 		previous.Enabled != input.Enabled ||
@@ -1276,7 +1275,7 @@ func (s *Store) UpdateAlertRule(ctx context.Context, principal Principal, ruleID
 		updated.ServerID = &updatedServerID.String
 	}
 
-	if changed {
+	if conditionChanged {
 		rows, err := tx.QueryContext(ctx, `
 			UPDATE alert_events
 			SET status = 'resolved', last_observed_at = now(), resolved_at = now()

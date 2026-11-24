@@ -308,10 +308,18 @@ function MetricVisualization({ panel, series, durationMs, annotations = [] }: {
             <text x="34" y={tick.y + 4} textAnchor="end" className="dashboard-chart-axis-label">{formatCompact(tick.value)}</text>
           </g>
         ))}
+        {panel.visualization === "area" && <path d={chart.area} className="dashboard-chart-area" />}
+        {panel.visualization === "bar" ? chart.points.map((point) => {
+          const baseline = 190;
+          const top = Math.min(point.yAverage, baseline);
+          const width = Math.max(2, 880 / chart.points.length * 0.66);
+          return <rect key={point.time} x={point.x - width / 2} y={top} width={width} height={Math.max(1, baseline - top)} rx="2" className="dashboard-chart-bar"><title>{new Date(point.time).toLocaleString()} · {formatMetric(point.average, unit)}</title></rect>;
+        }) : <path d={chart.line} className="dashboard-chart-line" />}
         {annotations.filter((event) => event.metric_name === panel.metric_name).map((event) => {
           const eventTime = new Date(event.triggered_at).getTime();
-          const chartStart = Date.now() - durationMs;
-          if (!Number.isFinite(eventTime) || eventTime < chartStart || eventTime > Date.now()) return null;
+          const now = Date.now();
+          const chartStart = now - durationMs;
+          if (!Number.isFinite(eventTime) || eventTime < chartStart || eventTime > now) return null;
           const x = 42 + ((eventTime - chartStart) / durationMs) * 920;
           return (
             <g key={event.id}>
@@ -322,13 +330,6 @@ function MetricVisualization({ panel, series, durationMs, annotations = [] }: {
             </g>
           );
         })}
-                {panel.visualization === "area" && <path d={chart.area} className="dashboard-chart-area" />}
-        {panel.visualization === "bar" ? chart.points.map((point, index) => {
-          const baseline = 190;
-          const top = Math.min(point.yAverage, baseline);
-          const width = Math.max(2, 880 / chart.points.length * 0.66);
-          return <rect key={point.time} x={point.x - width / 2} y={top} width={width} height={Math.max(1, baseline - top)} rx="2" className="dashboard-chart-bar"><title>{new Date(point.time).toLocaleString()} · {formatMetric(point.average, unit)}</title></rect>;
-        }) : <path d={chart.line} className="dashboard-chart-line" />}
         <line x1={chart.latest.x} x2={chart.latest.x} y1="18" y2="190" className="dashboard-chart-latest-guide" />
         <circle cx={chart.latest.x} cy={chart.latest.yAverage} r="4.5" className="dashboard-chart-latest-dot">
           <title>{new Date(chart.latest.time).toLocaleString()} · average {formatMetric(chart.latest.average, unit)} · min {formatMetric(chart.latest.minimum, unit)} · max {formatMetric(chart.latest.maximum, unit)}</title>
