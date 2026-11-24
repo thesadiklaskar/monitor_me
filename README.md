@@ -14,6 +14,14 @@ Monitor Me gives infrastructure operators one place to view server health, host 
   <img src="https://ik.imagekit.io/xvqovhmcyr/monitor_me/Docker%20Compose%20%E0%A6%B8%E0%A6%AE%E0%A6%B8%E0%A7%8D%E0%A6%AF%E0%A6%BE%20%282%29%20-%20Google%20Chrome%2011_24_2026%206_40_32%20PM.png" alt="Monitor Me container view" width="32%" />
 </p>
 
+
+<p align="center">
+  <img src="https://ik.imagekit.io/xvqovhmcyr/monitor_me/Monitor%20Me%20-%20Google%20Chrome%2011_24_2026%207_48_19%20PM.png" alt="Monitor Me live monitoring dashboard" width="48%" />
+  <img src="https://ik.imagekit.io/xvqovhmcyr/monitor_me/Monitor%20Me%20-%20Google%20Chrome%2011_24_2026%207_48_22%20PM.png" alt="Monitor Me server monitoring view" width="48%" />
+  <img src="https://ik.imagekit.io/xvqovhmcyr/monitor_me/Monitor%20Me%20-%20Google%20Chrome%2011_24_2026%207_48_29%20PM.png" alt="Monitor Me host metrics view" width="48%" />
+  <img src="https://ik.imagekit.io/xvqovhmcyr/monitor_me/Monitor%20Me%20-%20Google%20Chrome%2011_24_2026%207_48_36%20PM.png" alt="Monitor Me system monitoring view" width="48%" />
+</p>
+
 ## What Monitor Me does
 
 A Monitor Me installation has two parts:
@@ -176,8 +184,6 @@ flowchart LR
 ~~~
 
 The agent reads host counters and journal events, keeps unacknowledged telemetry in a bounded local write-ahead spool, and sends authenticated batches over TLS gRPC. The API validates each machine credential and stores accepted telemetry. PostgreSQL stores machine state and metric history, Redis provides ephemeral latest-value fan-out, and ClickHouse stores structured host logs. The web interface reads metric ranges and log pages through the private API.
-
-[Open the editable system diagram](docs/monitor-me-architecture.excalidraw) in [Excalidraw](https://excalidraw.com/) to inspect or modify the host, network, application and data-service flow.
 
 ## Technology
 
