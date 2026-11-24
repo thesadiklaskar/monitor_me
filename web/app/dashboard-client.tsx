@@ -427,10 +427,10 @@ export default function DashboardClient() {
         </div>
         <nav className="side-nav" aria-label="Main navigation">
           <span className="nav-section-label">Monitoring</span>
-          <button title="Server Inventory" aria-label="Server Inventory" className={!showDashboards && !showLogs && !showAlerts ? "nav-item nav-item-active" : "nav-item"} type="button" onClick={() => {  setShowDashboards(false); setShowLogs(false); setShowAlerts(false);  setSelectedServer(null); }}><span className="nav-item-icon"><ServerIcon size={18} strokeWidth={1.8} /></span><span className="nav-item-label">Server Inventory</span></button>
-          <button title="Log Explorer" aria-label="Log Explorer" className={showLogs ? "nav-item nav-item-active" : "nav-item"} type="button" onClick={() => {  setShowDashboards(false); setShowAlerts(false);  setSelectedServer(null); setShowLogs(true); }}><span className="nav-item-icon"><FileText size={18} strokeWidth={1.8} /></span><span className="nav-item-label">Log Explorer</span></button>
-          <button title="Saved Dashboards" aria-label="Saved Dashboards" className={showDashboards ? "nav-item nav-item-active" : "nav-item"} type="button" onClick={() => {  setShowLogs(false); setShowAlerts(false);  setSelectedServer(null); setShowDashboards(true); }}><span className="nav-item-icon"><LayoutDashboard size={18} strokeWidth={1.8} /></span><span className="nav-item-label">Saved Dashboards</span></button>
-                    <button title="Alert Rules" aria-label="Alert Rules" className={showAlerts ? "nav-item nav-item-active" : "nav-item"} type="button" onClick={() => {  setShowDashboards(false); setShowLogs(false);  setSelectedServer(null); setShowAlerts(true); }}><span className="nav-item-icon"><Bell size={18} strokeWidth={1.8} /></span><span className="nav-item-label">Alert Rules</span></button>
+          <button title="Servers" aria-label="Servers" className={!showDashboards && !showLogs && !showAlerts ? "nav-item nav-item-active" : "nav-item"} type="button" onClick={() => {  setShowDashboards(false); setShowLogs(false); setShowAlerts(false);  setSelectedServer(null); }}><span className="nav-item-icon"><ServerIcon size={18} strokeWidth={1.8} /></span><span className="nav-item-label">Servers</span></button>
+          <button title="Logs" aria-label="Logs" className={showLogs ? "nav-item nav-item-active" : "nav-item"} type="button" onClick={() => {  setShowDashboards(false); setShowAlerts(false);  setSelectedServer(null); setShowLogs(true); }}><span className="nav-item-icon"><FileText size={18} strokeWidth={1.8} /></span><span className="nav-item-label">Logs</span></button>
+          <button title="Dashboards" aria-label="Dashboards" className={showDashboards ? "nav-item nav-item-active" : "nav-item"} type="button" onClick={() => {  setShowLogs(false); setShowAlerts(false);  setSelectedServer(null); setShowDashboards(true); }}><span className="nav-item-icon"><LayoutDashboard size={18} strokeWidth={1.8} /></span><span className="nav-item-label">Dashboards</span></button>
+                    <button title="Alerts" aria-label="Alerts" className={showAlerts ? "nav-item nav-item-active" : "nav-item"} type="button" onClick={() => {  setShowDashboards(false); setShowLogs(false);  setSelectedServer(null); setShowAlerts(true); }}><span className="nav-item-icon"><Bell size={18} strokeWidth={1.8} /></span><span className="nav-item-label">Alerts</span></button>
         </nav>
         <div className="sidebar-bottom">
           <div className="sidebar-status" title="Self-hosted single installation"><span className="status-dot status-dot-online" /><span className="sidebar-status-label">Self-hosted · Single install</span></div>
@@ -448,7 +448,7 @@ export default function DashboardClient() {
           <ServerDetail server={selectedServer} apiPublicURL={publicAPIURL} onBack={() => setSelectedServer(null)} />
         ) : <>
         <header className="topbar">
-          <div><span className="breadcrumbs">Monitoring / Machines</span><h1>Server overview</h1></div>
+          <div><span className="breadcrumbs">Monitoring / Machines</span><h1>Overview</h1></div>
           <div className="topbar-actions">
             <span className="live-label">
               <span className={`status-dot ${apiStatus === "online" ? "status-dot-online" : apiStatus === "offline" ? "status-dot-unavailable" : "status-dot-pending"}`} />
