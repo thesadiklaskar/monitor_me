@@ -8,13 +8,14 @@ GRPC_PORT=8443
 ALLOW_HTTP=false
 APPLY=false
 ROLLBACK=false
+VERIFY_NO_PUBLIC_HTTPS=false
 STATE_DIR="${MONITOR_ME_FIREWALL_STATE_DIR:-/var/lib/monitor-me/firewall}"
 ADMIN_CIDRS=()
 GRPC_CIDRS=()
 usage() {
   cat <<'USAGE'
 Usage:
-  firewall.sh --role control-plane --admin-cidr CIDR [--admin-cidr CIDR] [--grpc-cidr CIDR] [--manager auto|ufw|firewalld] [--zone ZONE] [--ssh-port PORT] [--grpc-port PORT] [--http-01] [--apply]
+  firewall.sh --role control-plane --admin-cidr CIDR [--admin-cidr CIDR] [--grpc-cidr CIDR] [--manager auto|ufw|firewalld] [--zone ZONE] [--ssh-port PORT] [--grpc-port PORT] [--http-01] [--apply] [--verify-no-public-https]
   firewall.sh --role agent-only
   firewall.sh --rollback
 Dry-run is the default. This helper adds allow rules only; it never changes default policies or removes existing rules.
@@ -33,6 +34,7 @@ while (($#)); do
     --http-01) ALLOW_HTTP=true; shift ;;
     --apply) APPLY=true; shift ;;
     --rollback) ROLLBACK=true; shift ;;
+    --verify-no-public-https) VERIFY_NO_PUBLIC_HTTPS=true; shift ;;
     -h|--help) usage; exit 0 ;;
     *) echo "Unknown argument: $1" >&2; usage; exit 2 ;;
   esac
@@ -158,6 +160,31 @@ else
   if [[ "$ALLOW_HTTP" == true ]]; then add_firewalld_port 80; fi
   if [[ "$APPLY" == true ]]; then firewall-cmd --reload; fi
 fi
+if [[ "$VERIFY_NO_PUBLIC_HTTPS" == true ]]; then
+  if [[ "$MANAGER" == "ufw" ]]; then
+    broad_https="$(ufw status | awk '/443\/tcp/ && /Anywhere/ {print} /Nginx Full|Apache Full/ && /Anywhere/ {print}')"
+    if [[ -n "$broad_https" ]]; then
+      echo "Refusing no-login mode: existing unrestricted UFW HTTPS rules remain:" >&2
+      printf '%s\n' "$broad_https" >&2
+      echo "Remove or narrow these rules explicitly, then re-run verification." >&2
+      exit 3
+    fi
+  else
+    if firewall-cmd --permanent --zone="$ZONE" --query-service=https >/dev/null 2>&1 ||
+       firewall-cmd --permanent --zone="$ZONE" --query-port=443/tcp >/dev/null 2>&1; then
+      echo "Refusing no-login mode: firewalld still allows HTTPS through a public service/port rule." >&2
+      exit 3
+    fi
+    broad_rich_rules="$(firewall-cmd --permanent --zone="$ZONE" --list-rich-rules | grep -E 'port port="443"' | grep -v 'source address=' || true)"
+    if [[ -n "$broad_rich_rules" ]]; then
+      echo "Refusing no-login mode: unrestricted firewalld HTTPS rich rules remain:" >&2
+      printf '%s\n' "$broad_rich_rules" >&2
+      exit 3
+    fi
+  fi
+  echo "Verified: no unrestricted host-firewall HTTPS rule was found in $MANAGER."
+fi
+
 if [[ "$APPLY" == true ]]; then
   echo "Rules added. Verify SSH from a second session and test IPv4/IPv6 externally."
   echo "Existing broad rules/default policies were not changed. Inspect them before claiming least-privilege."
