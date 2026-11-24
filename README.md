@@ -152,8 +152,8 @@ The monitoring product itself is custom-built. The project will not embed or dep
 
 The Compose stack is the control plane (web, API, PostgreSQL and Redis). A native Monitor Me agent must run on each machine whose host metrics you want to collect; running Compose alone does not grant it reliable access to the Windows/Linux host.
 
-- **Windows host:** Add Server in the dashboard, select Windows, then from a Monitor Me source checkout on that Windows host run `.\scripts\setup-windows-agent.ps1` (PowerShell). The helper builds the native Windows binary with Docker if absent, then starts the agent and securely prompts for the one-time token.
-- **Linux host:** Add Server, select Linux, copy the control-plane CA to the monitored host, then run `sudo ./scripts/setup-linux-agent.sh --grpc-address <host:8443> --ca-file <trusted-ca-file>` from a source checkout. It builds the native Linux binary, installs the systemd service, enrolls, and removes the one-time token from the service environment after session persistence.
+- **Windows host:** Add Machine and create a one-time token. From a Monitor Me source checkout on that Windows host run `.\scripts\setup-windows-agent.ps1` (PowerShell). The helper builds the native Windows binary with Docker if absent, then starts the agent and securely prompts for the one-time token.
+- **Linux host:** Add Machine and create a one-time token. Copy the trusted control-plane CA to the monitored host, then run `sudo ./scripts/setup-linux-agent.sh --grpc-address <host:8443> --ca-file <trusted-ca-file>` from a source checkout. It builds the native Linux binary, installs the systemd service, enrolls, and removes the one-time token from the service environment after session persistence.
 
 Use a reachable gRPC endpoint and a CA trusted by the target machine. `localhost:8443` is only correct when the agent and control plane are on the same host. The initial Windows helper currently runs in the foreground; native Windows service installation, signed installers and unattended upgrades remain planned.
 
@@ -304,7 +304,7 @@ A phase is marked Completed only after implementation, acceptance tests, relevan
 
 ## MVP Readiness
 
-Phases 1–3 are complete and their phase gates pass CI. This does **not** mean the first usable product MVP is released. The first authenticated dashboard slice now includes login/first-owner setup, server inventory, Add Server, and one-time enrollment credentials. Historical/live metric panels, project switching, charts, alerts, and remote operations remain Phase 4 work. The API, Linux agent, durable ingestion, history, and live transport are verified foundations for the next server-detail/history/live views.
+Phases 1–3 are complete and their phase gates pass CI. This does **not** mean the first usable product MVP is released. The current single-install direction removes login/signup and organization creation from the default operator workflow. Host metrics, server inventory, historical/live charts, projects, alerts and operations exist in varying implementation states; raw logs, downloadable signed installers and the complete plug-and-play workflow remain outstanding. The API, Linux agent, durable ingestion, history, and live transport are verified foundations for the next server-detail/history/live views.
 
 ## Documentation Map
 
