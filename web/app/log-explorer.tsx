@@ -212,12 +212,12 @@ export default function LogExplorer({
           <button className="detail-back-button" type="button" onClick={onBack}>← Back to servers</button>
           <div className="eyebrow">Searchable host events</div>
           <h1>Log Explorer</h1>
-          <p>Search structured Linux journal events stored in your own ClickHouse instance. Results are time-bounded and limited to 200 rows per request.</p>
+          <p>Search Linux systemd journal events and Windows Application/System events when the host agent advertises the matching log capability. Results are time-bounded and loaded in pages of up to 200 events.</p>
         </div>
         <div className="log-explorer-header-actions">
           <Button variant="secondary" onClick={() => void loadLogs()} disabled={loading}><RefreshCw size={14} /> Refresh</Button>
           <Button variant={live ? "default" : "secondary"} onClick={() => setLive((value) => !value)}>
-            {live ? <Pause size={14} /> : <Play size={14} />} {live ? "Pause live tail" : "Live tail"}
+            {live ? <Pause size={14} /> : <Play size={14} />} {live ? "Pause auto-refresh" : "Auto-refresh · 10s"}
           </Button>
         </div>
       </header>
@@ -269,7 +269,7 @@ export default function LogExplorer({
         <CardHeader className="log-results-header">
           <div><CardTitle>Events</CardTitle><p>{selectedServer?.name ?? "No machine selected"} · {events.length} loaded · newest first</p></div>
           <div className="log-results-meta">
-            {live && <Badge variant="default">Live tail on</Badge>}
+            {live && <Badge variant="default">Auto-refresh on · 10s</Badge>}
             <span>{lastUpdated ? "Updated " + lastUpdated.toLocaleTimeString() : "Not loaded"}</span>
           </div>
         </CardHeader>
@@ -278,17 +278,18 @@ export default function LogExplorer({
         ) : error && events.length === 0 ? (
           <CardContent className="log-empty-state">The query did not complete. Correct the filters or retry.</CardContent>
         ) : events.length === 0 ? (
-          <CardContent className="log-empty-state"><FileText size={22} /><strong>No log events in this time range</strong><span>Check that the Linux machine has journald and that the agent has the logs.journald capability.</span></CardContent>
+          <CardContent className="log-empty-state"><FileText size={22} /><strong>No log events in this time range</strong><span>Confirm the host agent is running and advertises logs.journald (Linux) or logs.windows_eventlog (Windows). macOS and arbitrary file-tail collection are not currently supported.</span></CardContent>
         ) : (
           <div className="log-table-scroll">
             <Table>
-              <TableHeader><TableRow><TableHead>Time</TableHead><TableHead>Severity</TableHead><TableHead>Source</TableHead><TableHead>Message</TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow><TableHead>Timestamp</TableHead><TableHead>Severity</TableHead><TableHead>Source</TableHead><TableHead>Labels</TableHead><TableHead>Message</TableHead></TableRow></TableHeader>
               <TableBody>
                 {events.map((event) => (
                   <TableRow key={event.event_id} data-state={selectedEvent?.event_id === event.event_id ? "selected" : undefined} className="log-event-row" onClick={() => setSelectedEvent(event)}>
                     <TableCell className="log-time-cell">{formatTime(event.event_time_unix_nanos)}</TableCell>
                     <TableCell><Badge variant={severityVariant(event.severity)}>{event.severity}</Badge></TableCell>
                     <TableCell className="log-source-cell">{event.source}</TableCell>
+                    <TableCell className="log-labels-cell"><div className="log-label-list">{Object.entries(event.attributes ?? {}).slice(0, 4).map(([key, value]) => <span className="log-label" key={key}>{key}={value}</span>)}</div></TableCell>
                     <TableCell className="log-message-cell">{event.body}</TableCell>
                   </TableRow>
                 ))}
