@@ -18,11 +18,14 @@ RUN protoc -I proto \
     --go-grpc_out=. --go-grpc_opt=module=monitor-me.internal/backend \
     proto/monitor/v1/agent.proto
 
-RUN go mod tidy
-
-RUN CGO_ENABLED=0 GOOS=linux \
-    go build -trimpath -ldflags="-s -w" -o /out/monitor-me-api ./cmd/api && \
-    go build -trimpath -ldflags="-s -w" -o /out/monitor-me-migrate ./cmd/migrate
+# Resolve only the packages required by the shipped binaries. Do not run
+# "go mod tidy" in an image build: tidy also loads tests and every build-tagged
+# package, and mutates module metadata as a side effect.
+RUN mkdir -p /out && \
+    CGO_ENABLED=0 GOOS=linux \
+    go build -mod=mod -trimpath -ldflags="-s -w" -o /out/monitor-me-api ./cmd/api && \
+    CGO_ENABLED=0 GOOS=linux \
+    go build -mod=mod -trimpath -ldflags="-s -w" -o /out/monitor-me-migrate ./cmd/migrate
 
 FROM alpine:3.23 AS runtime
 
