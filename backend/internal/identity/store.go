@@ -1044,18 +1044,57 @@ func (s *Store) DeleteDashboardPanel(ctx context.Context, principal Principal, p
 	if !validUUID(panelID) {
 		return ErrNotFound
 	}
-	result, err := s.db.ExecContext(ctx,
-		"DELETE FROM dashboard_panels WHERE id = $1 AND organization_id = $2",
-		panelID, principal.OrganizationID)
+
+	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
+		return fmt.Errorf("begin dashboard panel deletion: %w", err)
+	}
+	defer tx.Rollback()
+
+	var dashboardID string
+	if err := tx.QueryRowContext(ctx, `
+		SELECT dashboard_id::text
+		FROM dashboard_panels
+		WHERE id = $1 AND organization_id = $2
+	`, panelID, principal.OrganizationID).Scan(&dashboardID); errors.Is(err, sql.ErrNoRows) {
+		return ErrNotFound
+	} else if err != nil {
+		return fmt.Errorf("load dashboard for panel deletion: %w", err)
+	}
+
+	var lockedDashboardID string
+	if err := tx.QueryRowContext(ctx, `
+		SELECT id::text FROM dashboards
+		WHERE id = $1 AND organization_id = $2
+		FOR UPDATE
+	`, dashboardID, principal.OrganizationID).Scan(&lockedDashboardID); errors.Is(err, sql.ErrNoRows) {
+		return ErrNotFound
+	} else if err != nil {
+		return fmt.Errorf("lock dashboard for panel deletion: %w", err)
+	}
+
+	if _, err := tx.ExecContext(ctx, `
+		DELETE FROM dashboard_panels
+		WHERE id = $1 AND dashboard_id = $2 AND organization_id = $3
+	`, panelID, lockedDashboardID, principal.OrganizationID); err != nil {
 		return fmt.Errorf("delete dashboard panel: %w", err)
 	}
-	affected, err := result.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("inspect dashboard panel deletion: %w", err)
+	if _, err := tx.ExecContext(ctx, `
+		WITH ranked AS (
+			SELECT id, row_number() OVER (ORDER BY position, id) - 1 AS next_position
+			FROM dashboard_panels
+			WHERE dashboard_id = $1 AND organization_id = $2
+		)
+		UPDATE dashboard_panels panel
+		SET position = ranked.next_position, updated_at = now()
+		FROM ranked
+		WHERE panel.id = ranked.id
+		  AND panel.position <> ranked.next_position
+	`, lockedDashboardID, principal.OrganizationID); err != nil {
+		return fmt.Errorf("compact dashboard panel positions: %w", err)
 	}
-	if affected == 0 {
-		return ErrNotFound
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit dashboard panel deletion: %w", err)
 	}
 	return nil
 }
