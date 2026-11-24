@@ -14,6 +14,7 @@ import (
 	"time"
 
 	monitorv1 "example.com/monitor-me/backend/gen/monitor/v1"
+	"example.com/monitor-me/backend/internal/telemetry"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
@@ -232,6 +233,46 @@ func (s *Service) persistTelemetryBatch(ctx context.Context, agentID, sessionTok
 	`, serverID); err != nil {
 		return false, "", status.Error(codes.Unavailable, "could not refresh server liveness")
 	}
+	// Evaluate alert rules before commit. A transient alert-storage failure
+	// rolls back the metrics batch too, allowing a safe replay from agent WAL.
+	alertRows, err := tx.QueryContext(ctx, `
+		SELECT metric_name, value, unit, labels, COALESCE(project_id::text, ''),
+		       (EXTRACT(EPOCH FROM observed_at) * 1000000000)::bigint
+		FROM telemetry_samples
+		WHERE agent_id = $1 AND batch_id = $2
+		ORDER BY id
+	`, agentID, batch.GetBatchId())
+	if err != nil {
+		return false, "", status.Error(codes.Unavailable, "could not load telemetry samples for alert evaluation")
+	}
+	alertSamples := make([]telemetry.LiveSample, 0, len(batch.GetSamples()))
+	for alertRows.Next() {
+		var sample telemetry.LiveSample
+		var labelsJSON []byte
+		if err := alertRows.Scan(
+			&sample.MetricName, &sample.Value, &sample.Unit, &labelsJSON,
+			&sample.ProjectID, &sample.ObservedAtUnixNanos,
+		); err != nil {
+			_ = alertRows.Close()
+			return false, "", status.Error(codes.Unavailable, "could not read telemetry samples for alert evaluation")
+		}
+		if len(labelsJSON) > 0 {
+			if err := json.Unmarshal(labelsJSON, &sample.Labels); err != nil {
+				_ = alertRows.Close()
+				return false, "", status.Error(codes.Unavailable, "could not decode telemetry labels for alert evaluation")
+			}
+		}
+		alertSamples = append(alertSamples, sample)
+	}
+	alertRowsErr := alertRows.Err()
+	alertRowsCloseErr := alertRows.Close()
+	if alertRowsErr != nil || alertRowsCloseErr != nil || len(alertSamples) != len(batch.GetSamples()) {
+		return false, "", status.Error(codes.Unavailable, "telemetry samples could not be verified for alert evaluation")
+	}
+	if err := evaluateCommittedSamples(ctx, tx, organizationID, serverID, alertSamples); err != nil {
+		return false, "", status.Error(codes.Unavailable, "alert evaluation could not be committed with telemetry")
+	}
+
 	if err := tx.Commit(); err != nil {
 		return false, "", status.Error(codes.Unavailable, "could not commit telemetry batch")
 	}

@@ -681,6 +681,69 @@ func TestPhase2AuthenticationAndAgentLifecycle(t *testing.T) {
 			},
 		}
 	}
+	// A notification-store failure must roll back telemetry and let the
+	// agent replay the same batch ID without losing the firing alert.
+	if _, err := database.ExecContext(ctx, `
+		CREATE OR REPLACE FUNCTION test_fail_firing_alert_notification()
+		RETURNS trigger LANGUAGE plpgsql AS $$
+		BEGIN
+			IF NEW.kind = 'firing' THEN
+				RAISE EXCEPTION 'injected alert notification failure';
+			END IF;
+			RETURN NEW;
+		END;
+		$$
+	`); err != nil {
+		t.Fatalf("create alert notification failure fixture: %v", err)
+	}
+	if _, err := database.ExecContext(ctx, `
+		CREATE TRIGGER test_fail_firing_alert_notification
+		BEFORE INSERT ON alert_notifications
+		FOR EACH ROW EXECUTE FUNCTION test_fail_firing_alert_notification()
+	`); err != nil {
+		t.Fatalf("install alert notification failure fixture: %v", err)
+	}
+	failureStream, err := agentClient.Stream(ctx)
+	if err != nil {
+		t.Fatalf("open stream for injected alert storage failure: %v", err)
+	}
+	if err := failureStream.Send(telemetryMessage(1048576)); err != nil {
+		t.Fatalf("send telemetry during injected alert storage failure: %v", err)
+	}
+	_, failureErr := failureStream.Recv()
+	if status.Code(failureErr) != codes.Unavailable {
+		t.Fatalf("alert notification storage failure must reject the telemetry batch for retry, got %v", failureErr)
+	}
+	_ = failureStream.CloseSend()
+	var rolledBackBatches, rolledBackSamples, rolledBackEvents int
+	if err := database.QueryRowContext(ctx, `
+		SELECT count(*) FROM telemetry_batches WHERE agent_id = $1 AND batch_id = $2
+	`, enrolled.GetAgentId(), batchID).Scan(&rolledBackBatches); err != nil {
+		t.Fatalf("verify telemetry batch rollback after alert failure: %v", err)
+	}
+	if err := database.QueryRowContext(ctx, `
+		SELECT count(*) FROM telemetry_samples WHERE agent_id = $1 AND batch_id = $2
+	`, enrolled.GetAgentId(), batchID).Scan(&rolledBackSamples); err != nil {
+		t.Fatalf("verify telemetry sample rollback after alert failure: %v", err)
+	}
+	if err := database.QueryRowContext(ctx, `
+		SELECT count(*) FROM alert_events WHERE rule_id = $1 AND status = 'firing'
+	`, createdAlertRule.Rule.ID).Scan(&rolledBackEvents); err != nil {
+		t.Fatalf("verify alert-event rollback after notification failure: %v", err)
+	}
+	if rolledBackBatches != 0 || rolledBackSamples != 0 || rolledBackEvents != 0 {
+		t.Fatalf("alert failure left partial monitoring data: batches=%d samples=%d events=%d",
+			rolledBackBatches, rolledBackSamples, rolledBackEvents)
+	}
+	if _, err := database.ExecContext(ctx,
+		"DROP TRIGGER test_fail_firing_alert_notification ON alert_notifications"); err != nil {
+		t.Fatalf("remove alert notification failure trigger: %v", err)
+	}
+	if _, err := database.ExecContext(ctx,
+		"DROP FUNCTION test_fail_firing_alert_notification()"); err != nil {
+		t.Fatalf("remove alert notification failure function: %v", err)
+	}
+
 	if err := stream.Send(telemetryMessage(1048576)); err != nil {
 		t.Fatalf("send first telemetry batch: %v", err)
 	}

@@ -17,39 +17,47 @@ type alertRuleMatch struct {
 	Threshold float64
 }
 
-func evaluateCommittedSamples(ctx context.Context, db *sql.DB, organizationID, serverID string, samples []telemetry.LiveSample) {
+// evaluateCommittedSamples runs inside the same transaction that stores the
+// telemetry batch. Any rule/event/notification write failure aborts the batch,
+// so the agent can retry its durable WAL record without silently losing an alert.
+func evaluateCommittedSamples(ctx context.Context, tx *sql.Tx, organizationID, serverID string, samples []telemetry.LiveSample) error {
 	for _, sample := range samples {
-		// The metric-name and optional project scope select the relevant sample.
-		rows, err := db.QueryContext(ctx,
+		rows, err := tx.QueryContext(ctx,
 			"SELECT id::text, name, operator, threshold FROM alert_rules "+
 				"WHERE organization_id = $1 AND enabled = true AND metric_name = $2 "+
 				"AND (server_id IS NULL OR server_id = $3) "+
 				"AND (project_id IS NULL OR project_id = NULLIF($4, '')::uuid) ORDER BY created_at",
 			organizationID, sample.MetricName, serverID, sample.ProjectID)
 		if err != nil {
-			continue
+			return fmt.Errorf("load matching alert rules for %s: %w", sample.MetricName, err)
 		}
 		matches := make([]alertRuleMatch, 0)
 		for rows.Next() {
 			var rule alertRuleMatch
 			if err := rows.Scan(&rule.ID, &rule.Name, &rule.Operator, &rule.Threshold); err != nil {
-				matches = nil
-				break
+				_ = rows.Close()
+				return fmt.Errorf("scan matching alert rule: %w", err)
 			}
 			matches = append(matches, rule)
 		}
 		rowsErr := rows.Err()
-		_ = rows.Close()
+		closeErr := rows.Close()
 		if rowsErr != nil {
-			continue
+			return fmt.Errorf("iterate matching alert rules: %w", rowsErr)
+		}
+		if closeErr != nil {
+			return fmt.Errorf("close matching alert rule rows: %w", closeErr)
 		}
 		for _, rule := range matches {
-			applyAlertRule(ctx, db, organizationID, serverID, sample, rule)
+			if err := applyAlertRule(ctx, tx, organizationID, serverID, sample, rule); err != nil {
+				return fmt.Errorf("evaluate alert rule %s: %w", rule.ID, err)
+			}
 		}
 	}
+	return nil
 }
 
-func applyAlertRule(ctx context.Context, db *sql.DB, organizationID, serverID string, sample telemetry.LiveSample, rule alertRuleMatch) {
+func applyAlertRule(ctx context.Context, tx *sql.Tx, organizationID, serverID string, sample telemetry.LiveSample, rule alertRuleMatch) error {
 	breached := false
 	switch rule.Operator {
 	case "gt":
@@ -61,22 +69,16 @@ func applyAlertRule(ctx context.Context, db *sql.DB, organizationID, serverID st
 	case "lte":
 		breached = sample.Value <= rule.Threshold
 	default:
-		return
+		return fmt.Errorf("unsupported alert operator %q", rule.Operator)
 	}
-
-	tx, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		return
-	}
-	defer tx.Rollback()
 
 	projectScope := sample.ProjectID
 	lockKey := rule.ID + ":" + serverID + ":" + projectScope
 	if _, err := tx.ExecContext(ctx, "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", lockKey); err != nil {
-		return
+		return fmt.Errorf("lock alert event scope: %w", err)
 	}
 	var eventID string
-	err = tx.QueryRowContext(ctx,
+	err := tx.QueryRowContext(ctx,
 		"SELECT id::text FROM alert_events WHERE rule_id = $1 AND organization_id = $2 "+
 			"AND server_id = $3 AND project_id IS NOT DISTINCT FROM NULLIF($4, '')::uuid "+
 			"AND status = 'firing' FOR UPDATE",
@@ -89,22 +91,30 @@ func applyAlertRule(ctx context.Context, db *sql.DB, organizationID, serverID st
 					"VALUES ($1, $2, $3, NULLIF($4, '')::uuid, $5, 'firing', $6) RETURNING id::text",
 				organizationID, rule.ID, serverID, projectScope, sample.MetricName, sample.Value).Scan(&eventID)
 			if insertErr != nil {
-				return
+				return fmt.Errorf("insert firing alert event: %w", insertErr)
 			}
 			message := fmt.Sprintf("%s observed %s; rule is %s %s", sample.MetricName,
 				strconv.FormatFloat(sample.Value, 'f', 2, 64), rule.Operator,
 				strconv.FormatFloat(rule.Threshold, 'f', 2, 64))
 			if err := createAlertNotifications(ctx, tx, organizationID, eventID, "firing", "Alert firing: "+rule.Name, message); err != nil {
-				return
+				return fmt.Errorf("create firing notifications: %w", err)
 			}
 		} else if err == nil {
-			if _, err := tx.ExecContext(ctx,
+			result, err := tx.ExecContext(ctx,
 				"UPDATE alert_events SET last_value = $1, last_observed_at = now() WHERE id = $2 AND status = 'firing'",
-				sample.Value, eventID); err != nil {
-				return
+				sample.Value, eventID)
+			if err != nil {
+				return fmt.Errorf("update firing alert event: %w", err)
+			}
+			count, err := result.RowsAffected()
+			if err != nil {
+				return fmt.Errorf("inspect firing alert event update: %w", err)
+			}
+			if count != 1 {
+				return fmt.Errorf("firing alert event update affected %d rows", count)
 			}
 		} else {
-			return
+			return fmt.Errorf("load active alert event: %w", err)
 		}
 	} else if err == nil {
 		result, err := tx.ExecContext(ctx,
@@ -112,21 +122,24 @@ func applyAlertRule(ctx context.Context, db *sql.DB, organizationID, serverID st
 				"last_observed_at = now(), resolved_at = now() WHERE id = $2 AND status = 'firing'",
 			sample.Value, eventID)
 		if err != nil {
-			return
+			return fmt.Errorf("resolve alert event: %w", err)
 		}
 		count, err := result.RowsAffected()
-		if err != nil || count == 0 {
-			return
+		if err != nil {
+			return fmt.Errorf("inspect resolved alert event: %w", err)
+		}
+		if count == 0 {
+			return fmt.Errorf("firing alert event disappeared during resolution")
 		}
 		message := fmt.Sprintf("%s returned below its threshold; latest value is %s",
 			sample.MetricName, strconv.FormatFloat(sample.Value, 'f', 2, 64))
 		if err := createAlertNotifications(ctx, tx, organizationID, eventID, "recovered", "Alert recovered: "+rule.Name, message); err != nil {
-			return
+			return fmt.Errorf("create recovery notifications: %w", err)
 		}
 	} else if !errors.Is(err, sql.ErrNoRows) {
-		return
+		return fmt.Errorf("load active alert event: %w", err)
 	}
-	_ = tx.Commit()
+	return nil
 }
 
 func createAlertNotifications(ctx context.Context, tx *sql.Tx, organizationID, eventID, kind, title, message string) error {
