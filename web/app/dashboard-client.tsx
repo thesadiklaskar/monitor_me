@@ -421,9 +421,9 @@ export default function DashboardClient() {
           <div className="brand-mark">M</div>
           <div className="sidebar-brand-copy"><p className="brand-name">MONITOR ME</p><p className="brand-subtitle">Observability</p></div>
         </div>
-        <div className="workspace-switcher" title="This self-hosted installation">
-          <span className="workspace-icon"><Activity size={15} strokeWidth={1.8} /></span>
-          <div className="workspace-switcher-copy"><strong>Infrastructure monitoring</strong><span>This installation</span></div>
+        <div className="installation-indicator" title="This self-hosted installation">
+          <span className="installation-indicator-icon"><Activity size={15} strokeWidth={1.8} /></span>
+          <div className="installation-indicator-copy"><strong>Infrastructure monitoring</strong><span>This installation</span></div>
         </div>
         <nav className="side-nav" aria-label="Main navigation">
           <span className="nav-section-label">Monitoring</span>
