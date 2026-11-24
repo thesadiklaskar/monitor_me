@@ -16,15 +16,15 @@ import (
 )
 
 type API struct {
-	identities          *identity.Store
-	cache               *redisv9.Client
-	telemetry           *telemetry.Store
-	logs                *logstore.Store
-	allowedLiveOrigins  map[string]struct{}
-	allowedRemoteUnits  []string
-	installationPrincipalMu    sync.Mutex
+	identities                       *identity.Store
+	cache                            *redisv9.Client
+	telemetry                        *telemetry.Store
+	logs                             *logstore.Store
+	allowedLiveOrigins               map[string]struct{}
+	allowedRemoteUnits               []string
+	installationPrincipalMu          sync.Mutex
 	cachedInstallationPrincipal      identity.Principal
-	installationPrincipalExpiresAt time.Time
+	installationPrincipalExpiresAt    time.Time
 }
 
 type principalContextKey struct{}
