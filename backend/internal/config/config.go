@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/url"
 	"os"
-	"regexp"
 	"strings"
 	"time"
 )
@@ -24,7 +23,6 @@ type Config struct {
 	DBConnectionLifetime time.Duration
 	StartupTimeout       time.Duration
 	WebAllowedOrigins      []string
-	RemoteAllowedUnits     []string
 	ClickHouseURL          string
 	ClickHouseUsername     string
 	ClickHousePassword     string
@@ -57,10 +55,6 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 	if err := validateDatabaseURL(cfg.DatabaseURL); err != nil {
-		return Config{}, err
-	}
-	cfg.RemoteAllowedUnits, err = parseRemoteAllowedUnits(os.Getenv("REMOTE_ALLOWED_SYSTEMD_UNITS"))
-	if err != nil {
 		return Config{}, err
 	}
 	if cfg.RedisAddress == "" {
@@ -130,24 +124,3 @@ func parseWebAllowedOrigins(raw string) ([]string, error) {
 	return origins, nil
 }
 
-var remoteSystemdUnitPattern = regexp.MustCompile("^[A-Za-z0-9_.:@-]{1,180}\\.service$")
-
-func parseRemoteAllowedUnits(raw string) ([]string, error) {
-	seen := make(map[string]struct{})
-	units := make([]string, 0)
-	for _, item := range strings.Split(raw, ",") {
-		unit := strings.TrimSpace(item)
-		if unit == "" {
-			continue
-		}
-		if !remoteSystemdUnitPattern.MatchString(unit) {
-			return nil, fmt.Errorf("REMOTE_ALLOWED_SYSTEMD_UNITS must contain comma-separated systemd .service unit names")
-		}
-		if _, exists := seen[unit]; exists {
-			continue
-		}
-		seen[unit] = struct{}{}
-		units = append(units, unit)
-	}
-	return units, nil
-}
