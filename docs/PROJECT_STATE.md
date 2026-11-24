@@ -18,9 +18,9 @@ This file is the authoritative resume point for Monitor Me. Read it before makin
 | MVP status | Single-install no-login shell, native metrics agents, saved dashboards, basic alert/operations views and the first Linux journald → ClickHouse log pipeline are implemented; Windows/Linux runtime acceptance, Windows/file logs, advanced Grafana-style dashboard controls, sustained-load tests and production-host verification remain |
 | Implementation status | The operator product direction is single-install, no-login and plug-and-play. Add Machine no longer asks for target OS; it offers PowerShell/POSIX launchers, a collapsible Lucide icon sidebar and a simplified single-install shell. Linux/Windows agents report OS/platform/architecture and available virtualization hints. The local Compose startup helper auto-generates a development certificate and the Compose artifact-builder now generates protobuf code and builds Linux amd64/arm64 plus Windows x64 binaries. Target-side installers download checksum-verified binaries without Docker/source checkout; Linux installs systemd and Windows installs a restart-enabled Windows Service. These installers and service lifecycles have not yet passed owner runtime acceptance or publisher code-signing. Production is also no-login: every deployment requires a trusted ADMIN_CIDR, Nginx allowlist and host firewall boundary while leaving installer/CA/artifact paths public; the host firewall helper and real-host IPv4/IPv6/cloud checks still need validation. Initial Linux journald log ingestion/search is implemented: a bounded durable agent spool, TLS gRPC batch delivery, ClickHouse MergeTree storage, organization/server-scoped search API and Log Explorer with 200-row keyset pagination and polling live-tail. This remains pending fresh CI/runtime acceptance; Windows Event Log and file-tail collectors are not implemented. The browser uses one implicit installation context, not login cookies or organization selection; production no-login is protected by the enforced Nginx ADMIN_CIDR/firewall boundary. |
 | Last source commit covered by latest successful CI run | 9685e115113123d5f9f8e8a1b222804752f5a283 (Go, frontend and native-agent jobs passed in run #45203706343; Compose integration failed at the web proxy login probe; later commits are not covered) |
-| Latest CI run | #45344817977 — completed with failure and an empty jobs list; no runner steps or tests executed for the recent single-install and log-pagination changes |
-| Latest implementation commit | 9c78fc5ae412679bd3114b82342baedd4d6715fe — guards Log Explorer pagination requests against stale filter/live-refresh responses and adds keyset cursor tests; subsequent commits complete single-install acceptance and CI workflow adjustments |
-| Next action | On the owner's Windows PC, pull `main`, run `.\scripts\start-local.ps1` in PowerShell, confirm `agent-artifacts` completed and the no-login dashboard opens, then Add Machine and validate the Windows x64 Service installer using a fresh one-time token. Inspect `Get-Service MonitorMeAgent` and `%ProgramData%\MonitorMe\agent.log`. Keep local dashboard/API ports loopback-bound. On a failure, capture `docker compose logs --no-color --tail=200 agent-artifacts`; recent Actions runs have no executed jobs, so local and CI test evidence is still required. |
+| Latest CI run | #530 — completed with failure and an empty jobs list (`total_count: 0`); no runner steps or tests executed. The reason jobs were not assigned is not established |
+| Latest implementation commit | d91076788b4ae25ea53b79c2247ad4f45b0319b6 — adds fail-closed handling for legacy databases containing multiple organizations; all implementation changes were committed directly to `main` |
+| Next action | On the owner's Windows PC, pull `main`, run `.\scripts\start-local.ps1` in PowerShell, confirm `agent-artifacts` completed and the no-login dashboard opens, then Add Machine and validate the Windows x64 Service installer using a fresh one-time token. Inspect `Get-Service MonitorMeAgent` and `%ProgramData%\MonitorMe\agent.log`. Keep local dashboard/API ports loopback-bound. On a failure, capture `docker compose logs --no-color --tail=200 agent-artifacts`; latest Actions run #530 has no jobs, so local and CI test evidence is still required. |
 
 
 
@@ -29,17 +29,18 @@ This file is the authoritative resume point for Monitor Me. Read it before makin
 
 **Status:** Implementation changes committed directly to `main`; no branch or pull request was created. Runtime/CI verification has not yet succeeded.
 
-- [x] Removed browser login/register/me/logout API routes and the signup/login form.
-- [x] Added a single-install bootstrap endpoint and made the backend use one implicit installation context for dashboard API requests.
-- [x] Removed the `MONITOR_ME_AUTH_DISABLED` option from backend config, local Compose, production Compose and environment examples. Login cannot be switched back on by setting an environment flag.
+- [x] Removed browser login/register/me/logout API routes, the signup/login form, and the unused identity-store `Login`, `Logout`, `Authenticate`, `RegisterFirst`, `AuthSession` and `RegisterInput` APIs.
+- [x] Added `/v1/installation` and `/api/installation`; dashboard API requests use a cached private installation context, not a browser session.
+- [x] Removed browser session cookies, bearer forwarding and login fallback guards from the web API proxy; frontend fetches omit cookies. Removed `MONITOR_ME_AUTH_DISABLED` from backend config, Compose and environment examples.
 - [x] Made production deployment always require a non-default `ADMIN_CIDR`, a generated Nginx allowlist and the host firewall verification/apply path. Public installer/CA/artifact routes remain separate.
-- [x] Added CI smoke checks for the installation descriptor and the removed login endpoint; adapted the agent lifecycle integration test to no-login operation.
+- [x] Added CI smoke checks for the installation descriptor and deleted login endpoints; the agent lifecycle integration test now runs without a browser bearer token. Agent enrollment/session credentials remain independent.
 - [x] Removed duplicate `golang.org/x/sys` requirement from the agent module and improved Windows/POSIX local startup scripts so a failed Compose run prints service state and the `agent-artifacts` logs.
-- [ ] Obtain a fresh green CI run and execute Go, TypeScript, Compose, Windows PowerShell and Linux host acceptance. GitHub Actions run #478 completed without executing jobs; do not treat it as test evidence.
+- [x] Fail closed when a legacy database has more than one organization rather than silently selecting the oldest scope.
+- [ ] Obtain a fresh green CI run and execute Go, TypeScript, Compose, Windows PowerShell and Linux host acceptance. Latest Actions run #530 completed without executing jobs; do not treat it as test evidence.
 - [ ] Re-run the user's Windows Compose startup and capture the actual artifact builder log if it still exits non-zero. The duplicate module requirement was corrected, but the supplied transcript did not contain the failing container log, so the root cause is not confirmed.
 - [ ] Complete a file-by-file repository audit, migration compatibility review, Windows runtime/service test, and production IPv4/IPv6/VPN boundary test.
 
-**Database compatibility note:** The SQL schema still contains users, organizations and memberships because resource tables, audit rows and existing migrations reference them. The application initializes one private compatibility principal and does not expose customer account, login, organization creation or membership workflows. Removing these tables entirely requires a separately tested schema/data migration and is not claimed by this pass.
+**Database compatibility note:** The SQL schema still contains `users`, `organizations`, `organization_memberships` and internal `user_sessions` because resource tables, live-stream tickets, audit rows and existing migrations reference them. New installs create one private compatibility identity with a random discarded password secret; it is not a customer login. The application exposes no account, login, organization-creation or membership workflow. Existing databases with multiple organizations now fail closed and need deliberate data migration or an isolated installation database. Removing the legacy tables entirely requires a separately tested schema/data migration and is not claimed by this pass.
   
 ## Reliability, tenancy and portability audit — 2026-11-24
 
@@ -74,7 +75,7 @@ This file is the authoritative resume point for Monitor Me. Read it before makin
 - [ ] Deliver a single control-plane bootstrap that generates secrets/TLS, provisions supported firewall policy, launches Compose and auto-enrolls the local host. Provider firewalls require scoped provider IAM and must not be guessed.
 - [x] Implement the first Linux journald → bounded agent spool → TLS gRPC → ClickHouse ingestion and bounded search/Log Explorer slice.
 - [ ] Add Windows Event Log and file-tail collectors; complete live-tail semantics, retention/backup acceptance and sustained-load/replay testing.
-- [ ] Verify the updated UI, installer and firewall code with local tests, external IPv4/IPv6 checks, cross-platform service acceptance and load/failure benchmarks. GitHub Actions free-minute quota currently prevents fresh runner verification; no new CI pass is claimed.
+- [ ] Verify the updated UI, installer and firewall code with local tests, external IPv4/IPv6 checks, cross-platform service acceptance and load/failure benchmarks. Recent GitHub Actions runs complete with empty job lists; the reason jobs are not assigned is not established, and no new CI pass is claimed.
 
 ## Plug-and-play onboarding and host metadata — 2026-11-24
 
@@ -87,8 +88,8 @@ This file is the authoritative resume point for Monitor Me. Read it before makin
 - [x] Linux and Windows collectors now emit OS/platform/kernel/architecture and available virtualization metadata. Linux adds best-effort DMI-based provider hints; environment classification distinguishes container, cloud VM hint, virtual machine and physical/unknown. Provider detection is not guaranteed across all VPS vendors.
 - [x] Added host-environment display to System information and unit assertions for classification. CI now cross-compiles the Windows x64 agent from Linux runners.
 - [x] Refreshed the complete application shell styling: navigation/sidebar, typography, sticky operator header, panels, focus states, mobile navigation, Add Server and install-command surfaces.
-- [ ] Build/run the updated Windows executable and accept the new UI against the already-enrolled Windows host. GitHub Actions free-minute quota has blocked runner assignment in recent runs; no fresh CI pass is claimed.
-- **Architecture boundary:** Compose starts the control plane, not all monitored machines. Each monitored Windows/Linux host requires a native agent on that host. Remote agents need a reachable gRPC address and a trusted control-plane CA; `localhost` only works for a same-host agent. Do not expose the local anonymous Compose profile outside localhost.
+- [ ] Build/run the updated Windows executable and accept the new UI against the already-enrolled Windows host. Recent Actions runs have empty job lists; the reason jobs are not assigned is not established, and no fresh CI pass is claimed.
+- **Architecture boundary:** Compose starts the control plane, not all monitored machines. Each monitored Windows/Linux host requires a native agent on that host. Remote agents need a reachable gRPC address and a trusted control-plane CA; `localhost` only works for a same-host agent. Do not expose the local no-login Compose profile outside localhost.
 
 ## Dashboard UI refresh — 2026-11-24
 
@@ -98,7 +99,7 @@ This file is the authoritative resume point for Monitor Me. Read it before makin
 - [x] Added direct CPU / Memory / Disk / Network chart shortcuts, a full metric selector, 1h/6h/24h range controls, and a larger SVG history chart with a value axis, shaded trend area, latest-point marker and visible gaps.
 - [x] Kept the existing history API, committed-telemetry WebSocket, project scope, and latest-snapshot/process APIs; no chart dependency or third-party monitoring platform was added.
 - [x] Clarified that TCP state and listening-port inventory are not reported by the initial Windows collector.
-- [ ] Pull the new main commit, rebuild the web container, and verify the refreshed UI against the enrolled Windows host. GitHub Actions quota is currently blocking fresh runner-based CI, so no new CI pass is claimed.
+- [ ] Pull the new main commit, rebuild the web container, and verify the refreshed UI against the enrolled Windows host. Recent Actions runs complete with empty job lists, so no fresh CI pass is claimed.
 - Historical Windows foreground-agent testing used a per-user LOCALAPPDATA state file. Before testing the new ProgramData Windows Service installer, stop the old foreground process and create a new Add Machine token for the separate service identity.
 
 ## Next Work Session — 2026-11-24
