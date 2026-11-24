@@ -50,6 +50,15 @@ type DashboardLogEvent = {
 type LogResponse = { events: DashboardLogEvent[]; count: number; has_more: boolean };
 type PanelSeries = { points?: SeriesPoint[]; logs?: DashboardLogEvent[]; error?: string };
 type MetricDefinition = { value: string; label: string; unit: string; category: string };
+type DashboardAlertEvent = {
+  id: string;
+  rule_name: string;
+  server_id: string;
+  metric_name: string;
+  status: "firing" | "resolved";
+  triggered_at: string;
+  resolved_at?: string | null;
+};
 
 const metricCatalog: MetricDefinition[] = [
   { value: "host.cpu.utilization", label: "CPU utilization", unit: "%", category: "Compute" },
@@ -193,10 +202,11 @@ function chartGeometry(points: SeriesPoint[], durationMs: number): ChartGeometry
   };
 }
 
-function MetricVisualization({ panel, series, durationMs }: {
+function MetricVisualization({ panel, series, durationMs, annotations = [] }: {
   panel: DashboardPanel;
   series: PanelSeries | undefined;
   durationMs: number;
+  annotations?: DashboardAlertEvent[];
 }) {
   const metric = metricCatalog.find((item) => item.value === panel.metric_name);
   if (panel.visualization === "logs") {
@@ -298,7 +308,21 @@ function MetricVisualization({ panel, series, durationMs }: {
             <text x="34" y={tick.y + 4} textAnchor="end" className="dashboard-chart-axis-label">{formatCompact(tick.value)}</text>
           </g>
         ))}
-        {panel.visualization === "area" && <path d={chart.area} className="dashboard-chart-area" />}
+        {annotations.filter((event) => event.metric_name === panel.metric_name).map((event) => {
+          const eventTime = new Date(event.triggered_at).getTime();
+          const chartStart = Date.now() - durationMs;
+          if (!Number.isFinite(eventTime) || eventTime < chartStart || eventTime > Date.now()) return null;
+          const x = 42 + ((eventTime - chartStart) / durationMs) * 920;
+          return (
+            <g key={event.id}>
+              <line x1={x} x2={x} y1="18" y2="190" className={event.status === "firing" ? "dashboard-alert-marker dashboard-alert-marker-firing" : "dashboard-alert-marker"} />
+              <circle cx={x} cy="19" r="5" className={event.status === "firing" ? "dashboard-alert-dot dashboard-alert-dot-firing" : "dashboard-alert-dot"}>
+                <title>{event.rule_name} · {event.status} · {new Date(event.triggered_at).toLocaleString()}</title>
+              </circle>
+            </g>
+          );
+        })}
+                {panel.visualization === "area" && <path d={chart.area} className="dashboard-chart-area" />}
         {panel.visualization === "bar" ? chart.points.map((point, index) => {
           const baseline = 190;
           const top = Math.min(point.yAverage, baseline);
@@ -324,6 +348,7 @@ export default function DashboardsView({ servers }: { servers: Server[] }) {
   const [dashboards, setDashboards] = useState<Dashboard[]>([]);
   const [selectedId, setSelectedId] = useState("");
   const [seriesByPanel, setSeriesByPanel] = useState<Record<string, PanelSeries>>({});
+  const [alertEvents, setAlertEvents] = useState<DashboardAlertEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -371,6 +396,15 @@ export default function DashboardsView({ servers }: { servers: Server[] }) {
       setError(loadError instanceof Error ? loadError.message : "Dashboards could not be loaded.");
     } finally {
       setLoading(false);
+    }
+  }, []);
+
+  const loadAlertEvents = useCallback(async () => {
+    try {
+      const response = await apiRequest<{ events: DashboardAlertEvent[] }>("/api/alerts");
+      setAlertEvents(Array.isArray(response.events) ? response.events : []);
+    } catch {
+      setAlertEvents([]);
     }
   }, []);
 
@@ -429,6 +463,12 @@ export default function DashboardsView({ servers }: { servers: Server[] }) {
     setServerFilter(selectedDashboard.default_server_id ?? "all");
     setRangeOverride(selectedDashboard.default_time_range || "panel");
   }, [selectedDashboard?.id, selectedDashboard?.default_server_id, selectedDashboard?.default_time_range]);
+
+  useEffect(() => {
+    const initial = window.setTimeout(() => { void loadAlertEvents(); }, 0);
+    const interval = window.setInterval(() => { void loadAlertEvents(); }, 30000);
+    return () => { window.clearTimeout(initial); window.clearInterval(interval); };
+  }, [loadAlertEvents]);
 
   useEffect(() => {
     if (!selectedDashboard) return;
@@ -755,7 +795,12 @@ export default function DashboardsView({ servers }: { servers: Server[] }) {
                           </div>
                         </CardHeader>
                         <CardContent className="dashboard-panel-content dashboard-panel-content-v2">
-                          <MetricVisualization panel={panel} series={seriesByPanel[panel.id]} durationMs={duration} />
+                          <MetricVisualization
+                            panel={panel}
+                            series={seriesByPanel[panel.id]}
+                            durationMs={duration}
+                            annotations={alertEvents.filter((event) => event.server_id === effectiveServer && event.metric_name === panel.metric_name)}
+                          />
                         </CardContent>
                       </Card>
                     );
