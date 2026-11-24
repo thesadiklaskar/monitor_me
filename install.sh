@@ -176,7 +176,7 @@ fi
 
 log "Installing restricted certificate copy and renewal hook."
 RENEWAL_HOOK="/etc/letsencrypt/renewal-hooks/deploy/monitor-me.sh"
-printf '#!/usr/bin/env bash\nset -Eeuo pipefail\nexport CERT_GROUP_ID="%s"\nexport AGENT_TLS_CERT_DIR="%s"\nexec "%s/deploy/production/certbot-deploy-hook.sh"\n' "$CERT_GROUP_ID" "$CERT_DIR" "$ROOT" > "$RENEWAL_HOOK"
+printf '#!/usr/bin/env bash\nset -Eeuo pipefail\nexport CERT_GROUP_ID="%s"\nexport AGENT_TLS_CERT_DIR="%s"\nexport MONITOR_ME_ROOT="%s"\nexec "%s/deploy/production/certbot-deploy-hook.sh"\n' "$CERT_GROUP_ID" "$CERT_DIR" "$ROOT" "$ROOT" > "$RENEWAL_HOOK"
 chmod 0750 "$RENEWAL_HOOK"
 RENEWED_LINEAGE="/etc/letsencrypt/live/$PUBLIC_HOSTNAME" CERT_GROUP_ID="$CERT_GROUP_ID" AGENT_TLS_CERT_DIR="$CERT_DIR" "$RENEWAL_HOOK"
 
