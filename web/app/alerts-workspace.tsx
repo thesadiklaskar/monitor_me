@@ -142,7 +142,7 @@ export default function AlertsWorkspace({ servers, projects, role, onBack }: {
       )}
       <div className="alerts-sections-grid">
         <section className="alert-list-card">
-          <div className="panel-heading"><div><h2>Alert rules</h2><p>Organization-scoped threshold policies</p></div></div>
+          <div className="panel-heading"><div><h2>Alert rules</h2><p>Installation-wide threshold policies</p></div></div>
           {loading ? <div className="project-empty">Loading alert rules…</div> : rules.length === 0 ? <div className="project-empty">No alert rules configured.</div> : rules.map((rule) => {
             const metricDef = METRICS.find((item) => item.value === rule.metric_name);
             const server = servers.find((item) => item.id === rule.server_id);
@@ -164,7 +164,7 @@ export default function AlertsWorkspace({ servers, projects, role, onBack }: {
         </section>
       </div>
       <section className="alert-list-card alert-notifications-card">
-        <div className="panel-heading"><div><h2>In-app notifications</h2><p>Delivered separately to each organization member</p></div><Button className="button button-secondary" variant="secondary" type="button" onClick={() => { void load(); }}>Refresh</Button></div>
+        <div className="panel-heading"><div><h2>In-app notifications</h2><p>Notifications are stored in this installation</p></div><Button className="button button-secondary" variant="secondary" type="button" onClick={() => { void load(); }}>Refresh</Button></div>
         {loading ? <div className="project-empty">Loading notifications…</div> : notifications.length === 0 ? <div className="project-empty">No notifications yet.</div> : notifications.map((item) => (
           <div className={item.read_at ? "alert-notification-row" : "alert-notification-row alert-notification-unread"} key={item.id}>
             <div><strong>{item.title}</strong><p>{item.message}</p><small>{formatTime(item.created_at)}</small></div>
