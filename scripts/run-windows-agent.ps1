@@ -21,9 +21,16 @@ New-Item -ItemType Directory -Force -Path $spoolDirectory | Out-Null
 $stateFile = Join-Path $dataDirectory "agent-state.json"
 $token = ""
 if (-not (Test-Path $stateFile)) {
-    $token = Read-Host "Paste the one-time enrollment token from the Monitor Me Add Server dialog"
-    if ([string]::IsNullOrWhiteSpace($token)) {
+    $secureToken = Read-Host "Paste the one-time enrollment token from the Monitor Me Add Server dialog" -AsSecureString
+    if ($secureToken.Length -eq 0) {
         throw "An enrollment token is required for first enrollment."
+    }
+    $tokenPointer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secureToken)
+    try {
+        $token = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($tokenPointer)
+    }
+    finally {
+        [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($tokenPointer)
     }
 }
 
