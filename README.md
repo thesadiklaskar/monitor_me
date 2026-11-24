@@ -4,14 +4,14 @@ A self-hosted infrastructure monitoring product for a VPS, VM, cloud VM, VPC-hos
 
 Monitor Me is an independently implemented monitoring product with a native web interface, native query builder and native visualization engine.
 
-> **Release status:** this is the development `main` branch, not a certified public release. The API, database, migration runner, agent-artifact builder and base web dashboard previously started successfully in one Windows Docker Desktop environment. The native dashboard editor and new visualization set in the current commits still require a fresh local build, browser acceptance and real telemetry review. Clean-host production install, multiple Linux distributions, ARM hardware, backup/restore and load limits remain unverified.
+> **Release status:** this is the development `main` branch, not a certified public release. The API, database, migration runner, agent-artifact builder and base web dashboard previously started successfully in one Windows Docker Desktop environment. The fleet overview dashboard and saved dashboard editor still require a fresh local production build, browser acceptance and real telemetry review. Clean-host production install, multiple Linux distributions, ARM hardware, backup/restore and load limits remain unverified.
 
 ## Product principles
 
 - One installation, one operator boundary and one local data store.
 - No browser login/signup, customer profile, organization, workspace, project or project mapping.
 - No remote shell, stop/restart or host-control operations. This is a monitoring tool.
-- Four clear UI areas: **Servers**, **Logs**, **Dashboards** and **Alerts**.
+- Five clear UI areas: **Dashboard**, **Servers**, **Logs**, **Dashboards** and **Alerts**.
 - Real host telemetry only. Missing or unsupported metrics are shown as unavailable, never as fabricated zeroes.
 - Native Go agent on monitored hosts; Docker is needed for the Linux control plane, not on monitored machines.
 - Keep the product easy to install, understand, operate and modify.
@@ -105,7 +105,7 @@ Generate bounded real CPU, memory and disk activity for two minutes:
 bash ./scripts/demo-load.sh --duration 120
 ```
 
-The script asks for confirmation, runs `stress-ng` with bounded defaults and exits after the requested duration. Open **Servers** and inspect the machine, then open its metric charts. In **Logs**, search for `monitor-me-demo`. In **Dashboards**, create a dashboard and add CPU, memory, disk and network panels. In **Alerts**, create a temporary CPU threshold rule if you want to demonstrate a firing/recovery cycle; remove the rule after the demo.
+The script asks for confirmation, runs `stress-ng` with bounded defaults and exits after the requested duration. Open **Dashboard** to inspect the machine cards and combined per-host graphs/logs. Open **Servers** for the detailed host view. In **Logs**, search for `monitor-me-demo`. In **Dashboards**, create a dashboard and add CPU, memory, disk and network panels. In **Alerts**, create a temporary CPU threshold rule if you want to demonstrate a firing/recovery cycle; remove the rule after the demo.
 
 Capture screenshots from the browser after actual data has arrived:
 1. Servers inventory showing the enrolled machine and online status.
