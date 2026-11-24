@@ -27,6 +27,36 @@ For the first Linux MVP release, Phase 5 has two primary release deliverables: f
 
 ---
 
+
+## Product Direction Update — 2026-11-24
+
+The product owner's latest direction supersedes the earlier login/organization-first workflow and the assumption that Add Server should ask the operator to choose Windows or Linux. The intended product is a single-install, no-login, plug-and-play monitoring console. See [PRODUCT_VISION_PLUG_AND_PLAY.md](PRODUCT_VISION_PLUG_AND_PLAY.md), [ADR 0004](adr/0004-single-install-no-login-network-boundary.md), and [ADR 0005](adr/0005-clickhouse-high-volume-logs.md).
+
+**Target experience:** one control-plane installer starts the complete supported Docker Compose stack and creates its implicit installation workspace. Add Machine issues one short-lived token and shows shell launchers. The launcher running on the target detects its own OS/architecture/virtualization, downloads the right signed agent, installs the correct service, enrolls and starts it. The operator must not select the OS in a dashboard form or hand-configure collector environment.
+
+**Important current-vs-target distinction:** current local helpers still build from a repository checkout with Docker; Windows agent runs in the foreground; signed downloadable binaries, automatic Windows Service setup, universal target bootstrap and a no-login production gate are not yet shipped. Raw log collection/search is not implemented. The ClickHouse log design is proposed only. No Grafana-replacement or million-log claim is valid until the verification gates pass.
+
+### Updated delivery sequence
+
+1. **Operator experience and safe single-install model:** remove signup/login/org workflows from the default UI, maintain an internal implicit installation workspace, keep local no-login on loopback, and require an enforced HTTPS administrator CIDR/VPN boundary before enabling remote no-login mode.
+2. **Universal node bootstrap:** build signed/versioned Linux and Windows release artifacts; use POSIX/PowerShell launchers that detect target OS/architecture/service manager; install native services; secure one-use token exchange; support upgrades, rollback, revocation and uninstall. No Docker, Go or source checkout on monitored machines.
+3. **One-command control-plane installer:** detect supported Linux distribution/architecture, generate per-install secrets/TLS, configure the supported Compose profile, apply migrations, run readiness checks, open/print the UI and enroll the local host agent. Add safe Windows-local developer bootstrap separately.
+4. **Firewall/security automation:** keep data stores and internal ports private, restrict dashboard HTTPS to the known admin CIDR/VPN for no-login mode, allow only the required TLS gRPC ingress for agents, leave agent-only machines with outbound-only access, and verify IPv4/IPv6/Docker/cloud firewall paths. Do not change cloud security groups without scoped provider IAM; report when that external step is required.
+5. **Raw log platform:** implement native Linux journald/file and Windows Event Log/file collection, bounded WAL/back-pressure, durable ClickHouse batches, idempotent ACK, retention/indexes/redaction, bounded search APIs and Log Explorer live tail.
+6. **Professional observability UI:** finish the icon-led collapsible navigation, monitoring overview, host/service/network views, log explorer, query controls, alert views and accurate unsupported/stale/error states.
+7. **Reliability and scale proof:** test crashes, storage exhaustion, network partitions, duplicate replay, query cancellation, browser virtualization, sustained ingest and 100-million-event retention/search. Only publish measured capacity claims.
+
+### Updated completion gates
+
+- [ ] A fresh Linux control-plane install completes from one command without editing environment files or manually generating TLS certificates.
+- [ ] Add Machine creates a token without OS dropdown/organization/user management and supplies the correct shell launcher(s).
+- [ ] Linux and Windows target launchers detect the target environment, install verified signed artifacts, enroll, create the platform service and survive reboot/upgrade/uninstall tests.
+- [ ] Remote no-login dashboard mode refuses to start unless HTTPS and admin network isolation are enforced; localhost remains loopback-only.
+- [ ] Host firewall policy is idempotent, source-aware, reversible, IPv4/IPv6-aware and verified against Docker forwarding; cloud firewall prerequisites are surfaced explicitly.
+- [ ] Linux journald/file and Windows Event Log/file sources ingest durably into ClickHouse with bounded queues, back-pressure, idempotency, searchable structured fields and retention.
+- [ ] Log Explorer remains responsive with large histories and bounded query/page sizes; millions of events are stored, filtered and paged without loading them into the DOM.
+- [ ] Published scale numbers come from reproducible load, failure/recovery and query benchmarks.
+
 ## Phase 1 — Product Specification and Technical Blueprint
 
 **Status: Completed**
