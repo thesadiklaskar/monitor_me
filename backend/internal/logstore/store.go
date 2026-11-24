@@ -150,13 +150,19 @@ func validateBatch(batch Batch, now time.Time) error {
 		return ErrInvalidBatch
 	}
 	var estimatedBytes int
+	seenEventIDs := make(map[string]struct{}, len(batch.Events))
 	for _, event := range batch.Events {
 		if !eventIDPattern.MatchString(event.ID) || event.EventTimeUnixNanos <= 0 ||
 			event.ObservedAtUnixNanos <= 0 || len(event.Body) == 0 || len(event.Body) > maxEventBody ||
 			len(event.Source) == 0 || len(event.Source) > 128 ||
+			strings.ContainsAny(event.Source, "\r\n\x00") ||
 			!validSeverity(event.Severity) || len(event.Attributes) > 16 {
 			return ErrInvalidBatch
 		}
+		if _, exists := seenEventIDs[event.ID]; exists {
+			return ErrInvalidBatch
+		}
+		seenEventIDs[event.ID] = struct{}{}
 		if time.Unix(0, event.EventTimeUnixNanos).After(now.Add(5*time.Minute)) ||
 			time.Unix(0, event.ObservedAtUnixNanos).After(now.Add(5*time.Minute)) {
 			return ErrInvalidBatch
@@ -250,15 +256,22 @@ func (s *Store) Ingest(ctx context.Context, agentID, sessionToken string, batch 
 	rows := make([]clickHouseRow, 0, len(batch.Events))
 	for _, event := range batch.Events {
 		projectID := projectByUnit[event.Attributes["systemd_unit"]]
+		if projectID == "" {
+			projectID = projectByUnit[event.Attributes["systemd_cgroup"]]
+		}
 		var nullableProject *string
 		if projectID != "" {
 			nullableProject = &projectID
+		}
+		attributes := event.Attributes
+		if attributes == nil {
+			attributes = map[string]string{}
 		}
 		rows = append(rows, clickHouseRow{
 			OrganizationID: organizationID, ServerID: serverID, AgentID: agentID, BatchID: batch.ID,
 			EventID: event.ID, EventTime: clickHouseTime(event.EventTimeUnixNanos),
 			ObservedAt: clickHouseTime(event.ObservedAtUnixNanos), Source: event.Source,
-			Severity: event.Severity, Body: event.Body, Attributes: event.Attributes, ProjectID: nullableProject,
+			Severity: event.Severity, Body: event.Body, Attributes: attributes, ProjectID: nullableProject,
 		})
 	}
 	if err := s.insertRows(ctx, rows); err != nil {

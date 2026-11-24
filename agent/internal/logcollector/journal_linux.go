@@ -37,6 +37,7 @@ type journalRecord struct {
 	Message string `json:"MESSAGE"`
 	Priority string `json:"PRIORITY"`
 	Unit string `json:"_SYSTEMD_UNIT"`
+	CGroup string `json:"_SYSTEMD_CGROUP"`
 	Identifier string `json:"SYSLOG_IDENTIFIER"`
 	Comm string `json:"_COMM"`
 	PID string `json:"_PID"`
@@ -172,9 +173,12 @@ func normalizeRecord(record journalRecord, observedAt time.Time) (logspool.Event
 		body = strings.ToValidUTF8(body[:16<<10], "")
 	}
 
-	attributes := make(map[string]string, 4)
+	attributes := make(map[string]string, 5)
 	if record.Unit != "" {
 		attributes["systemd_unit"] = bounded(record.Unit, 256)
+	}
+	if record.CGroup != "" {
+		attributes["systemd_cgroup"] = bounded(record.CGroup, 512)
 	}
 	if record.Comm != "" {
 		attributes["comm"] = bounded(record.Comm, 128)
