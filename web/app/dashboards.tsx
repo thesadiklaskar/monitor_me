@@ -23,6 +23,8 @@ type DashboardPanel = {
   time_range: TimeRange;
   position: number;
   grid_width: GridWidth;
+  label_key: string;
+  label_value: string;
   created_at: string;
   updated_at: string;
 };
@@ -369,6 +371,8 @@ export default function DashboardsView({ servers }: { servers: Server[] }) {
   const [panelVisualization, setPanelVisualization] = useState<Visualization>("timeseries");
   const [panelRange, setPanelRange] = useState<TimeRange>("1h");
   const [panelGridWidth, setPanelGridWidth] = useState<GridWidth>(6);
+  const [panelLabelKey, setPanelLabelKey] = useState("");
+  const [panelLabelValue, setPanelLabelValue] = useState("");
   const [serverFilter, setServerFilter] = useState("all");
   const [rangeOverride, setRangeOverride] = useState<"panel" | TimeRange>("panel");
   const [draggingPanelId, setDraggingPanelId] = useState("");
@@ -441,6 +445,8 @@ export default function DashboardsView({ servers }: { servers: Server[] }) {
         // date_bin uses epoch-aligned buckets; include both edge buckets.
         limit: "150",
         metric: panel.metric_name,
+        label_key: panel.label_key || "",
+        label_value: panel.label_value || "",
       });
       try {
         const response = await apiRequest<SeriesResponse>(
@@ -487,6 +493,8 @@ export default function DashboardsView({ servers }: { servers: Server[] }) {
     setPanelVisualization(panel?.visualization ?? "timeseries");
     setPanelRange(panel?.time_range ?? "1h");
     setPanelGridWidth(panel?.grid_width ?? 6);
+    setPanelLabelKey(panel?.label_key ?? "");
+    setPanelLabelValue(panel?.label_value ?? "");
     setShowPanelForm(true);
   }
 
@@ -578,6 +586,8 @@ export default function DashboardsView({ servers }: { servers: Server[] }) {
       metric_name: panelVisualization === "logs" ? "host.logs.events" : panelMetric,
       time_range: panelRange,
       grid_width: panelGridWidth,
+      label_key: panelLabelKey.trim(),
+      label_value: panelLabelValue,
       ...(editingPanel ? {} : { position: selectedDashboard.panels.length }),
     };
     setBusy(true);
@@ -752,6 +762,9 @@ export default function DashboardsView({ servers }: { servers: Server[] }) {
                       <label className="field"><span>Visualization</span><select value={panelVisualization} onChange={(event) => setPanelVisualization(event.target.value as Visualization)}><option value="timeseries">Time series</option><option value="area">Area</option><option value="bar">Bar</option><option value="stat">Stat</option><option value="gauge">Gauge</option><option value="heatmap">Heatmap</option><option value="table">Table</option><option value="logs">Host logs</option></select></label>
                       <label className="field"><span>Default time range</span><select value={panelRange} onChange={(event) => setPanelRange(event.target.value as TimeRange)}>{Object.entries(rangeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
                       <label className="field"><span>Panel width</span><select value={panelGridWidth} onChange={(event) => setPanelGridWidth(Number(event.target.value) as GridWidth)}><option value={4}>Compact · ⅓</option><option value={6}>Half · ½</option><option value={8}>Wide · ⅔</option><option value={12}>Full width</option></select></label>
+                      <label className="field"><span>Label key (optional)</span><input value={panelLabelKey} onChange={(event) => setPanelLabelKey(event.target.value)} maxLength={64} placeholder="mountpoint or interface" disabled={panelVisualization === "logs"} /></label>
+                      <label className="field"><span>Label value (optional)</span><input value={panelLabelValue} onChange={(event) => setPanelLabelValue(event.target.value)} maxLength={256} placeholder="/ or eth0" disabled={panelVisualization === "logs"} /></label>
+
                       <div className="dashboard-builder-actions">
                         <Button variant="secondary" type="button" onClick={() => { setShowPanelForm(false); setEditingPanel(null); }}>Cancel</Button>
                         <Button type="submit" disabled={busy || servers.length === 0}><Save size={14} /> {busy ? "Saving…" : editingPanel ? "Save changes" : "Add panel"}</Button>
@@ -786,7 +799,7 @@ export default function DashboardsView({ servers }: { servers: Server[] }) {
                         <CardHeader className="dashboard-panel-heading dashboard-panel-heading-v2">
                           <div className="dashboard-panel-title">
                             <div className="dashboard-panel-title-line"><span className="dashboard-panel-grip" title="Drag to reorder"><GripVertical size={16} /></span><CardTitle>{panel.title}</CardTitle></div>
-                            <CardDescription>{selectedServerName} · {panel.visualization === "logs" && effectiveRange === "30d" ? "Last 7 days (log limit)" : rangeLabels[effectiveRange]} · {panel.visualization === "logs" ? "Host log events" : metricCatalog.find((metric) => metric.value === panel.metric_name)?.label ?? panel.metric_name}</CardDescription>
+                            <CardDescription>{selectedServerName} · {panel.visualization === "logs" && effectiveRange === "30d" ? "Last 7 days (log limit)" : rangeLabels[effectiveRange]} · {panel.visualization === "logs" ? "Host log events" : (metricCatalog.find((metric) => metric.value === panel.metric_name)?.label ?? panel.metric_name) + (panel.label_key && panel.label_value ? " · " + panel.label_key + "=" + panel.label_value : "")}</CardDescription>
                           </div>
                           <div className="dashboard-panel-actions dashboard-panel-actions-v2">
                             <Badge variant="secondary">{panel.visualization}</Badge>
