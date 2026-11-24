@@ -59,7 +59,7 @@ A committed npm lockfile is a release requirement; until it exists, `npm install
 - `app/dashboard-client.tsx` — application shell, sidebar, machine inventory and enrollment.
 - `app/server-detail.tsx` — host metrics, historical/live charts and process/socket inventory.
 - `app/log-explorer.tsx` — searchable log explorer.
-- `app/dashboards.tsx` — dashboard settings, saved filters, panel editor, metric/log renderers and custom visualizations.
+- `app/dashboards.tsx` — dashboard settings, saved filters, panel editor, saved dashboard defaults, metric/log renderers, alert markers and custom visualizations.
 - `app/alerts.tsx` — threshold rules and notifications.
 - `app/api/` — same-origin API proxies.
 - `app/globals.css` — design tokens, layout, responsive and component styles.

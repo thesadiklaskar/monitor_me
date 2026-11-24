@@ -968,3 +968,9 @@ td { font-size: 13px; }
   .alert-rule-actions { justify-content:flex-start; }
   .alerts-form-actions { width:100%; justify-content:flex-start; }
 }
+
+
+.dashboard-alert-marker { stroke:rgba(236,181,92,.8); stroke-width:1.2; stroke-dasharray:3 4; }
+.dashboard-alert-marker-firing { stroke:rgba(245,126,132,.92); stroke-width:1.8; }
+.dashboard-alert-dot { fill:#e9ba67; stroke:#1b2634; stroke-width:2; }
+.dashboard-alert-dot-firing { fill:#f47f87; }
