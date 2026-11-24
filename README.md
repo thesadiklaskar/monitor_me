@@ -149,18 +149,33 @@ The monitoring product itself is custom-built. The project will not embed or dep
 
 ## Local Development
 
+### Native agent setup (run on each monitored host)
+
+The Compose stack is the control plane (web, API, PostgreSQL and Redis). A native Monitor Me agent must run on each machine whose host metrics you want to collect; running Compose alone does not grant it reliable access to the Windows/Linux host.
+
+- **Windows host:** Add Server in the dashboard, select Windows, then from a Monitor Me source checkout on that Windows host run `.` scripts\setup-windows-agent.ps1 (PowerShell). The helper builds the native Windows binary with Docker if absent, then starts the agent and securely prompts for the one-time token.
+- **Linux host:** Add Server, select Linux, copy the control-plane CA to the monitored host, then run `sudo ./scripts/setup-linux-agent.sh --grpc-address <host:8443> --ca-file <trusted-ca-file>` from a source checkout. It builds the native Linux binary, installs the systemd service, enrolls, and removes the one-time token from the service environment after session persistence.
+
+Use a reachable gRPC endpoint and a CA trusted by the target machine. `localhost:8443` is only correct when the agent and control plane are on the same host. The initial Windows helper currently runs in the foreground; native Windows service installation, signed installers and unattended upgrades remain planned.
+
+Host OS and virtualization labels come from the native agent, not the browser. Virtualization detection is best-effort: hypervisor metadata is reported where available, and provider-specific VPS hints can be missing. A missing signal is shown as unknown rather than guessed. Containers, VMs and the host OS are distinct concepts; a Docker Compose control plane does not itself identify the external host's environment.
+
+
 See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for prerequisites and current limitations.
 
-For the initial local control-plane environment:
+For a one-command local control-plane setup, start Docker Desktop / Docker Engine, clone this repository, then run the matching helper from the repository root:
 
-```sh
-cp .env.example .env
-# Replace the local PostgreSQL and Redis passwords in .env.
-docker compose up --build -d
-docker compose ps
+```powershell
+.\scripts\start-local.ps1
 ```
 
-The API exposes `/health/live` and `/health/ready`. Liveness reports process health independently; readiness checks PostgreSQL and Redis and returns HTTP 503 when either dependency is unavailable. Docker Compose runs a one-shot migration service before the API starts. The local Next.js dashboard includes authenticated server/project views, historical/live charts, alert and notification workflows, and allowlisted remote operations. Use a real Linux agent for live telemetry acceptance; the host collector is Linux-only.
+```sh
+./scripts/start-local.sh
+```
+
+The helper creates `.env` from `.env.example` when needed, generates a localhost-only development TLS certificate, builds the Compose services, waits for the dashboard probe, and opens (PowerShell) or prints (shell) `http://localhost:3000`. It does not erase existing database volumes. The helper is for local development only; do not reuse its self-signed certificate or anonymous local access mode on a public deployment.
+
+The API exposes `/health/live` and `/health/ready`. Liveness reports process health independently; readiness checks PostgreSQL and Redis and returns HTTP 503 when either dependency is unavailable. Docker Compose runs a one-shot migration service before the API starts. The dashboard includes server/project views, historical/live charts, alert and notification workflows, and allowlisted remote operations.
 
 Build the native agent and its tests:
 
