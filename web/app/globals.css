@@ -768,3 +768,6 @@ td { font-size: 13px; }
   th { font-size: 10px; }
   td { font-size: 12px; }
 }
+
+/* Brand alignment retained after removing the obsolete login shell. */
+.sidebar-brand { display: flex; align-items: center; gap: 10px; }
