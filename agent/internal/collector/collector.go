@@ -205,7 +205,6 @@ func (c *ProcCollector) Collect(ctx context.Context) ([]Sample, error) {
 		c.previousDisk = current
 	}
 
-
 	// Filesystem capacity changes slowly; collect it once per minute rather
 	// than running statfs on every high-frequency CPU/network snapshot.
 	if c.previousDiskCapacityAt.IsZero() || now.Sub(c.previousDiskCapacityAt) >= time.Minute {
@@ -334,12 +333,12 @@ func (c *ProcCollector) Collect(ctx context.Context) ([]Sample, error) {
 			hostname = info.Hostname
 		}
 		labels := map[string]string{
-			"hostname": hostname,
-			"os": runtime.GOOS,
-			"platform": info.Platform,
+			"hostname":         hostname,
+			"os":               runtime.GOOS,
+			"platform":         info.Platform,
 			"platform_version": info.PlatformVersion,
-			"kernel_version": info.KernelVersion,
-			"architecture": runtime.GOARCH,
+			"kernel_version":   info.KernelVersion,
+			"architecture":     runtime.GOARCH,
 		}
 		if info.VirtualizationSystem != "" {
 			labels["virtualization_system"] = info.VirtualizationSystem
