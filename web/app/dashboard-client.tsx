@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { Activity, Bell, Folder, PanelLeftClose, PanelLeftOpen, Server as ServerIcon } from "lucide-react";
 import { apiRequest } from "@/lib/client-api";
 import { ServerDetail } from "./server-detail";
 import ProjectWorkspace from "./project-workspace";
@@ -108,20 +109,6 @@ function slugFromName(value: string): string {
 
 
 
-type UiIconName = "panel" | "server" | "folder" | "bell" | "activity";
-
-function UiIcon({ name, size = 18 }: { name: UiIconName; size?: number }) {
-  const common = { fill: "none", stroke: "currentColor", strokeWidth: 1.7, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" focusable="false" {...common}>
-      {name === "panel" && <><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M9 3v18M14 8l-3 4 3 4" /></>}
-      {name === "server" && <><rect x="3" y="4" width="18" height="7" rx="2" /><rect x="3" y="13" width="18" height="7" rx="2" /><path d="M7 7.5h.01M7 16.5h.01M11 7.5h6M11 16.5h6" /></>}
-      {name === "folder" && <><path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><path d="M3 10h18" /></>}
-      {name === "bell" && <><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" /></>}
-      {name === "activity" && <><path d="M3 12h4l3-8 4 16 3-8h4" /></>}
-    </svg>
-  );
-}
 
 function AuthScreen({
   onAuthenticated,
@@ -644,19 +631,19 @@ export default function DashboardClient() {
         <div className="sidebar-brand">
           <div className="brand-mark">M</div>
           <div className="sidebar-brand-copy"><p className="brand-name">MONITOR ME</p><p className="brand-subtitle">Observability</p></div>
-          <button className="sidebar-toggle" type="button" onClick={toggleSidebar} aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"} title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}><UiIcon name="panel" /></button>
+          <button className="sidebar-toggle" type="button" onClick={toggleSidebar} aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"} title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}>{sidebarCollapsed ? <PanelLeftOpen size={18} strokeWidth={1.8} /> : <PanelLeftClose size={18} strokeWidth={1.8} />}</button>
         </div>
         <div className="workspace-switcher" title="Single installation">
-          <span className="workspace-icon"><UiIcon name="activity" size={15} /></span>
+          <span className="workspace-icon"><Activity size={15} strokeWidth={1.8} /></span>
           <div className="workspace-switcher-copy"><strong>Infrastructure</strong><span>Single installation</span></div>
         </div>
         <nav className="side-nav" aria-label="Main navigation">
           <span className="nav-section-label">Monitor</span>
-          <button title="Servers" aria-label="Servers" className={!showProjects && !showAlerts && !showOperations ? "nav-item nav-item-active" : "nav-item"} type="button" onClick={() => { setShowProjects(false); setShowAlerts(false); setShowOperations(false); setSelectedServer(null); }}><span className="nav-item-icon"><UiIcon name="server" /></span><span className="nav-item-label">Servers</span></button>
-          <button title="Projects" aria-label="Projects" className={showProjects ? "nav-item nav-item-active" : "nav-item"} type="button" onClick={() => { setShowAlerts(false); setShowOperations(false); setSelectedServer(null); setShowProjects(true); }}><span className="nav-item-icon"><UiIcon name="folder" /></span><span className="nav-item-label">Projects</span></button>
+          <button title="Servers" aria-label="Servers" className={!showProjects && !showAlerts && !showOperations ? "nav-item nav-item-active" : "nav-item"} type="button" onClick={() => { setShowProjects(false); setShowAlerts(false); setShowOperations(false); setSelectedServer(null); }}><span className="nav-item-icon"><ServerIcon size={18} strokeWidth={1.8} /></span><span className="nav-item-label">Servers</span></button>
+          <button title="Projects" aria-label="Projects" className={showProjects ? "nav-item nav-item-active" : "nav-item"} type="button" onClick={() => { setShowAlerts(false); setShowOperations(false); setSelectedServer(null); setShowProjects(true); }}><span className="nav-item-icon"><Folder size={18} strokeWidth={1.8} /></span><span className="nav-item-label">Projects</span></button>
           <span className="nav-section-label nav-section-spaced">Manage</span>
-          <button title="Alerts" aria-label="Alerts" className={showAlerts ? "nav-item nav-item-active" : "nav-item"} type="button" onClick={() => { setShowProjects(false); setShowOperations(false); setSelectedServer(null); setShowAlerts(true); }}><span className="nav-item-icon"><UiIcon name="bell" /></span><span className="nav-item-label">Alerts</span></button>
-          <button title="Operations" aria-label="Operations" className={showOperations ? "nav-item nav-item-active" : "nav-item"} type="button" onClick={() => { setShowProjects(false); setShowAlerts(false); setSelectedServer(null); setShowOperations(true); }}><span className="nav-item-icon"><UiIcon name="activity" /></span><span className="nav-item-label">Operations</span></button>
+          <button title="Alerts" aria-label="Alerts" className={showAlerts ? "nav-item nav-item-active" : "nav-item"} type="button" onClick={() => { setShowProjects(false); setShowOperations(false); setSelectedServer(null); setShowAlerts(true); }}><span className="nav-item-icon"><Bell size={18} strokeWidth={1.8} /></span><span className="nav-item-label">Alerts</span></button>
+          <button title="Operations" aria-label="Operations" className={showOperations ? "nav-item nav-item-active" : "nav-item"} type="button" onClick={() => { setShowProjects(false); setShowAlerts(false); setSelectedServer(null); setShowOperations(true); }}><span className="nav-item-icon"><Activity size={18} strokeWidth={1.8} /></span><span className="nav-item-label">Operations</span></button>
         </nav>
         <div className="sidebar-bottom">
           <div className="sidebar-status" title={authDisabled ? "Local no-login access" : "Authenticated session"}><span className="status-dot status-dot-online" /><span className="sidebar-status-label">{authDisabled ? "No-login · Local" : "Session active"}</span></div>
