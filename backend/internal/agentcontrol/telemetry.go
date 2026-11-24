@@ -227,32 +227,22 @@ func (s *Service) persistTelemetryBatch(ctx context.Context, agentID, sessionTok
 	result, err = tx.ExecContext(ctx, `
 		INSERT INTO telemetry_samples (
 			organization_id, server_id, agent_id, batch_id, metric_name, value,
-			unit, labels, observed_at, project_id, attribution_method
+			unit, labels, observed_at, attribution_method
 		)
 		SELECT
 			$1, $2, $3, $4, sample.metric_name, sample.value, sample.unit,
 			sample.labels,
 			to_timestamp(sample.observed_at_unix_nanos / 1000000000.0),
-			mapping.project_id,
 			CASE
 				WHEN sample.labels->>'attribution_method' = 'shared' THEN 'shared'
 				WHEN sample.labels->>'attribution_method' = 'unclassified' THEN 'unclassified'
-				WHEN sample.labels ? 'workload_selector' THEN COALESCE(mapping.attribution_method, 'unclassified')
+				WHEN sample.labels ? 'workload_selector' THEN 'unclassified'
 				ELSE 'host_total'
 			END
 		FROM jsonb_to_recordset($5::jsonb) AS sample(
 			metric_name text, value double precision, unit text, labels jsonb,
 			observed_at_unix_nanos bigint
 		)
-		LEFT JOIN LATERAL (
-			SELECT mapping.project_id, mapping.attribution_method
-			FROM server_project_mappings mapping
-			WHERE mapping.organization_id = $1
-			  AND mapping.server_id = $2
-			  AND mapping.workload_type = sample.labels->>'workload_type'
-			  AND mapping.workload_selector = sample.labels->>'workload_selector'
-			LIMIT 1
-		) mapping ON true
 	`, organizationID, serverID, agentID, batch.GetBatchId(), string(payloadJSON))
 	if err != nil {
 		return false, "", status.Error(codes.Unavailable, "could not persist telemetry samples")
@@ -282,7 +272,7 @@ func (s *Service) persistTelemetryBatch(ctx context.Context, agentID, sessionTok
 	// Evaluate alert rules before commit. A transient alert-storage failure
 	// rolls back the metrics batch too, allowing a safe replay from agent WAL.
 	alertRows, err := tx.QueryContext(ctx, `
-		SELECT metric_name, value, unit, labels, COALESCE(project_id::text, ''),
+		SELECT metric_name, value, unit, labels,
 		       (EXTRACT(EPOCH FROM observed_at) * 1000000000)::bigint
 		FROM telemetry_samples
 		WHERE agent_id = $1 AND batch_id = $2
@@ -297,7 +287,7 @@ func (s *Service) persistTelemetryBatch(ctx context.Context, agentID, sessionTok
 		var labelsJSON []byte
 		if err := alertRows.Scan(
 			&sample.MetricName, &sample.Value, &sample.Unit, &labelsJSON,
-			&sample.ProjectID, &sample.ObservedAtUnixNanos,
+			&sample.ObservedAtUnixNanos,
 		); err != nil {
 			_ = alertRows.Close()
 			return false, "", status.Error(codes.Unavailable, "could not read telemetry samples for alert evaluation")
