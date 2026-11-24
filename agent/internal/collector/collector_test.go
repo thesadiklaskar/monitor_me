@@ -3,6 +3,7 @@ package collector
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -64,6 +65,9 @@ func TestParseMemoryAndProcCounters(t *testing.T) {
 }
 
 func TestProcCollectorCollectsFixture(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("procfs fixture collection is Linux-specific; Windows uses native host counters")
+	}
 	root := t.TempDir()
 	write := func(name, value string) {
 		t.Helper()
@@ -232,7 +236,6 @@ func TestProcCollectorEmitsAgentCPUAfterBaselineSnapshot(t *testing.T) {
 	}
 	t.Fatal("expected process CPU utilization after the baseline snapshot")
 }
-
 
 func TestClassifyEnvironmentTypeUsesExplicitHostSignals(t *testing.T) {
 	tests := []struct {
