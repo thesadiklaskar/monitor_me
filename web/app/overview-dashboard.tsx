@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Activity, ArrowDownToLine, ArrowLeft, ArrowUpFromLine, Cpu, Database, HardDrive, MemoryStick, Network, RefreshCw, Server as ServerIcon, TerminalSquare } from "lucide-react";
 import { apiRequest } from "@/lib/client-api";
 import { formatByteRate } from "@/lib/format";
@@ -168,6 +168,7 @@ function MetricCard({
   definition: MetricDefinition;
   result?: PanelResult;
   latest?: LatestSample;
+  loading: boolean;
 }) {
   const points = result?.points ?? [];
   const mostRecentPoint = points[points.length - 1];
@@ -181,6 +182,8 @@ function MetricCard({
       </div>
       {result?.error ? (
         <div className="overview-chart-empty">{result.error}</div>
+      ) : loading && result === undefined ? (
+        <div className="overview-chart-empty">Loading real host samples…</div>
       ) : (
         <>
           <strong className="overview-metric-value">{formatMetric(value, definition.unit)}</strong>
@@ -217,6 +220,7 @@ export default function OverviewDashboard({ servers }: { servers: Server[] }) {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const requestSequence = useRef(0);
 
   const selectedServer = useMemo(
     () => servers.find((server) => server.id === selectedServerId) ?? null,
@@ -230,6 +234,7 @@ export default function OverviewDashboard({ servers }: { servers: Server[] }) {
 
   const loadServerDashboard = useCallback(async () => {
     if (!selectedServer) return;
+    const requestId = ++requestSequence.current;
     const now = Date.now();
     const from = new Date(now - timeWindowMs).toISOString();
     const to = new Date(now).toISOString();
@@ -255,6 +260,7 @@ export default function OverviewDashboard({ servers }: { servers: Server[] }) {
       })),
     ]);
 
+    if (requestId !== requestSequence.current) return;
     setData({
       latest: latestResult.value,
       panels: Object.fromEntries(panelEntries),
@@ -274,23 +280,28 @@ export default function OverviewDashboard({ servers }: { servers: Server[] }) {
     return () => {
       window.clearTimeout(initial);
       window.clearInterval(interval);
+      requestSequence.current += 1;
     };
   }, [loadServerDashboard, selectedServer]);
 
   function openServer(serverId: string) {
+    requestSequence.current += 1;
+    setLoading(true);
     setData(null);
     setError("");
     setSelectedServerId(serverId);
   }
 
   function backToServers() {
+    requestSequence.current += 1;
+    setLoading(false);
     setSelectedServerId("");
     setData(null);
     setError("");
   }
 
   if (selectedServer) {
-    const latestByMetric = new Map(data?.latest.map((sample) => [sample.metric_name, sample]) ?? []);
+    const latestByMetric = new Map(data?.latest.map((sample) => [sample.metric_name, sample] as const) ?? []);
     const lastUpdated = data?.refreshedAt ? new Date(data.refreshedAt).toLocaleTimeString() : "Loading";
     const storageSamples = data?.latest.filter((sample) => sample.metric_name === "host.disk.used.percent") ?? [];
     const logs = data?.logs.slice(0, 20) ?? [];
@@ -331,6 +342,7 @@ export default function OverviewDashboard({ servers }: { servers: Server[] }) {
               definition={definition}
               result={data?.panels[definition.key]}
               latest={latestByMetric.get(definition.metric)}
+              loading={loading}
             />
           ))}
           <article className="overview-metric-card overview-logs-card">
@@ -340,6 +352,8 @@ export default function OverviewDashboard({ servers }: { servers: Server[] }) {
             </div>
             {data?.logsError ? (
               <div className="overview-chart-empty">{data.logsError}</div>
+            ) : logs.length === 0 && loading && data === null ? (
+              <div className="overview-chart-empty">Loading recent host log events…</div>
             ) : logs.length === 0 ? (
               <div className="overview-chart-empty">No log events were returned for this server in the last hour.</div>
             ) : (
