@@ -57,7 +57,6 @@ message AgentToServerMessage {
 
   oneof payload {
     TelemetryBatch telemetry_batch = 3;
-    AgentEvent event = 4;
     AgentHealth health = 5;
     LogBatch log_batch = 6;
   }
@@ -78,14 +77,6 @@ message MetricSample {
   int64 observed_at_unix_nanos = 5;
 }
 
-// AgentEvent is reserved for a future versioned event-ingestion path.
-message AgentEvent {
-  string event_id = 1;
-  string event_type = 2;
-  string message = 3;
-  int64 occurred_at_unix_nanos = 4;
-}
-
 // AgentHealth is reserved for a future health-reporting path. Current agent
 // liveness is reported through the authenticated heartbeat RPC.
 message AgentHealth {
@@ -98,7 +89,6 @@ message AgentHealth {
 message ServerToAgentMessage {
   oneof payload {
     BatchAcknowledgement acknowledgement = 1;
-    AgentCommand command = 2;
   }
 }
 
@@ -107,14 +97,6 @@ message BatchAcknowledgement {
   bool accepted = 2;
   string rejection_code = 3;
   string message = 4;
-}
-
-// AgentCommand is reserved for the future allowlisted remote-operation channel.
-message AgentCommand {
-  string command_id = 1;
-  string command_type = 2;
-  bytes payload = 3;
-  int64 expires_at_unix_millis = 4;
 }
 
 message LogBatch {
