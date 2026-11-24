@@ -8,14 +8,14 @@ GRPC_PORT=8443
 ALLOW_HTTP=false
 APPLY=false
 ROLLBACK=false
-VERIFY_NO_PUBLIC_HTTPS=false
+VERIFY_ADMIN_UI_ALLOWLIST=false
 STATE_DIR="${MONITOR_ME_FIREWALL_STATE_DIR:-/var/lib/monitor-me/firewall}"
 ADMIN_CIDRS=()
 GRPC_CIDRS=()
 usage() {
   cat <<'USAGE'
 Usage:
-  firewall.sh --role control-plane --admin-cidr CIDR [--admin-cidr CIDR] [--grpc-cidr CIDR] [--manager auto|ufw|firewalld] [--zone ZONE] [--ssh-port PORT] [--grpc-port PORT] [--http-01] [--apply] [--verify-no-public-https]
+  firewall.sh --role control-plane --admin-cidr CIDR [--admin-cidr CIDR] [--grpc-cidr CIDR] [--manager auto|ufw|firewalld] [--zone ZONE] [--ssh-port PORT] [--grpc-port PORT] [--http-01] [--apply] [--verify-admin-ui-allowlist]
   firewall.sh --role agent-only
   firewall.sh --rollback
 Dry-run is the default. This helper adds allow rules only; it never changes default policies or removes existing rules.
@@ -34,7 +34,7 @@ while (($#)); do
     --http-01) ALLOW_HTTP=true; shift ;;
     --apply) APPLY=true; shift ;;
     --rollback) ROLLBACK=true; shift ;;
-    --verify-no-public-https) VERIFY_NO_PUBLIC_HTTPS=true; shift ;;
+    --verify-admin-ui-allowlist|--verify-no-public-https) VERIFY_ADMIN_UI_ALLOWLIST=true; shift ;;
     -h|--help) usage; exit 0 ;;
     *) echo "Unknown argument: $1" >&2; usage; exit 2 ;;
   esac
@@ -145,7 +145,7 @@ add_firewalld_port() {
 }
 if [[ "$MANAGER" == "ufw" ]]; then
   for cidr in "${ADMIN_CIDRS[@]}"; do add_ufw_source "$cidr" "$SSH_PORT"; done
-  for cidr in "${ADMIN_CIDRS[@]}"; do add_ufw_source "$cidr" 443; done
+  add_ufw_port 443
   if ((${#GRPC_CIDRS[@]} > 0)); then
     for cidr in "${GRPC_CIDRS[@]}"; do add_ufw_source "$cidr" "$GRPC_PORT"; done
   else
@@ -154,7 +154,7 @@ if [[ "$MANAGER" == "ufw" ]]; then
   if [[ "$ALLOW_HTTP" == true ]]; then add_ufw_port 80; fi
 else
   for cidr in "${ADMIN_CIDRS[@]}"; do add_firewalld_source "$cidr" "$SSH_PORT"; done
-  for cidr in "${ADMIN_CIDRS[@]}"; do add_firewalld_source "$cidr" 443; done
+  add_firewalld_port 443
   if ((${#GRPC_CIDRS[@]} > 0)); then
     for cidr in "${GRPC_CIDRS[@]}"; do add_firewalld_source "$cidr" "$GRPC_PORT"; done
   else
@@ -163,29 +163,32 @@ else
   if [[ "$ALLOW_HTTP" == true ]]; then add_firewalld_port 80; fi
   if [[ "$APPLY" == true ]]; then firewall-cmd --reload; fi
 fi
-if [[ "$VERIFY_NO_PUBLIC_HTTPS" == true ]]; then
-  if [[ "$MANAGER" == "ufw" ]]; then
-    broad_https="$(ufw status | awk '/443\/tcp/ && /Anywhere/ {print} /Nginx Full|Apache Full/ && /Anywhere/ {print}')"
-    if [[ -n "$broad_https" ]]; then
-      echo "Refusing no-login mode: existing unrestricted UFW HTTPS rules remain:" >&2
-      printf '%s\n' "$broad_https" >&2
-      echo "Remove or narrow these rules explicitly, then re-run verification." >&2
+if [[ "$VERIFY_ADMIN_UI_ALLOWLIST" == true ]]; then
+  command -v nginx >/dev/null 2>&1 || { echo "Nginx is required to verify the no-login operator access boundary." >&2; exit 3; }
+  access_file="${MONITOR_ME_NGINX_ACCESS_FILE:-/etc/nginx/snippets/monitor-me-admin-allowlist.conf}"
+  [[ -s "$access_file" ]] || { echo "Missing Nginx administrator allowlist: $access_file" >&2; exit 3; }
+  grep -Eq '^allow [^;]+;$' "$access_file" || { echo "The Nginx access file contains no administrator allow rule." >&2; exit 3; }
+  grep -Fxq 'deny all;' "$access_file" || { echo "The Nginx access file must end with deny all;." >&2; exit 3; }
+  for cidr in "$(grep -E '^allow ' "$access_file" | sed -E 's/^allow ([^;]+);$/\1/')"; do
+    python3 -c 'import ipaddress,sys; network=ipaddress.ip_network(sys.argv[1], strict=False); sys.exit(1 if network.prefixlen == 0 else 0)' "$cidr" || {
+      echo "The Nginx administrator allowlist contains an invalid or unrestricted CIDR: $cidr" >&2
       exit 3
-    fi
-  else
-    if firewall-cmd --permanent --zone="$ZONE" --query-service=https >/dev/null 2>&1 ||
-       firewall-cmd --permanent --zone="$ZONE" --query-port=443/tcp >/dev/null 2>&1; then
-      echo "Refusing no-login mode: firewalld still allows HTTPS through a public service/port rule." >&2
+    }
+  done
+  nginx_config="$(nginx -T 2>&1)" || { echo "nginx -T failed; cannot verify operator access." >&2; printf '%s\n' "$nginx_config" >&2; exit 3; }
+  include_count="$(printf '%s\n' "$nginx_config" | grep -F -c "include $access_file;" || true)"
+  [[ "$include_count" -ge 2 ]] || { echo "Nginx must include the administrator allowlist in both the dashboard and live-WebSocket locations." >&2; exit 3; }
+  for location in \
+    "location = /install/agent-linux.sh" \
+    "location = /install/agent-windows.ps1" \
+    "location ^~ /api/agent-artifacts/" \
+    "location = /api/agent-ca"; do
+    printf '%s\n' "$nginx_config" | grep -Fq "$location" || {
+      echo "Nginx is missing the public node-bootstrap route: $location" >&2
       exit 3
-    fi
-    broad_rich_rules="$(firewall-cmd --permanent --zone="$ZONE" --list-rich-rules | grep -E 'port port="443"' | grep -v 'source address=' || true)"
-    if [[ -n "$broad_rich_rules" ]]; then
-      echo "Refusing no-login mode: unrestricted firewalld HTTPS rich rules remain:" >&2
-      printf '%s\n' "$broad_rich_rules" >&2
-      exit 3
-    fi
-  fi
-  echo "Verified: no unrestricted host-firewall HTTPS rule was found in $MANAGER."
+    }
+  done
+  echo "Verified: no-login dashboard and live WebSocket use the Nginx administrator allowlist; only node bootstrap, CA and artifact routes are public on HTTPS."
 fi
 
 if [[ "$APPLY" == true ]]; then
