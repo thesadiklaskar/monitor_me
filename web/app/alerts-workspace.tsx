@@ -140,18 +140,18 @@ export default function AlertsWorkspace({ servers, role, onBack }: {
       <div className="alerts-sections-grid">
         <section className="alert-list-card">
           <div className="panel-heading"><div><h2>Alert rules</h2><p>Installation-wide threshold policies</p></div></div>
-          {loading ? <div className="project-empty">Loading alert rules…</div> : rules.length === 0 ? <div className="project-empty">No alert rules configured.</div> : rules.map((rule) => {
+          {loading ? <div className="monitor-empty">Loading alert rules…</div> : rules.length === 0 ? <div className="monitor-empty">No alert rules configured.</div> : rules.map((rule) => {
             const metricDef = METRICS.find((item) => item.value === rule.metric_name);
             const server = servers.find((item) => item.id === rule.server_id);
             return <div className="alert-rule-row" key={rule.id}>
               <div><strong>{rule.name}</strong><small>{metricDef?.label ?? rule.metric_name} {rule.operator} {formatNumber(rule.threshold, metricDef?.unit ?? "")}</small><small>{server?.name ?? "All servers"}</small></div>
-              {canAdminister && <Button className="project-inline-delete" variant="destructive" size="sm" type="button" disabled={busy} onClick={() => void deleteRule(rule)}>Delete</Button>}
+              {canAdminister && <Button className="inline-text-action" variant="destructive" size="sm" type="button" disabled={busy} onClick={() => void deleteRule(rule)}>Delete</Button>}
             </div>;
           })}
         </section>
         <section className="alert-list-card">
           <div className="panel-heading"><div><h2>Recent events</h2><p>Firing and recovered transitions</p></div></div>
-          {loading ? <div className="project-empty">Loading alert events…</div> : events.length === 0 ? <div className="project-empty">No alert events recorded.</div> : events.map((item) => (
+          {loading ? <div className="monitor-empty">Loading alert events…</div> : events.length === 0 ? <div className="monitor-empty">No alert events recorded.</div> : events.map((item) => (
             <div className="alert-event-row" key={item.id}>
               <div><strong>{item.rule_name}</strong><small>{item.server_name} · {item.metric_name}</small><small>Last value {item.last_value.toLocaleString()} · {formatTime(item.last_observed_at)}</small></div>
               <span className={item.status === "firing" ? "alert-state alert-state-firing" : "alert-state alert-state-resolved"}>{item.status}</span>
@@ -161,10 +161,10 @@ export default function AlertsWorkspace({ servers, role, onBack }: {
       </div>
       <section className="alert-list-card alert-notifications-card">
         <div className="panel-heading"><div><h2>In-app notifications</h2><p>Notifications are stored in this installation</p></div><Button className="button button-secondary" variant="secondary" type="button" onClick={() => { void load(); }}>Refresh</Button></div>
-        {loading ? <div className="project-empty">Loading notifications…</div> : notifications.length === 0 ? <div className="project-empty">No notifications yet.</div> : notifications.map((item) => (
+        {loading ? <div className="monitor-empty">Loading notifications…</div> : notifications.length === 0 ? <div className="monitor-empty">No notifications yet.</div> : notifications.map((item) => (
           <div className={item.read_at ? "alert-notification-row" : "alert-notification-row alert-notification-unread"} key={item.id}>
             <div><strong>{item.title}</strong><p>{item.message}</p><small>{formatTime(item.created_at)}</small></div>
-            {!item.read_at && <Button className="project-inline-delete" variant="ghost" size="sm" type="button" onClick={() => void markRead(item)}>Mark read</Button>}
+            {!item.read_at && <Button className="inline-text-action" variant="ghost" size="sm" type="button" onClick={() => void markRead(item)}>Mark read</Button>}
           </div>
         ))}
       </section>
