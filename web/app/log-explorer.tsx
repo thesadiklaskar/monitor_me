@@ -14,7 +14,6 @@ import {
 } from "@/components/ui/table";
 
 type Server = { id: string; name: string; status: string };
-type Project = { id: string; name: string; slug: string };
 type LogEvent = {
   event_id: string;
   event_time_unix_nanos: number;
@@ -23,7 +22,6 @@ type LogEvent = {
   severity: string;
   body: string;
   attributes: Record<string, string>;
-  project_id?: string;
 };
 type LogResponse = { events: LogEvent[]; count: number; has_more: boolean };
 
@@ -51,20 +49,17 @@ function severityVariant(value: string): "default" | "secondary" | "destructive"
 
 export default function LogExplorer({
   servers,
-  projects,
   onBack,
 }: {
   servers: Server[];
-  projects: Project[];
   onBack: () => void;
 }) {
   const [serverId, setServerId] = useState(servers[0]?.id ?? "");
-  const [projectId, setProjectId] = useState("");
   const [range, setRange] = useState<Range>("1h");
   const [searchText, setSearchText] = useState("");
   const [sourceText, setSourceText] = useState("");
   const [severity, setSeverity] = useState("");
-  const [applied, setApplied] = useState({ search: "", source: "", severity: "", projectId: "" });
+  const [applied, setApplied] = useState({ search: "", source: "", severity: "" });
   const [events, setEvents] = useState<LogEvent[]>([]);
   const [selectedEvent, setSelectedEvent] = useState<LogEvent | null>(null);
   const [loading, setLoading] = useState(false);
@@ -106,7 +101,6 @@ export default function LogExplorer({
       to: window.to,
       limit: "201",
     });
-    if (applied.projectId) query.set("project_id", applied.projectId);
     if (applied.search) query.set("search", applied.search);
     if (applied.source) query.set("source", applied.source);
     if (applied.severity) query.set("severity", applied.severity);
@@ -130,7 +124,7 @@ export default function LogExplorer({
     } finally {
       if (requestId === requestSequence.current) setLoading(false);
     }
-  }, [serverId, projectId, range, applied]);
+  }, [serverId, range, applied]);
 
   useEffect(() => {
     const initial = window.setTimeout(() => { void loadLogs(); }, 0);
@@ -166,7 +160,6 @@ export default function LogExplorer({
       before_time: String(last.event_time_unix_micros),
       before_id: last.event_id,
     });
-    if (applied.projectId) query.set("project_id", applied.projectId);
     if (applied.search) query.set("search", applied.search);
     if (applied.source) query.set("source", applied.source);
     if (applied.severity) query.set("severity", applied.severity);
@@ -194,15 +187,14 @@ export default function LogExplorer({
   }, [serverId, events, hasMore, loadingMore, applied]);
 
   function applyFilters() {
-    setApplied({ search: searchText.trim(), source: sourceText.trim(), severity, projectId });
+    setApplied({ search: searchText.trim(), source: sourceText.trim(), severity });
   }
 
   function clearFilters() {
     setSearchText("");
     setSourceText("");
     setSeverity("");
-    setProjectId("");
-    setApplied({ search: "", source: "", severity: "", projectId: "" });
+    setApplied({ search: "", source: "", severity: "" });
   }
 
   return (
@@ -228,12 +220,6 @@ export default function LogExplorer({
             <select value={serverId} onChange={(event) => setServerId(event.target.value)}>
               <option value="">Select machine</option>
               {servers.map((server) => <option key={server.id} value={server.id}>{server.name} · {server.status}</option>)}
-            </select>
-          </label>
-          <label className="field"><span>Project</span>
-            <select value={projectId} onChange={(event) => setProjectId(event.target.value)}>
-              <option value="">All projects</option>
-              {projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
             </select>
           </label>
           <label className="field"><span>Time range</span>
