@@ -215,3 +215,29 @@ func TestProcCollectorEmitsAgentCPUAfterBaselineSnapshot(t *testing.T) {
 	}
 	t.Fatal("expected process CPU utilization after the baseline snapshot")
 }
+
+
+func TestClassifyEnvironmentTypeUsesExplicitHostSignals(t *testing.T) {
+	tests := []struct {
+		name                 string
+		virtualizationSystem string
+		virtualizationRole   string
+		inContainer          bool
+		cloudProviderHint    bool
+		want                 string
+	}{
+		{name: "container takes precedence", virtualizationSystem: "kvm", virtualizationRole: "guest", inContainer: true, cloudProviderHint: true, want: "container"},
+		{name: "cloud provider hint", cloudProviderHint: true, want: "cloud_vm"},
+		{name: "virtual machine guest", virtualizationSystem: "kvm", virtualizationRole: "guest", want: "virtual_machine"},
+		{name: "hypervisor host", virtualizationSystem: "kvm", virtualizationRole: "host", want: "virtual_machine"},
+		{name: "unknown physical", want: "physical_or_unknown"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got := classifyEnvironmentType(test.virtualizationSystem, test.virtualizationRole, test.inContainer, test.cloudProviderHint)
+			if got != test.want {
+				t.Fatalf("classifyEnvironmentType() = %q, want %q", got, test.want)
+			}
+		})
+	}
+}
