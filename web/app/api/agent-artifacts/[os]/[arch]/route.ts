@@ -21,7 +21,7 @@ export async function GET(_request: Request, context: RouteContext) {
   }
 
   const directory = process.env.MONITOR_ME_AGENT_ARTIFACT_DIR || "/app/.data/agent-artifacts";
-  const relativeFile = \`\${os}-\${arch}/\${filename}\`;
+  const relativeFile = `${os}-${arch}/${filename}`;
   try {
     const manifestRaw = await readFile(path.join(directory, "manifest.json"), "utf8");
     const manifest = JSON.parse(manifestRaw) as {
@@ -45,7 +45,7 @@ export async function GET(_request: Request, context: RouteContext) {
       headers: {
         "Content-Type": "application/octet-stream",
         "Content-Length": String(content.byteLength),
-        "Content-Disposition": \`attachment; filename="\${filename}"\`,
+        "Content-Disposition": `attachment; filename="${filename}"`,
         "Cache-Control": "public, max-age=300",
         "X-Content-Type-Options": "nosniff",
         "X-MonitorMe-SHA256": digest,
