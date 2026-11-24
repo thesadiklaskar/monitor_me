@@ -4,7 +4,7 @@
 **Planned work session:** 2026-11-23  
 **Target:** Complete Phase 4 — Dashboard and Operational Features before starting Phase 5.
 
-Phase 4 implementation started on 2026-11-23. Authentication and Add Server have historical CI evidence; the current dashboard now also includes server history/live metrics, project/mapping administration, alert/notification workflows, and allowlisted remote operations. Current acceptance and CI re-verification remain pending because the repository owner reports the Actions free-minute quota is exhausted. Continue directly on main; do not create a branch.
+Phase 4 implementation started on 2026-11-23. The former login/register slice has been removed from the product. The current dashboard opens in a single-install context and includes server history/live metrics, project/mapping administration, alert/notification workflows, and allowlisted remote operations; the no-login refactor still requires a fresh green CI run. Current acceptance and CI re-verification remain pending because the repository owner reports the Actions free-minute quota is exhausted. Continue directly on main; do not create a branch.
 
 ## 1. Required delivery order
 
@@ -22,12 +22,11 @@ The existing Windows/macOS and fleet-scale roadmap items remain documented as br
 
 ## 2. Current implementation baseline
 
-The frontend now includes login/first-owner setup, server inventory/enrollment, server-detail historical charts and live WebSocket updates, project/mapping administration, alert rules and in-app notifications, and a remote-operations workspace. The backend provides these API foundations:
+The frontend now opens directly into a single-install dashboard with server inventory/enrollment, server-detail historical charts and live WebSocket updates, project/mapping administration, alert rules and in-app notifications, and a remote-operations workspace. No user login, signup, logout, profile or organization-creation route is part of this product mode. The backend provides these API foundations:
 
 | Capability | Existing endpoint | UI work required |
 | --- | --- | --- |
-| Initial owner bootstrap | POST /v1/auth/register | First-run setup guidance; do not present registration as an open public signup flow |
-| Login and current session | POST /v1/auth/login, GET /v1/auth/me, POST /v1/auth/logout | Login form, safe session handling, logout, expired-session behavior |
+| Single-install bootstrap | GET /v1/installation | Initialize the local installation context without signup, login or organization selection |
 | Server inventory | GET /v1/servers | Inventory page, loading/empty/error states, server status/last-seen display |
 | Add Server | POST /v1/servers | Form, one-time enrollment-token handling, copyable Linux install/enrollment instructions |
 | Reissue/revoke credentials | POST /v1/servers/{serverID}/enrollment-token, POST /v1/enrollment-tokens/{tokenID}/revoke | Authorized credential lifecycle controls and clear expiry/revocation feedback |
@@ -39,28 +38,28 @@ The frontend now includes login/first-owner setup, server inventory/enrollment, 
 
 The existing historical query is bounded: 100ms minimum aggregation step, 30-day raw range, and at most 5,000 output points. The live ticket is single-use and expires after 30 seconds. The UI must request a fresh ticket after reconnect; it must not store or reuse a consumed ticket.
 
-Project mapping administration, alert evaluation/in-app notifications, and constrained remote systemd operations now have backend/UI paths. Remote execution still requires owner/admin authorization, a configured REMOTE_ALLOWED_SYSTEMD_UNITS allowlist, a recent online agent, and an end-to-end result/audit acceptance test. External notification-provider delivery, application HTTP request metrics, and one-command agent installation are not complete. The current gRPC stream carries telemetry batches; remote systemd operations use the existing authenticated agent-control command path. Do not simulate these features with hard-coded dashboard values.
+Project mapping administration, alert evaluation/in-app notifications, and constrained remote systemd operations now have backend/UI paths. Remote execution is available to the trusted installation operator, but still requires a configured REMOTE_ALLOWED_SYSTEMD_UNITS allowlist, a recent online agent, and an end-to-end result/audit acceptance test. External notification-provider delivery, application HTTP request metrics, and one-command agent installation are not complete. The current gRPC stream carries telemetry batches; remote systemd operations use the agent's authenticated device credential and installation-level command path. Do not simulate these features with hard-coded dashboard values.
 
 ## 3. Phase 4 implementation order
 
-### Slice 1 — Authentication and application shell
+### Slice 1 — No-login single-install shell
 
-**Implemented and CI-verified in run #45188259431:** first-owner setup, login, logout, current-session lookup, and the authenticated application shell are in place. The bearer credential is held in a server-set HttpOnly cookie.
+**Implementation committed; fresh CI/runtime acceptance pending:** the browser login/register screens and API endpoints have been removed. The web dashboard requests `/api/installation`, and the backend resolves one implicit local installation context. No browser session cookie or account is required.
 
-- Build login and initial owner setup guidance around the existing API.
-- Implement session handling without putting bearer tokens in URLs, browser logs, or persistent unencrypted storage.
-- Add authenticated route handling, logout, expired-session redirects, and loading/error states.
-- Keep API errors understandable without exposing secrets or internal details.
+- Keep local management ports loopback-bound.
+- Keep all normal operator APIs behind the production Nginx administrator/VPN allowlist; do not expose owner-level installation capabilities publicly.
+- Test first startup against an empty database and a database created by the previous version.
+- Verify loading, unavailable, and recovery states without introducing a login fallback.
 
 ### Slice 2 — Server inventory and Add Server
 
-**Implemented and CI-verified in run #45188259431:** organization-scoped server inventory, empty/loading/error states, server creation, one-time token display/copy/expiry, token rotation and role-aware revoke controls are in place. Reissuing a token revokes prior unused credentials transactionally. Agent deployment remains guided/manual; a fully automated installer is not yet claimed.
+**Historical implementation retained under one implicit installation context:** server inventory, empty/loading/error states, server creation, one-time token display/copy/expiry, token rotation and revoke controls are in place. Reissuing a token revokes prior unused credentials transactionally. Agent deployment remains guided/manual; a fully automated installer is not yet claimed.
 
-- Build organization-scoped inventory with empty, loading, error, connected, stale, and disconnected states based only on available backend fields.
+- Build single-install inventory with empty, loading, error, connected, stale, and disconnected states based only on available backend fields.
 - Implement Add Server using the existing create-server endpoint.
 - Display the returned enrollment token only once; support explicit copy and expiry information.
 - Generate an installation/enrollment command from the actual configured control-plane address and CA instructions. Never embed a reusable secret in a committed file or log.
-- Add safe reissue/revoke flows with role-aware UI feedback.
+- Add safe reissue/revoke flows for the trusted installation operator. The deployment network boundary, not browser accounts, controls access.
 
 ### Slice 3 — Server detail and monitoring dashboard
 
@@ -82,11 +81,11 @@ Project mapping administration, alert evaluation/in-app notifications, and const
 - Add supported process/port/connection/workload views.
 - Alert rules, recovery events and persisted in-app notifications are implemented; external provider delivery and its retries remain open.
 - The remote-operations UI and same-origin proxy routes are implemented over the API/agent allowlist and audit path. Verify queue, dispatch, completion, expiry, failure, and role-denial behavior end to end. No arbitrary remote shell is provided.
-- The guided one-command Linux agent installation workflow and broader user/role administration remain open.
+- The guided one-command Linux agent installation workflow remains open. User, login, membership and organization administration are out of scope for the self-hosted single-install product.
 
 ### Slice 6 — Phase 4 verification and documentation
 
-- Add component/API/integration tests for normal, empty, stale, unauthorized, expired, reconnect, and failure states.
+- Add component/API/integration tests for normal, empty, stale, missing installation dependencies, invalid agent credentials, expired enrollment, reconnect, and failure states.
 - Verify dashboard values and attribution against backend fixtures and actual telemetry ingestion.
 - Run Go tests/race tests/vet/build, frontend lint/typecheck/production build, and the complete Compose integration pipeline.
 - Update README, the feature acceptance matrix, roadmap, and project state from the test evidence.
@@ -96,7 +95,7 @@ Project mapping administration, alert evaluation/in-app notifications, and const
 
 Use a clean local environment and a real Linux agent host. Verify:
 
-- Local control-plane startup, first-owner setup, login, logout, and session expiry behavior.
+- Local control-plane startup into the dashboard with no account-creation or login prompt; verify restart and database recovery.
 - Add Server, one-time token display, token expiry/reissue/revocation, and enrollment.
 - Agent heartbeat and server last-seen/connection status.
 - Live and historical CPU, memory, disk, network, process, and TCP/listening-port views.
