@@ -59,7 +59,6 @@ type Batch struct {
 type Query struct {
 	OrganizationID string
 	ServerID string
-	ProjectID string
 	From time.Time
 	To time.Time
 	Search string
@@ -78,7 +77,6 @@ type Result struct {
 	Severity string `json:"severity"`
 	Body string `json:"body"`
 	Attributes map[string]string `json:"attributes"`
-	ProjectID string `json:"project_id,omitempty"`
 }
 
 type Config struct {
@@ -129,7 +127,7 @@ func New(ctx context.Context, db *sql.DB, cfg Config) (*Store, error) {
 		"organization_id UUID, server_id UUID, agent_id UUID, batch_id String, event_id String, "+
 		"event_time DateTime64(6, 'UTC'), observed_at DateTime64(6, 'UTC'), "+
 		"source LowCardinality(String), severity LowCardinality(String), "+
-		"body String CODEC(ZSTD(3)), attributes Map(String, String), project_id Nullable(UUID), "+
+		"body String CODEC(ZSTD(3)), attributes Map(String, String), "+
 		"received_at DateTime64(3, 'UTC') DEFAULT now64(3)"+
 		") ENGINE = ReplacingMergeTree(received_at) "+
 		"PARTITION BY toYYYYMM(event_time) "+
@@ -138,6 +136,10 @@ func New(ctx context.Context, db *sql.DB, cfg Config) (*Store, error) {
 		"SETTINGS index_granularity = 8192"
 	if err := store.execute(ctx, createTable, nil); err != nil {
 		return nil, fmt.Errorf("initialize ClickHouse logs table: %w", err)
+	}
+	// Upgrade installations created before project attribution was removed.
+	if err := store.execute(ctx, "ALTER TABLE "+database+".logs DROP COLUMN IF EXISTS project_id", nil); err != nil {
+		return nil, fmt.Errorf("remove legacy ClickHouse project column: %w", err)
 	}
 	return store, nil
 }
@@ -251,20 +253,8 @@ func (s *Store) Ingest(ctx context.Context, agentID, sessionToken string, batch 
 		return false, "", fmt.Errorf("check log batch idempotency: %w", err)
 	}
 
-	projectByUnit, err := s.projectMappings(ctx, tx, organizationID, serverID)
-	if err != nil {
-		return false, "", err
-	}
 	rows := make([]clickHouseRow, 0, len(batch.Events))
 	for _, event := range batch.Events {
-		projectID := projectByUnit[event.Attributes["systemd_unit"]]
-		if projectID == "" {
-			projectID = projectByUnit[event.Attributes["systemd_cgroup"]]
-		}
-		var nullableProject *string
-		if projectID != "" {
-			nullableProject = &projectID
-		}
 		attributes := event.Attributes
 		if attributes == nil {
 			attributes = map[string]string{}
@@ -273,7 +263,7 @@ func (s *Store) Ingest(ctx context.Context, agentID, sessionToken string, batch 
 			OrganizationID: organizationID, ServerID: serverID, AgentID: agentID, BatchID: batch.ID,
 			EventID: event.ID, EventTime: clickHouseTime(event.EventTimeUnixNanos),
 			ObservedAt: clickHouseTime(event.ObservedAtUnixNanos), Source: event.Source,
-			Severity: event.Severity, Body: event.Body, Attributes: attributes, ProjectID: nullableProject,
+			Severity: event.Severity, Body: event.Body, Attributes: attributes,
 		})
 	}
 	if err := s.insertRows(ctx, rows); err != nil {
@@ -307,30 +297,6 @@ func (s *Store) Ingest(ctx context.Context, agentID, sessionToken string, batch 
 	return true, "", nil
 }
 
-func (s *Store) projectMappings(ctx context.Context, tx *sql.Tx, organizationID, serverID string) (map[string]string, error) {
-	rows, err := tx.QueryContext(ctx, `
-		SELECT workload_selector, project_id::text
-		FROM server_project_mappings
-		WHERE organization_id = $1 AND server_id = $2 AND workload_type = 'systemd'
-	`, organizationID, serverID)
-	if err != nil {
-		return nil, fmt.Errorf("load log project mappings: %w", err)
-	}
-	defer rows.Close()
-	result := make(map[string]string)
-	for rows.Next() {
-		var selector, projectID string
-		if err := rows.Scan(&selector, &projectID); err != nil {
-			return nil, fmt.Errorf("scan log project mapping: %w", err)
-		}
-		result[selector] = projectID
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate log project mappings: %w", err)
-	}
-	return result, nil
-}
-
 type clickHouseRow struct {
 	OrganizationID string `json:"organization_id"`
 	ServerID string `json:"server_id"`
@@ -343,7 +309,6 @@ type clickHouseRow struct {
 	Severity string `json:"severity"`
 	Body string `json:"body"`
 	Attributes map[string]string `json:"attributes"`
-	ProjectID *string `json:"project_id"`
 }
 
 func clickHouseTime(unixNanos int64) string {
@@ -400,7 +365,6 @@ func (s *Store) execute(ctx context.Context, query string, body io.Reader) error
 
 func (s *Store) Query(ctx context.Context, query Query) ([]Result, error) {
 	if !validUUID(query.OrganizationID) || !validUUID(query.ServerID) ||
-		(query.ProjectID != "" && !validUUID(query.ProjectID)) ||
 		query.From.IsZero() || query.To.IsZero() || !query.From.Before(query.To) ||
 		query.To.After(time.Now().UTC().Add(time.Minute)) ||
 		query.To.Sub(query.From) > maxQueryRange ||
@@ -419,7 +383,7 @@ func (s *Store) Query(ctx context.Context, query Query) ([]Result, error) {
 	}
 	sqlText := "SELECT event_id, toUnixTimestamp64Nano(event_time) AS event_time_unix_nanos, "+
 		"toUnixTimestamp64Micro(event_time) AS event_time_unix_micros, "+
-		"source, severity, body, attributes, ifNull(toString(project_id), '') AS project_id "+
+		"source, severity, body, attributes "+
 		"FROM "+s.database+".logs FINAL "+
 		"WHERE organization_id = {org_id:UUID} AND server_id = {server_id:UUID} "+
 		"AND event_time >= {from:DateTime64(6, 'UTC')} AND event_time < {to:DateTime64(6, 'UTC')} "+
@@ -435,10 +399,6 @@ func (s *Store) Query(ctx context.Context, query Query) ([]Result, error) {
 		"param_severity": {query.Severity},
 		"param_source": {query.Source},
 		"param_limit": {strconv.Itoa(query.Limit)},
-	}
-	if query.ProjectID != "" {
-		sqlText += " AND project_id = {project_id:UUID}"
-		params.Set("param_project_id", query.ProjectID)
 	}
 	if query.BeforeTimeUnixMicros > 0 {
 		sqlText += " AND tuple(event_time, event_id) < tuple(fromUnixTimestamp64Micro({before_time:Int64}), {before_event_id:String})"
