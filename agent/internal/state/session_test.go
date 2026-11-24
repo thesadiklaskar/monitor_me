@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 )
@@ -37,14 +38,15 @@ func TestCredentialsSurviveRestartWithPrivatePermissions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if info.Mode().Perm() != 0o600 {
+	// Windows exposes ACLs rather than POSIX permission bits through FileMode.
+	if runtime.GOOS != "windows" && info.Mode().Perm() != 0o600 {
 		t.Fatalf("credential file mode = %o, want 600", info.Mode().Perm())
 	}
 	dirInfo, err := os.Stat(filepath.Dir(path))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if dirInfo.Mode().Perm() != 0o700 {
+	if runtime.GOOS != "windows" && dirInfo.Mode().Perm() != 0o700 {
 		t.Fatalf("credential directory mode = %o, want 700", dirInfo.Mode().Perm())
 	}
 }
@@ -57,17 +59,22 @@ func TestLoadRejectsSymlinkAndInsecurePermissions(t *testing.T) {
 	}
 	link := filepath.Join(directory, "link")
 	if err := os.Symlink(target, link); err != nil {
+		if runtime.GOOS == "windows" {
+			t.Skipf("creating symlinks on Windows requires Developer Mode or elevation: %v", err)
+		}
 		t.Fatal(err)
 	}
 	if _, err := Load(link); err == nil {
 		t.Fatal("credential symlink must be rejected")
 	}
-	path := filepath.Join(directory, "insecure.json")
-	if err := os.WriteFile(path, []byte("{}"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := Load(path); err == nil {
-		t.Fatal("credential file readable by other users must be rejected")
+	if runtime.GOOS != "windows" {
+		path := filepath.Join(directory, "insecure.json")
+		if err := os.WriteFile(path, []byte("{}"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := Load(path); err == nil {
+			t.Fatal("credential file readable by other users must be rejected")
+		}
 	}
 }
 
