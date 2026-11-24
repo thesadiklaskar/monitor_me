@@ -237,7 +237,7 @@ func runRemote(ctx context.Context, cfg config.Config, capabilities []string, st
 				}
 			case <-deliveryTicker.C:
 				callContext, cancel := context.WithTimeout(ctx, 30*time.Second)
-				sent, sendErr := client.SendPending(callContext, session, store, cfg.AllowedSystemdUnits)
+				sent, sendErr := client.SendPending(callContext, session, store)
 				if sent > 0 {
 					healthState.MarkSuccessfulSend(time.Now().UTC())
 					logger.Debug("telemetry batches acknowledged by control plane", "batch_count", sent)
