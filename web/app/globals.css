@@ -135,10 +135,7 @@ tbody tr:hover { background:rgba(142,205,196,.025); }
   .app-shell { display:block; }
   .sidebar { position:relative; width:100%; height:auto; padding:15px; border-right:0; border-bottom:1px solid var(--border); }
   .sidebar-brand { padding-bottom:13px; }
-  .installation-indicator { margin:12px 0; }
   .side-nav { display:none; }
-  .sidebar-bottom { margin-top:5px; }
-  .sidebar-status { padding:7px 4px; }
   .dashboard-main { padding:20px 14px; }
   .topbar { align-items:flex-start; }
   .topbar-actions { width:100%; }
@@ -381,8 +378,6 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   box-shadow: 12px 0 36px rgba(0, 0, 0, .10);
 }
 .sidebar-brand { padding-bottom: 21px; }
-.brand-mark { box-shadow: inset 0 0 18px rgba(142,205,196,.06), 0 8px 20px rgba(0,0,0,.16); }
-.installation-indicator { border-color: rgba(65, 87, 113, .62); background: linear-gradient(145deg, #142337, #101c2b); }
 .nav-item { min-height: 42px; transition: background 140ms ease, color 140ms ease, border-color 140ms ease; }
 .nav-item:not(.nav-item-disabled):hover { background: rgba(136, 160, 190, .08); color: #edf4fc; }
 .nav-item-active { box-shadow: inset 2px 0 0 var(--accent); }
@@ -472,13 +467,10 @@ td { padding-top: 15px; padding-bottom: 15px; }
   .app-shell { display: block; }
   .sidebar { position: relative; width: 100%; height: auto; padding: 14px 16px 10px; border-right: 0; border-bottom: 1px solid var(--border); }
   .sidebar-brand { padding-bottom: 12px; }
-  .installation-indicator { margin: 10px 0 12px; }
   .side-nav { display: flex; flex-direction: row; gap: 6px; overflow-x: auto; padding: 2px 0 7px; scrollbar-width: thin; }
   .nav-section-label { display: none; }
   .nav-item { flex: 0 0 auto; min-height: 36px; padding: 0 11px; white-space: nowrap; }
   .nav-item-disabled { display: none; }
-  .sidebar-bottom { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 3px; }
-  .sidebar-status { padding: 4px 2px; }
   .dashboard-main { padding: 20px 16px 28px; }
   .topbar { top: 0; margin: -20px -16px 0; padding: 17px 16px 15px; }
   .topbar h1 { font-size: 23px; }
@@ -491,7 +483,6 @@ td { padding-top: 15px; padding-bottom: 15px; }
   .topbar-actions > * { flex: 1 1 auto; }
   .live-label { flex-basis: 100%; }
   .platform-choice-grid { grid-template-columns: 1fr; }
-  .sidebar-bottom { align-items: stretch; flex-direction: column; }
   .modal-backdrop { padding: 12px; }
   .modal-card { max-height: calc(100vh - 24px); padding: 19px; }
 }
@@ -631,7 +622,6 @@ body {
   border-color: #39485a;
 }
 .sidebar-brand { padding-bottom: 20px; }
-.installation-indicator { background: #202a38; border-color: #3a495b; }
 .side-nav { gap: 7px; }
 .nav-section-label { color: #a8b4c5; font-size: 10px; letter-spacing: .10em; }
 .nav-item { width: 100%; min-height: 44px; gap: 12px; padding: 0 12px; color: #c5cfdb; font-size: 13px; }
@@ -640,7 +630,6 @@ body {
 .nav-item-active { border-color: rgba(142,205,196,.24); background: rgba(142,205,196,.12); color: #dff2ee; }
 .nav-item-active .nav-item-icon { color: #a3d8d0; }
 .nav-item:not(.nav-item-disabled):hover { background: rgba(142,205,196,.08); color: #eff8f6; }
-.sidebar-status { color: #aab6c6; font-size: 11px; }
 .summary-card,.inventory-panel,.metric-panel,.log-results-card,.dashboard-list-card,.dashboard-panel-card {
   background-color: #1a2430;
   border-color: #39485a;
@@ -679,8 +668,6 @@ input:focus-visible,textarea:focus-visible,select:focus-visible,button:focus-vis
   .nav-section-label { display: none; }
   .nav-item { width: auto; min-height: 40px; flex: 0 0 auto; justify-content: flex-start; padding: 0 12px; }
   .nav-item-label { min-width: 0; }
-  .sidebar-bottom { margin-top: 4px; }
-  .sidebar-status { padding: 4px 2px; }
 }
 
 
@@ -713,13 +700,9 @@ input:focus-visible,textarea:focus-visible,select:focus-visible,button:focus-vis
 
 /* Readability pass: clear navigation, tables and controls at normal viewing distance. */
 body { font-size: 14px; line-height: 1.5; }
-.installation-indicator { align-items: center; }
-.installation-indicator strong { max-width: none; font-size: 12px; line-height: 1.35; }
-.installation-indicator span:not(.installation-indicator-icon):not(.chevron) { font-size: 11px; }
 .nav-section-label { font-size: 10px; letter-spacing: .12em; }
 .nav-item { min-height: 46px; font-size: 14px; }
 .nav-item-label { overflow: visible; text-overflow: clip; }
-.sidebar-status { font-size: 11px; }
 .breadcrumbs { font-size: 11px; }
 .live-label { font-size: 12px; }
 .welcome-strip p { font-size: 13px; line-height: 1.55; }
@@ -843,7 +826,6 @@ td { font-size: 13px; }
   .sidebar-collapsed .nav-item-label { display: inline; }
   .sidebar-collapsed .nav-item-icon { width: 19px; flex-basis: 19px; }
   .nav-item { flex: 0 0 auto; width: auto; min-height: 42px; justify-content: flex-start; padding: 0 12px; white-space: nowrap; }
-  .sidebar-bottom { display: none; }
   .topbar { margin-top: -20px; }
   .log-explorer-header,.dashboards-view-header,.alerts-view-header { align-items: flex-start; flex-direction: column; gap: 14px; }
   .log-explorer-header-actions,.dashboards-header-actions { width: 100%; }
