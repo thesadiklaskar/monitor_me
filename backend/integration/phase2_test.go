@@ -307,29 +307,10 @@ func TestSingleInstallAndAgentLifecycle(t *testing.T) {
 		t.Fatalf("open authenticated telemetry stream: %v", err)
 	}
 
-	// Create a project mapping so ingestion proves that workload selectors are
-	// attributed only through an organization-scoped mapping.
-	var projectID string
-	if err := database.QueryRowContext(ctx, `
-		INSERT INTO projects (organization_id, name, slug)
-		VALUES ($1, 'Phase Three Project', 'phase-three-project')
-		RETURNING id::text
-	`, organizationID).Scan(&projectID); err != nil {
-		t.Fatalf("create project for workload attribution: %v", err)
-	}
-	if _, err := database.ExecContext(ctx, `
-		INSERT INTO server_project_mappings (
-			organization_id, server_id, project_id, workload_type, workload_selector, attribution_method
-		)
-		VALUES ($1, $2, $3, 'systemd', '/system.slice/example.service', 'systemd')
-	`, organizationID, serverID, projectID); err != nil {
-		t.Fatalf("create Systemd project mapping: %v", err)
-	}
-
 	// Saved dashboards and panels are durable, organization-scoped resources.
 	dashboardCreate := requestJSON(t, ctx, http.MethodPost, baseURL+"/v1/dashboards", map[string]any{
 		"name": "Infrastructure Overview", "description": "Production host signals",
-		"project_id": projectID, "is_default": true,
+		"is_default": true,
 	})
 	if dashboardCreate.StatusCode != http.StatusCreated {
 		t.Fatalf("owner dashboard creation: expected 201, got %d: %s", dashboardCreate.StatusCode, dashboardCreate.Body)
@@ -348,7 +329,7 @@ func TestSingleInstallAndAgentLifecycle(t *testing.T) {
 	panelCreate := requestJSON(t, ctx, http.MethodPost,
 		baseURL+"/v1/dashboards/"+createdDashboard.Dashboard.ID+"/panels", map[string]any{
 			"title": "Host CPU", "visualization": "timeseries", "server_id": serverID,
-			"project_id": projectID, "metric_name": "host.cpu.utilization", "time_range": "1h", "position": 0,
+			"metric_name": "host.cpu.utilization", "time_range": "1h", "position": 0,
 		})
 	if panelCreate.StatusCode != http.StatusCreated {
 		t.Fatalf("owner dashboard panel creation: expected 201, got %d: %s", panelCreate.StatusCode, panelCreate.Body)
@@ -358,14 +339,12 @@ func TestSingleInstallAndAgentLifecycle(t *testing.T) {
 			ID          string `json:"id"`
 			DashboardID string `json:"dashboard_id"`
 			ServerID    string `json:"server_id"`
-			ProjectID   string `json:"project_id"`
 			MetricName  string `json:"metric_name"`
 		} `json:"panel"`
 	}
 	decodeResponse(t, panelCreate.Body, &createdPanel)
 	if createdPanel.Panel.ID == "" || createdPanel.Panel.DashboardID != createdDashboard.Dashboard.ID ||
-		createdPanel.Panel.ServerID != serverID || createdPanel.Panel.ProjectID != projectID ||
-		createdPanel.Panel.MetricName != "host.cpu.utilization" {
+		createdPanel.Panel.ServerID != serverID || createdPanel.Panel.MetricName != "host.cpu.utilization" {
 		t.Fatalf("dashboard panel creation returned incomplete or mis-scoped data: %#v", createdPanel.Panel)
 	}
 	secondPanelCreate := requestJSON(t, ctx, http.MethodPost,
@@ -833,17 +812,17 @@ func TestSingleInstallAndAgentLifecycle(t *testing.T) {
 			aggregateCount, minimum, maximum, weightedSum/float64(aggregateCount))
 	}
 
-	var mappedProject, attributionMethod string
+	var attributionMethod string
 	if err := database.QueryRowContext(ctx, `
-		SELECT project_id::text, attribution_method
+		SELECT attribution_method
 		FROM telemetry_samples
 		WHERE agent_id = $1 AND batch_id = $2
 		  AND metric_name = 'process.memory.rss' AND labels->>'pid' = '123'
-	`, enrolled.GetAgentId(), batchID).Scan(&mappedProject, &attributionMethod); err != nil {
-		t.Fatalf("query workload-attributed telemetry: %v", err)
+	`, enrolled.GetAgentId(), batchID).Scan(&attributionMethod); err != nil {
+		t.Fatalf("query workload attribution metadata: %v", err)
 	}
-	if mappedProject != projectID || attributionMethod != "systemd" {
-		t.Fatalf("unexpected workload attribution: project=%s method=%s", mappedProject, attributionMethod)
+	if attributionMethod != "unclassified" {
+		t.Fatalf("unmapped workload must remain explicitly unclassified, got %s", attributionMethod)
 	}
 	var unclassifiedCount, sharedCount, hostTotalCount int
 	if err := database.QueryRowContext(ctx, `
