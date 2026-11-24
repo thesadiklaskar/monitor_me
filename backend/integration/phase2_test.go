@@ -396,6 +396,15 @@ func TestSingleInstallAndAgentLifecycle(t *testing.T) {
 		t.Fatalf("dashboard panel reorder was not persisted: %#v", orderedPanels)
 	}
 
+	tablePanelCreate := requestJSON(t, ctx, http.MethodPost,
+		baseURL+"/v1/dashboards/"+createdDashboard.Dashboard.ID+"/panels", map[string]any{
+			"title": "Network traffic table", "visualization": "table", "server_id": serverID,
+			"metric_name": "host.network.receive.bytes_per_second", "time_range": "1h", "position": 2,
+		})
+	if tablePanelCreate.StatusCode != http.StatusCreated {
+		t.Fatalf("create table dashboard panel: expected 201, got %d: %s", tablePanelCreate.StatusCode, tablePanelCreate.Body)
+	}
+
 	ticketResponse := requestJSON(t, ctx, http.MethodPost, baseURL+"/v1/live/ticket", map[string]any{})
 	if ticketResponse.StatusCode != http.StatusCreated {
 		t.Fatalf("create live ticket: expected 201, got %d: %s", ticketResponse.StatusCode, ticketResponse.Body)
