@@ -22,7 +22,7 @@ Monitor Me is an original monitoring product. It does not embed Grafana, Prometh
 |---|---|---|
 | Machine inventory | Enrolment tokens, machine status, agent heartbeat and credential rotation | The owner must keep the dashboard protected by the configured network allowlist |
 | Host metrics | CPU, memory, swap, disk, network, uptime, process count and selected process/socket metadata | Metric availability differs by OS; no eBPF or HTTP request tracing |
-| Metric dashboards | Saved installation-wide dashboards, time-series/stat panels, historical averages and min/max ranges | No drag/resize grid, template variables, annotations, table/log panels or advanced query editor yet |
+| Metric dashboards | Saved installation-wide dashboards, time-series/stat/table panels, historical averages and min/max ranges, persisted up/down ordering | No drag/resize grid, template variables, annotations, log panels or advanced query editor yet |
 | Live metrics | Authenticated agent stream, bounded WebSocket updates and historical catch-up | Live freshness depends on agent sampling, storage and network; no zero-latency guarantee |
 | Logs | Linux journald ingestion through bounded local spool and ClickHouse search; time/severity/source filters and paged results | The UI's 10-second auto-refresh is HTTP polling, not push-based live tail. General file/syslog tail and rotation support are not delivered. Windows Event Log source code needs runtime acceptance |
 | Alerts | Metric threshold rules, firing/recovered events and in-app notifications | External email/chat notification providers are not implemented |
