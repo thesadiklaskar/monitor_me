@@ -22,7 +22,6 @@ type LiveDependencies struct {
 	Telemetry              *telemetry.Store
 	AllowedOrigins         []string
 	RemoteAllowedUnits     []string
-	DisableAuthentication  bool
 	Logs                   *logstore.Store
 }
 
@@ -37,7 +36,6 @@ func NewRouter(version string, dependencies []Dependency, identities *identity.S
 		api := &API{identities: identities}
 		if len(live) > 0 {
 			api.allowedRemoteUnits = append([]string(nil), live[0].RemoteAllowedUnits...)
-			api.disableAuthentication = live[0].DisableAuthentication
 			api.cache = live[0].Cache
 			api.telemetry = live[0].Telemetry
 			api.logs = live[0].Logs
@@ -46,15 +44,7 @@ func NewRouter(version string, dependencies []Dependency, identities *identity.S
 				api.allowedLiveOrigins[origin] = struct{}{}
 			}
 		}
-		if api.disableAuthentication {
-			mux.HandleFunc("POST /v1/auth/register", api.authenticationDisabled)
-			mux.HandleFunc("POST /v1/auth/login", api.authenticationDisabled)
-		} else {
-			mux.HandleFunc("POST /v1/auth/register", api.register)
-			mux.HandleFunc("POST /v1/auth/login", api.login)
-		}
-		mux.Handle("GET /v1/auth/me", api.requireAuth(http.HandlerFunc(api.me)))
-		mux.Handle("POST /v1/auth/logout", api.requireAuth(http.HandlerFunc(api.logout)))
+		mux.Handle("GET /v1/installation", api.requireAuth(http.HandlerFunc(api.installation)))
 		mux.Handle("GET /v1/remote-operations/config", api.requireAuth(http.HandlerFunc(api.remoteOperationConfig)))
 		mux.Handle("GET /v1/remote-operations", api.requireAuth(http.HandlerFunc(api.listRemoteOperations)))
 		mux.Handle("POST /v1/servers/{serverID}/remote-operations", api.requireAuth(http.HandlerFunc(api.createRemoteOperation)))
