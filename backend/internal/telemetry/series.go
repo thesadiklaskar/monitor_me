@@ -18,13 +18,11 @@ const (
 
 var (
 	seriesMetricName = regexp.MustCompile("^[a-zA-Z][a-zA-Z0-9_.-]{0,127}$")
-	seriesUUID       = regexp.MustCompile("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$")
 )
 
 type RangeQuery struct {
 	OrganizationID string
 	ServerID       string
-	ProjectID      string
 	MetricName     string
 	From           time.Time
 	To             time.Time
@@ -43,9 +41,6 @@ type SeriesPoint struct {
 func ValidateRangeQuery(query RangeQuery, now time.Time) error {
 	if query.OrganizationID == "" || query.ServerID == "" || !seriesMetricName.MatchString(query.MetricName) {
 		return errors.New("organization, server, and valid metric name are required")
-	}
-	if query.ProjectID != "" && !seriesUUID.MatchString(query.ProjectID) {
-		return errors.New("project ID must be a valid UUID")
 	}
 	if query.From.IsZero() || query.To.IsZero() || !query.From.Before(query.To) ||
 		query.To.After(now.Add(time.Minute)) || query.To.Sub(query.From) > maximumSeriesRange {
@@ -99,12 +94,11 @@ func QueryRange(ctx context.Context, db *sql.DB, query RangeQuery) ([]SeriesPoin
 		  AND metric_name = $4
 		  AND observed_at >= $5
 		  AND observed_at < $6
-		  AND ($8::uuid IS NULL OR project_id = $8::uuid)
 		GROUP BY bucket
 		ORDER BY bucket
 		LIMIT $7
 	`, interval, query.OrganizationID, query.ServerID, query.MetricName,
-		query.From.UTC(), query.To.UTC(), query.Limit, nullableProjectID(query.ProjectID))
+		query.From.UTC(), query.To.UTC(), query.Limit)
 	if err != nil {
 		return nil, fmt.Errorf("query aggregated telemetry series: %w", err)
 	}
@@ -124,9 +118,3 @@ func QueryRange(ctx context.Context, db *sql.DB, query RangeQuery) ([]SeriesPoin
 	return points, nil
 }
 
-func nullableProjectID(value string) any {
-	if value == "" {
-		return nil
-	}
-	return value
-}
