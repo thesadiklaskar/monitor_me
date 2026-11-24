@@ -78,7 +78,10 @@ if [[ "$ROLE" == "agent-only" ]]; then
 fi
 (${#ADMIN_CIDRS[@]} > 0) || { echo "Control-plane mode requires --admin-cidr; SSH must never be opened to the world." >&2; exit 2; }
 for cidr in "${ADMIN_CIDRS[@]}" "${GRPC_CIDRS[@]}"; do
-  python3 -c 'import ipaddress,sys; ipaddress.ip_network(sys.argv[1], strict=False)' "$cidr" || { echo "Invalid administrator CIDR: $cidr" >&2; exit 2; }
+  python3 -c 'import ipaddress,sys; network=ipaddress.ip_network(sys.argv[1], strict=False); sys.exit(1 if network.prefixlen == 0 else 0)' "$cidr" || {
+    echo "Invalid or unrestricted CIDR (default routes are not allowed): $cidr" >&2
+    exit 2
+  }
 done
 if [[ "$MANAGER" == "auto" ]]; then
   ufw_active=false; firewalld_active=false
