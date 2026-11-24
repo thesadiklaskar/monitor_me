@@ -66,10 +66,12 @@ func run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	journal := logcollector.NewJournal()
 	capabilities := append([]string(nil), hostCollector.Capabilities()...)
 	if journal.Available() {
-		capabilities = append(capabilities, "logs.journald")
-		logger.Info("Linux journald collection enabled", "log_spool_directory", cfg.LogSpoolDirectory)
+		capabilities = append(capabilities, journal.Capability())
+		logger.Info("native event log collection enabled", "capability", journal.Capability(), "log_spool_directory", cfg.LogSpoolDirectory)
 	} else if runtime.GOOS == "linux" {
 		logger.Warn("journalctl not found; host metrics remain active but journald collection is unavailable")
+	} else if runtime.GOOS == "windows" {
+		logger.Warn("PowerShell event-log reader not found; host metrics remain active but Windows Event Log collection is unavailable")
 	}
 	healthState := health.New()
 	logger.Info("native monitoring agent started",
@@ -85,7 +87,7 @@ func run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 
 	ticker := time.NewTicker(cfg.CollectionInterval)
 	defer ticker.Stop()
-	logTicker := time.NewTicker(2 * time.Second)
+	logTicker := time.NewTicker(journal.PollInterval())
 	defer logTicker.Stop()
 	for {
 		select {

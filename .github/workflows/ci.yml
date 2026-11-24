@@ -117,6 +117,7 @@ jobs:
         run: |
           go build -trimpath -o /tmp/monitor-me-agent.exe ./cmd/monitor-agent
           go test -c -o /tmp/monitor-me-agent.test.exe ./cmd/monitor-agent
+          go test -c -o /tmp/monitor-me-logcollector.test.exe ./internal/logcollector
       - name: Cross-compile Linux ARM64 agent
         working-directory: agent
         env:

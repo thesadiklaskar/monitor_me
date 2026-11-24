@@ -53,6 +53,10 @@ func (j *Journal) Available() bool {
 	return err == nil
 }
 
+func (j *Journal) Capability() string { return "logs.journald" }
+
+func (j *Journal) PollInterval() time.Duration { return 2 * time.Second }
+
 // Collect reads at most limit records after the last acknowledged journal cursor.
 // It never writes the cursor file itself: the durable spool advances the cursor
 // only after the control plane acknowledges the corresponding log batch.
