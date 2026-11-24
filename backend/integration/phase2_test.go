@@ -22,7 +22,6 @@ import (
 
 	monitorv1 "example.com/monitor-me/backend/gen/monitor/v1"
 	"example.com/monitor-me/backend/internal/identity"
-	"example.com/monitor-me/backend/internal/security"
 	"github.com/gorilla/websocket"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"google.golang.org/grpc"
@@ -69,172 +68,45 @@ func TestPhase2AuthenticationAndAgentLifecycle(t *testing.T) {
 	}
 	defer database.Close()
 
-	registerBody := map[string]any{
-		"email":             "phase2-owner@example.invalid",
-		"display_name":      "Phase Two Owner",
-		"password":          "a-strong-initial-password-2026",
-		"organization_name": "Phase Two Test Organization",
-		"organization_slug": "phase-two-test-org",
+	installationResponse := requestJSON(t, ctx, http.MethodGet, baseURL+"/v1/installation", "", nil)
+	if installationResponse.StatusCode != http.StatusOK {
+		t.Fatalf("single-install bootstrap: expected 200, got %d: %s", installationResponse.StatusCode, installationResponse.Body)
 	}
-	registerResponse := requestJSON(t, ctx, http.MethodPost, baseURL+"/v1/auth/register", "", registerBody)
-	if registerResponse.StatusCode != http.StatusCreated {
-		t.Fatalf("initial owner registration: expected 201, got %d: %s", registerResponse.StatusCode, registerResponse.Body)
+	var installation struct {
+		Installation struct {
+			Name string `json:"name"`
+			Mode string `json:"mode"`
+		} `json:"installation"`
 	}
-	var registered apiResponse
-	decodeResponse(t, registerResponse.Body, &registered)
-	if registered.User.Role != "owner" || registered.User.ID == "" || registered.User.OrganizationID == "" {
-		t.Fatalf("unexpected bootstrap user: %#v", registered.User)
+	decodeResponse(t, installationResponse.Body, &installation)
+	if installation.Installation.Mode != "single-install" || installation.Installation.Name != "Monitor Me" {
+		t.Fatalf("unexpected installation descriptor: %#v", installation.Installation)
 	}
-
-	duplicateRegister := requestJSON(t, ctx, http.MethodPost, baseURL+"/v1/auth/register", "", registerBody)
-	if duplicateRegister.StatusCode != http.StatusForbidden {
-		t.Fatalf("second bootstrap registration: expected 403, got %d", duplicateRegister.StatusCode)
-	}
-	wrongPassword := requestJSON(t, ctx, http.MethodPost, baseURL+"/v1/auth/login", "", map[string]any{
-		"email": registerBody["email"], "password": "incorrect-password",
-	})
-	if wrongPassword.StatusCode != http.StatusUnauthorized {
-		t.Fatalf("wrong password login: expected 401, got %d", wrongPassword.StatusCode)
+	for _, path := range []string{"/v1/auth/register", "/v1/auth/login", "/v1/auth/logout", "/v1/auth/me"} {
+		response := requestJSON(t, ctx, http.MethodPost, baseURL+path, "", map[string]any{})
+		if response.StatusCode != http.StatusNotFound {
+			t.Fatalf("interactive authentication route %s must not exist: got %d: %s", path, response.StatusCode, response.Body)
+		}
 	}
 
-	loginResponse := requestJSON(t, ctx, http.MethodPost, baseURL+"/v1/auth/login", "", map[string]any{
-		"email": registerBody["email"], "password": registerBody["password"],
-	})
-	if loginResponse.StatusCode != http.StatusOK {
-		t.Fatalf("owner login: expected 200, got %d: %s", loginResponse.StatusCode, loginResponse.Body)
-	}
-	var session apiResponse
-	decodeResponse(t, loginResponse.Body, &session)
-	if len(session.AccessToken) < 32 {
-		t.Fatal("login did not return an opaque bearer session")
-	}
-	bearer := session.AccessToken
-
-	me := requestJSON(t, ctx, http.MethodGet, baseURL+"/v1/auth/me", bearer, nil)
-	if me.StatusCode != http.StatusOK {
-		t.Fatalf("authenticated /me: expected 200, got %d", me.StatusCode)
-	}
-
-	// A viewer can inspect the organization but cannot provision infrastructure.
-	viewerPassword := "viewer-password-for-phase-two"
-	viewerHash, err := security.HashPassword(viewerPassword)
-	if err != nil {
-		t.Fatalf("hash viewer password: %v", err)
-	}
-	var viewerID string
+	// A private compatibility identity remains only for legacy database foreign
+	// keys. It is generated locally and never exposed as an account workflow.
+	var userID, organizationID string
 	if err := database.QueryRowContext(ctx, `
-		INSERT INTO users (email, display_name, password_hash)
-		VALUES ('phase2-viewer@example.invalid', 'Phase Two Viewer', $1)
-		RETURNING id::text
-	`, viewerHash).Scan(&viewerID); err != nil {
-		t.Fatalf("create viewer account for authorization test: %v", err)
+		SELECT user_id::text, organization_id::text
+		FROM organization_memberships ORDER BY created_at LIMIT 1
+	`).Scan(&userID, &organizationID); err != nil {
+		t.Fatalf("load internal installation scope: %v", err)
 	}
-	if _, err := database.ExecContext(ctx, `
-		INSERT INTO organization_memberships (organization_id, user_id, role)
-		VALUES ($1, $2, 'viewer')
-	`, registered.User.OrganizationID, viewerID); err != nil {
-		t.Fatalf("create viewer membership: %v", err)
-	}
-	viewerLogin := requestJSON(t, ctx, http.MethodPost, baseURL+"/v1/auth/login", "", map[string]any{
-		"email": "phase2-viewer@example.invalid", "password": viewerPassword,
-	})
-	if viewerLogin.StatusCode != http.StatusOK {
-		t.Fatalf("viewer login: expected 200, got %d: %s", viewerLogin.StatusCode, viewerLogin.Body)
-	}
-	var viewerSession apiResponse
-	decodeResponse(t, viewerLogin.Body, &viewerSession)
-	viewerCreate := requestJSON(t, ctx, http.MethodPost, baseURL+"/v1/servers", viewerSession.AccessToken, map[string]any{"name": "forbidden-node"})
-	if viewerCreate.StatusCode != http.StatusForbidden {
-		t.Fatalf("viewer server creation: expected 403, got %d", viewerCreate.StatusCode)
-	}
-	viewerList := requestJSON(t, ctx, http.MethodGet, baseURL+"/v1/servers", viewerSession.AccessToken, nil)
-	if viewerList.StatusCode != http.StatusOK {
-		t.Fatalf("viewer inventory read: expected 200, got %d", viewerList.StatusCode)
-	}
+	bearer := ""
 
 	serverResponse := createServer(t, ctx, baseURL, bearer, "integration-node")
 	serverID, enrollmentToken := serverResponse.Server.ID, serverResponse.Enrollment.Token
 	if serverID == "" || len(enrollmentToken) < 32 {
-		t.Fatalf("server creation did not return a scoped enrollment token: %#v", serverResponse)
+		t.Fatalf("server creation did not return a one-time enrollment token: %#v", serverResponse)
 	}
 	if time.Until(serverResponse.Enrollment.ExpiresAt) <= 0 || time.Until(serverResponse.Enrollment.ExpiresAt) > 16*time.Minute {
 		t.Fatalf("unexpected enrollment token expiry: %s", serverResponse.Enrollment.ExpiresAt)
-	}
-
-	// A viewer cannot revoke an enrollment credential created by an owner.
-	viewerRevoke := requestJSON(t, ctx, http.MethodPost,
-		baseURL+"/v1/enrollment-tokens/"+serverResponse.Enrollment.TokenID+"/revoke",
-		viewerSession.AccessToken, map[string]any{})
-	if viewerRevoke.StatusCode != http.StatusForbidden {
-		t.Fatalf("viewer token revocation: expected 403, got %d", viewerRevoke.StatusCode)
-	}
-
-	// A member of a different organization must never see this server.
-	otherPassword := "second-organization-owner-password"
-	otherHash, err := security.HashPassword(otherPassword)
-	if err != nil {
-		t.Fatalf("hash second organization password: %v", err)
-	}
-	var otherOrganizationID, otherUserID string
-	if err := database.QueryRowContext(ctx, `
-		INSERT INTO organizations (name, slug)
-		VALUES ('Second Test Organization', 'second-test-organization')
-		RETURNING id::text
-	`).Scan(&otherOrganizationID); err != nil {
-		t.Fatalf("create second organization: %v", err)
-	}
-	if err := database.QueryRowContext(ctx, `
-		INSERT INTO users (email, display_name, password_hash)
-		VALUES ('second-owner@example.invalid', 'Second Organization Owner', $1)
-		RETURNING id::text
-	`, otherHash).Scan(&otherUserID); err != nil {
-		t.Fatalf("create second organization user: %v", err)
-	}
-	if _, err := database.ExecContext(ctx, `
-		INSERT INTO organization_memberships (organization_id, user_id, role)
-		VALUES ($1, $2, 'owner')
-	`, otherOrganizationID, otherUserID); err != nil {
-		t.Fatalf("create second organization membership: %v", err)
-	}
-	// A user with memberships in two organizations must not be silently
-	// authenticated into whichever organization happens to have the oldest row.
-	if _, err := database.ExecContext(ctx, `
-		INSERT INTO organization_memberships (organization_id, user_id, role)
-		VALUES ($1, $2, 'viewer')
-	`, otherOrganizationID, registered.User.ID); err != nil {
-		t.Fatalf("create second membership for ambiguous-login test: %v", err)
-	}
-	ambiguousLogin := requestJSON(t, ctx, http.MethodPost, baseURL+"/v1/auth/login", "", map[string]any{
-		"email": registerBody["email"], "password": registerBody["password"],
-	})
-	if ambiguousLogin.StatusCode != http.StatusConflict || !strings.Contains(ambiguousLogin.Body, "organization_selection_required") {
-		t.Fatalf("multi-organization login must fail closed with 409: status=%d body=%s",
-			ambiguousLogin.StatusCode, ambiguousLogin.Body)
-	}
-	if _, err := database.ExecContext(ctx, `
-		DELETE FROM organization_memberships WHERE organization_id = $1 AND user_id = $2
-	`, otherOrganizationID, registered.User.ID); err != nil {
-		t.Fatalf("restore single-organization owner membership after test: %v", err)
-	}
-
-	otherLogin := requestJSON(t, ctx, http.MethodPost, baseURL+"/v1/auth/login", "", map[string]any{
-		"email": "second-owner@example.invalid", "password": otherPassword,
-	})
-	if otherLogin.StatusCode != http.StatusOK {
-		t.Fatalf("second organization login: expected 200, got %d: %s", otherLogin.StatusCode, otherLogin.Body)
-	}
-	var otherSession apiResponse
-	decodeResponse(t, otherLogin.Body, &otherSession)
-	otherInventoryResponse := requestJSON(t, ctx, http.MethodGet, baseURL+"/v1/servers", otherSession.AccessToken, nil)
-	if otherInventoryResponse.StatusCode != http.StatusOK {
-		t.Fatalf("second organization inventory: expected 200, got %d", otherInventoryResponse.StatusCode)
-	}
-	var otherInventory struct {
-		Servers []json.RawMessage `json:"servers"`
-	}
-	decodeResponse(t, otherInventoryResponse.Body, &otherInventory)
-	if len(otherInventory.Servers) != 0 {
-		t.Fatalf("cross-organization inventory leak: received %d foreign servers", len(otherInventory.Servers))
 	}
 
 	// Phase 4 project administration and server workload mapping authorization.
@@ -253,13 +125,6 @@ func TestPhase2AuthenticationAndAgentLifecycle(t *testing.T) {
 	decodeResponse(t, projectCreate.Body, &createdProject)
 	if createdProject.Project.ID == "" || createdProject.Project.Name != "Payments API" {
 		t.Fatalf("project creation returned an incomplete project: %#v", createdProject.Project)
-	}
-
-	viewerProjectCreate := requestJSON(t, ctx, http.MethodPost, baseURL+"/v1/projects", viewerSession.AccessToken, map[string]any{
-		"name": "Forbidden Project", "slug": "forbidden-project",
-	})
-	if viewerProjectCreate.StatusCode != http.StatusForbidden {
-		t.Fatalf("viewer project creation: expected 403, got %d: %s", viewerProjectCreate.StatusCode, viewerProjectCreate.Body)
 	}
 
 	mappingCreate := requestJSON(t, ctx, http.MethodPost,
@@ -286,7 +151,7 @@ func TestPhase2AuthenticationAndAgentLifecycle(t *testing.T) {
 	}
 
 	mappingList := requestJSON(t, ctx, http.MethodGet,
-		baseURL+"/v1/servers/"+serverID+"/project-mappings", viewerSession.AccessToken, nil)
+		baseURL+"/v1/servers/"+serverID+"/project-mappings", bearer, nil)
 	if mappingList.StatusCode != http.StatusOK {
 		t.Fatalf("viewer workload mapping list: expected 200, got %d: %s", mappingList.StatusCode, mappingList.Body)
 	}
@@ -301,17 +166,6 @@ func TestPhase2AuthenticationAndAgentLifecycle(t *testing.T) {
 		t.Fatalf("server workload mapping was not returned in organization scope: %#v", listedMappings.Mappings)
 	}
 
-	viewerMappingCreate := requestJSON(t, ctx, http.MethodPost,
-		baseURL+"/v1/servers/"+serverID+"/project-mappings", viewerSession.AccessToken, map[string]any{
-			"project_id":         createdProject.Project.ID,
-			"workload_type":      "systemd",
-			"workload_selector":  "forbidden.service",
-			"attribution_method": "systemd",
-		})
-	if viewerMappingCreate.StatusCode != http.StatusForbidden {
-		t.Fatalf("viewer workload mapping creation: expected 403, got %d: %s", viewerMappingCreate.StatusCode, viewerMappingCreate.Body)
-	}
-
 	mappingDelete := requestJSON(t, ctx, http.MethodDelete,
 		baseURL+"/v1/project-mappings/"+createdMapping.Mapping.ID, bearer, map[string]any{})
 	if mappingDelete.StatusCode != http.StatusNoContent {
@@ -323,17 +177,6 @@ func TestPhase2AuthenticationAndAgentLifecycle(t *testing.T) {
 		t.Fatalf("owner project deletion: expected 204, got %d: %s", projectDelete.StatusCode, projectDelete.Body)
 	}
 
-	otherProjects := requestJSON(t, ctx, http.MethodGet, baseURL+"/v1/projects", otherSession.AccessToken, nil)
-	if otherProjects.StatusCode != http.StatusOK {
-		t.Fatalf("second organization project list: expected 200, got %d", otherProjects.StatusCode)
-	}
-	var otherProjectList struct {
-		Projects []json.RawMessage `json:"projects"`
-	}
-	decodeResponse(t, otherProjects.Body, &otherProjectList)
-	if len(otherProjectList.Projects) != 0 {
-		t.Fatalf("cross-organization project leak: received %d foreign projects", len(otherProjectList.Projects))
-	}
 
 	certificatePEM, err := os.ReadFile(rootCAPath)
 	if err != nil {
@@ -529,7 +372,7 @@ func TestPhase2AuthenticationAndAgentLifecycle(t *testing.T) {
 		INSERT INTO projects (organization_id, name, slug)
 		VALUES ($1, 'Phase Three Project', 'phase-three-project')
 		RETURNING id::text
-	`, registered.User.OrganizationID).Scan(&projectID); err != nil {
+	`, organizationID).Scan(&projectID); err != nil {
 		t.Fatalf("create project for workload attribution: %v", err)
 	}
 	if _, err := database.ExecContext(ctx, `
@@ -537,7 +380,7 @@ func TestPhase2AuthenticationAndAgentLifecycle(t *testing.T) {
 			organization_id, server_id, project_id, workload_type, workload_selector, attribution_method
 		)
 		VALUES ($1, $2, $3, 'systemd', '/system.slice/example.service', 'systemd')
-	`, registered.User.OrganizationID, serverID, projectID); err != nil {
+	`, organizationID, serverID, projectID); err != nil {
 		t.Fatalf("create Systemd project mapping: %v", err)
 	}
 
@@ -599,32 +442,6 @@ func TestPhase2AuthenticationAndAgentLifecycle(t *testing.T) {
 		len(ownerDashboards.Dashboards[0].Panels) != 1 {
 		t.Fatalf("dashboard persistence did not return its one saved panel: %#v", ownerDashboards.Dashboards)
 	}
-	viewerDashboardCreate := requestJSON(t, ctx, http.MethodPost, baseURL+"/v1/dashboards", viewerSession.AccessToken, map[string]any{
-		"name": "Viewer dashboard", "description": "", "project_id": "", "is_default": false,
-	})
-	if viewerDashboardCreate.StatusCode != http.StatusForbidden {
-		t.Fatalf("viewer dashboard creation: expected 403, got %d: %s", viewerDashboardCreate.StatusCode, viewerDashboardCreate.Body)
-	}
-	foreignDashboardList := requestJSON(t, ctx, http.MethodGet, baseURL+"/v1/dashboards", otherSession.AccessToken, nil)
-	if foreignDashboardList.StatusCode != http.StatusOK {
-		t.Fatalf("foreign organization dashboard list: expected 200, got %d: %s", foreignDashboardList.StatusCode, foreignDashboardList.Body)
-	}
-	var foreignDashboards struct {
-		Dashboards []json.RawMessage `json:"dashboards"`
-	}
-	decodeResponse(t, foreignDashboardList.Body, &foreignDashboards)
-	if len(foreignDashboards.Dashboards) != 0 {
-		t.Fatalf("cross-organization dashboard leak: received %d foreign dashboards", len(foreignDashboards.Dashboards))
-	}
-	foreignPanelCreate := requestJSON(t, ctx, http.MethodPost,
-		baseURL+"/v1/dashboards/"+createdDashboard.Dashboard.ID+"/panels", otherSession.AccessToken, map[string]any{
-			"title": "Foreign panel", "visualization": "stat", "server_id": serverID,
-			"project_id": "", "metric_name": "host.cpu.utilization", "time_range": "1h", "position": 0,
-		})
-	if foreignPanelCreate.StatusCode != http.StatusNotFound {
-		t.Fatalf("foreign organization must not add a panel to another organization's dashboard: expected 404, got %d: %s",
-			foreignPanelCreate.StatusCode, foreignPanelCreate.Body)
-	}
 
 	ticketResponse := requestJSON(t, ctx, http.MethodPost, baseURL+"/v1/live/ticket", bearer, map[string]any{})
 	if ticketResponse.StatusCode != http.StatusCreated {
@@ -644,63 +461,6 @@ func TestPhase2AuthenticationAndAgentLifecycle(t *testing.T) {
 		t.Fatalf("connect authorized organization live stream: response=%v error=%v", liveResponse, err)
 	}
 	defer liveConnection.Close()
-
-	// A ticket is invalid as soon as its parent user session is logged out.
-	revokedTicketResponse := requestJSON(t, ctx, http.MethodPost,
-		baseURL+"/v1/live/ticket", viewerSession.AccessToken, map[string]any{})
-	if revokedTicketResponse.StatusCode != http.StatusCreated {
-		t.Fatalf("create live ticket for logout test: expected 201, got %d: %s",
-			revokedTicketResponse.StatusCode, revokedTicketResponse.Body)
-	}
-	var revokedTicket struct {
-		Ticket string `json:"ticket"`
-	}
-	decodeResponse(t, revokedTicketResponse.Body, &revokedTicket)
-	logoutViewer := requestJSON(t, ctx, http.MethodPost,
-		baseURL+"/v1/auth/logout", viewerSession.AccessToken, map[string]any{})
-	if logoutViewer.StatusCode != http.StatusNoContent {
-		t.Fatalf("revoke viewer session: expected 204, got %d: %s", logoutViewer.StatusCode, logoutViewer.Body)
-	}
-	revokedTicketURL := "ws" + strings.TrimPrefix(baseURL, "http") +
-		"/v1/live/ws?ticket=" + url.QueryEscape(revokedTicket.Ticket)
-	revokedTicketConnection, revokedTicketResult, revokedTicketErr :=
-		websocket.DefaultDialer.DialContext(ctx, revokedTicketURL, liveHeaders)
-	if revokedTicketErr == nil {
-		_ = revokedTicketConnection.Close()
-		t.Fatal("a ticket must not outlive its revoked parent user session")
-	}
-	if revokedTicketResult == nil || revokedTicketResult.StatusCode != http.StatusUnauthorized {
-		t.Fatalf("ticket from a revoked session should return 401: response=%v error=%v",
-			revokedTicketResult, revokedTicketErr)
-	}
-	if revokedTicketResult.Body != nil {
-		revokedTicketResult.Body.Close()
-	}
-
-	// A separate organization's valid ticket may subscribe successfully, but it
-	// must never receive telemetry events published for this organization.
-	foreignTicketResponse := requestJSON(t, ctx, http.MethodPost,
-		baseURL+"/v1/live/ticket", otherSession.AccessToken, map[string]any{})
-	if foreignTicketResponse.StatusCode != http.StatusCreated {
-		t.Fatalf("create foreign organization live ticket: expected 201, got %d: %s",
-			foreignTicketResponse.StatusCode, foreignTicketResponse.Body)
-	}
-	var foreignTicket struct {
-		Ticket string `json:"ticket"`
-	}
-	decodeResponse(t, foreignTicketResponse.Body, &foreignTicket)
-	foreignLiveURL := "ws" + strings.TrimPrefix(baseURL, "http") +
-		"/v1/live/ws?ticket=" + url.QueryEscape(foreignTicket.Ticket)
-	foreignLiveConnection, foreignLiveResponse, err :=
-		websocket.DefaultDialer.DialContext(ctx, foreignLiveURL, liveHeaders)
-	if err != nil {
-		if foreignLiveResponse != nil && foreignLiveResponse.Body != nil {
-			foreignLiveResponse.Body.Close()
-		}
-		t.Fatalf("connect foreign organization live stream: response=%v error=%v",
-			foreignLiveResponse, err)
-	}
-	defer foreignLiveConnection.Close()
 
 	// Threshold rules are organization-scoped and can only be managed by owners/admins.
 	alertRuleResponse := requestJSON(t, ctx, http.MethodPost, baseURL+"/v1/alert-rules", bearer, map[string]any{
@@ -722,23 +482,6 @@ func TestPhase2AuthenticationAndAgentLifecycle(t *testing.T) {
 	decodeResponse(t, alertRuleResponse.Body, &createdAlertRule)
 	if createdAlertRule.Rule.ID == "" || createdAlertRule.Rule.Name != "High host memory" {
 		t.Fatalf("alert rule creation returned an incomplete rule: %#v", createdAlertRule.Rule)
-	}
-	viewerAlertRule := requestJSON(t, ctx, http.MethodPost, baseURL+"/v1/alert-rules", viewerSession.AccessToken, map[string]any{
-		"name": "Viewer forbidden rule", "metric_name": "host.memory.used", "operator": "gt", "threshold": 100,
-	})
-	if viewerAlertRule.StatusCode != http.StatusForbidden {
-		t.Fatalf("viewer alert rule creation: expected 403, got %d: %s", viewerAlertRule.StatusCode, viewerAlertRule.Body)
-	}
-	foreignAlertRules := requestJSON(t, ctx, http.MethodGet, baseURL+"/v1/alert-rules", otherSession.AccessToken, nil)
-	if foreignAlertRules.StatusCode != http.StatusOK {
-		t.Fatalf("second organization alert rule list: expected 200, got %d", foreignAlertRules.StatusCode)
-	}
-	var foreignRules struct {
-		Rules []json.RawMessage `json:"rules"`
-	}
-	decodeResponse(t, foreignAlertRules.Body, &foreignRules)
-	if len(foreignRules.Rules) != 0 {
-		t.Fatalf("cross-organization alert-rule leak: received %d foreign rules", len(foreignRules.Rules))
 	}
 
 	collectedAt := time.Now().UTC().UnixNano()
@@ -884,20 +627,9 @@ func TestPhase2AuthenticationAndAgentLifecycle(t *testing.T) {
 	if err := liveConnection.ReadJSON(&liveEvent); err != nil {
 		t.Fatalf("read post-commit live event: %v", err)
 	}
-	if liveEvent.Type != "telemetry.batch" || liveEvent.OrganizationID != registered.User.OrganizationID ||
+	if liveEvent.Type != "telemetry.batch" || liveEvent.OrganizationID != organizationID ||
 		liveEvent.ServerID != serverID || liveEvent.BatchID != batchID {
 		t.Fatalf("live event has incorrect tenant or batch scope: %+v", liveEvent)
-	}
-	if err := foreignLiveConnection.SetReadDeadline(time.Now().Add(250 * time.Millisecond)); err != nil {
-		t.Fatal(err)
-	}
-	_, _, foreignReadErr := foreignLiveConnection.ReadMessage()
-	if foreignReadErr == nil {
-		t.Fatal("telemetry from one organization must not reach another organization's subscriber")
-	}
-	var networkError net.Error
-	if !errors.As(foreignReadErr, &networkError) || !networkError.Timeout() {
-		t.Fatalf("foreign live subscription ended unexpectedly instead of remaining isolated: %v", foreignReadErr)
 	}
 	_ = liveConnection.Close()
 
@@ -1082,17 +814,6 @@ func TestPhase2AuthenticationAndAgentLifecycle(t *testing.T) {
 	if markRead.StatusCode != http.StatusNoContent {
 		t.Fatalf("mark notification as read: expected 204, got %d: %s", markRead.StatusCode, markRead.Body)
 	}
-	viewerNotifications := requestJSON(t, ctx, http.MethodGet, baseURL+"/v1/notifications", viewerSession.AccessToken, nil)
-	if viewerNotifications.StatusCode != http.StatusOK {
-		t.Fatalf("viewer notification list: expected 200, got %d", viewerNotifications.StatusCode)
-	}
-	var viewerNotificationList struct {
-		Notifications []json.RawMessage `json:"notifications"`
-	}
-	decodeResponse(t, viewerNotifications.Body, &viewerNotificationList)
-	if len(viewerNotificationList.Notifications) != 2 {
-		t.Fatalf("alert notifications should be delivered to each organization member, got %d", len(viewerNotificationList.Notifications))
-	}
 
 	// The history endpoint is organization-scoped and uses bounded aggregation.
 	seriesValues := url.Values{
@@ -1136,17 +857,6 @@ func TestPhase2AuthenticationAndAgentLifecycle(t *testing.T) {
 		weightedSum/float64(aggregateCount) != 1572864 {
 		t.Fatalf("historical buckets did not preserve expected aggregation: count=%d min=%v max=%v average=%v",
 			aggregateCount, minimum, maximum, weightedSum/float64(aggregateCount))
-	}
-	foreignSeries := requestJSON(t, ctx, http.MethodGet, seriesURL, otherSession.AccessToken, nil)
-	if foreignSeries.StatusCode != http.StatusOK {
-		t.Fatalf("foreign organization metrics query: expected 200, got %d", foreignSeries.StatusCode)
-	}
-	var foreignSeriesResult struct {
-		Points []json.RawMessage `json:"points"`
-	}
-	decodeResponse(t, foreignSeries.Body, &foreignSeriesResult)
-	if len(foreignSeriesResult.Points) != 0 {
-		t.Fatalf("cross-organization telemetry leak: received %d metric points", len(foreignSeriesResult.Points))
 	}
 
 	var mappedProject, attributionMethod string
@@ -1245,7 +955,7 @@ func TestPhase2AuthenticationAndAgentLifecycle(t *testing.T) {
 
 	identityStore := identity.NewStore(database)
 	operationPrincipal := identity.Principal{
-		UserID: registered.User.ID, OrganizationID: registered.User.OrganizationID, Role: "owner",
+		UserID: userID, OrganizationID: organizationID, Role: "owner",
 	}
 	const operationTarget = "monitor-me-agent.service"
 	if _, err := database.ExecContext(ctx, `
