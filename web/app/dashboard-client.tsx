@@ -438,9 +438,9 @@ export default function DashboardClient() {
         {showLogs ? (
           <LogExplorer servers={servers} />
         ) : showAlerts ? (
-          <AlertsView servers={servers} role="owner" />
+          <AlertsView servers={servers} />
         ) : showDashboards ? (
-          <DashboardsView servers={servers} role="owner" />
+          <DashboardsView servers={servers} />
         ) : selectedServer ? (
           <ServerDetail server={selectedServer} apiPublicURL={publicAPIURL} onBack={() => setSelectedServer(null)} />
         ) : <>
