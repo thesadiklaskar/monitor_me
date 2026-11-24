@@ -37,27 +37,27 @@ server {
         add_header Cache-Control "no-store";
     }
     location = /install/agent-windows.ps1 {
-        limit_req zone=monitor_me_agent_bootstrap burst=10 nodelay;
+        limit_req zone=monitor_me_agent_bootstrap burst=100 nodelay;
         proxy_pass http://127.0.0.1:13000;
         proxy_set_header Host $host;
         proxy_set_header X-Forwarded-Proto https;
         add_header Cache-Control "no-store";
     }
     location = /api/agent-artifacts/manifest {
-        limit_req zone=monitor_me_agent_bootstrap burst=10 nodelay;
+        limit_req zone=monitor_me_agent_bootstrap burst=100 nodelay;
         proxy_pass http://127.0.0.1:13000;
         proxy_set_header Host $host;
         proxy_set_header X-Forwarded-Proto https;
         add_header Cache-Control "no-store";
     }
     location ^~ /api/agent-artifacts/ {
-        limit_req zone=monitor_me_agent_bootstrap burst=10 nodelay;
+        limit_req zone=monitor_me_agent_bootstrap burst=100 nodelay;
         proxy_pass http://127.0.0.1:13000;
         proxy_set_header Host $host;
         proxy_set_header X-Forwarded-Proto https;
     }
     location = /api/agent-ca {
-        limit_req zone=monitor_me_agent_bootstrap burst=10 nodelay;
+        limit_req zone=monitor_me_agent_bootstrap burst=100 nodelay;
         proxy_pass http://127.0.0.1:13000;
         proxy_set_header Host $host;
         proxy_set_header X-Forwarded-Proto https;
