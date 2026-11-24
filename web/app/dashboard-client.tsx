@@ -197,7 +197,7 @@ function EnrollmentDialog({
             </div>
             <p>Run in a root shell on a systemd Linux target. It detects the host architecture, downloads the matching native agent, verifies SHA-256, installs and enables the systemd service, then removes the one-time token after session persistence.</p>
           </div>
-          <p className="install-note">Use the command for the shell available on the target machine; the installer itself detects that machine's OS and architecture. It downloads binaries and the public CA over the control-plane endpoint. Remote hosts must reach the advertised gRPC address; <code>localhost</code> only works when the agent and control plane share a host. The downloaded binaries are checksum-verified, but are not yet code-signed; OS publisher-signature verification remains a release gate.</p>
+          <p className="install-note">Use the command for the shell available on the target machine; the installer itself detects that machine&apos;s OS and architecture. It downloads binaries and the public CA over the control-plane endpoint. Remote hosts must reach the advertised gRPC address; <code>localhost</code> only works when the agent and control plane share a host. The downloaded binaries are checksum-verified, but are not yet code-signed; OS publisher-signature verification remains a release gate.</p>
         </div>
 
         {error && <div className="notice notice-error" role="alert">{error}</div>}
