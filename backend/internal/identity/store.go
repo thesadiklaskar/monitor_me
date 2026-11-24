@@ -254,6 +254,22 @@ func (s *Store) createInstallationIdentity(ctx context.Context) error {
 // CreateInstallationPrincipal resolves the private compatibility identity and creates an internal
 // short-lived session used only to bind live-stream tickets. No browser credential is created.
 func (s *Store) CreateInstallationPrincipal(ctx context.Context) (Principal, time.Time, error) {
+	// A legacy database may contain data for several previously supported
+	// organizations. Never pick one implicitly: that could hide or expose the
+	// wrong tenant's monitoring data after switching to single-install mode.
+	var organizationCount int
+	if err := s.db.QueryRowContext(ctx, `
+		SELECT count(DISTINCT organization_id) FROM organization_memberships
+	`).Scan(&organizationCount); err != nil {
+		return Principal{}, time.Time{}, fmt.Errorf("inspect legacy installation scopes: %w", err)
+	}
+	if organizationCount > 1 {
+		return Principal{}, time.Time{}, fmt.Errorf(
+			"single-install mode found %d legacy organizations; migrate or isolate the database before startup",
+			organizationCount,
+		)
+	}
+
 	loadPrincipal := func() (Principal, error) {
 		var principal Principal
 		err := s.db.QueryRowContext(ctx, `
