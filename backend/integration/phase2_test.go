@@ -19,7 +19,6 @@ import (
 	"time"
 
 	monitorv1 "monitor-me.internal/backend/gen/monitor/v1"
-	"monitor-me.internal/backend/internal/identity"
 	"github.com/gorilla/websocket"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"google.golang.org/grpc"
@@ -109,72 +108,15 @@ func TestSingleInstallAndAgentLifecycle(t *testing.T) {
 		t.Fatalf("unexpected enrollment token expiry: %s", serverResponse.Enrollment.ExpiresAt)
 	}
 
-	// Phase 4 project administration and server workload mapping authorization.
-	projectCreate := requestJSON(t, ctx, http.MethodPost, baseURL+"/v1/projects", map[string]any{
-		"name": "Payments API", "slug": "payments-api",
-	})
-	if projectCreate.StatusCode != http.StatusCreated {
-		t.Fatalf("owner project creation: expected 201, got %d: %s", projectCreate.StatusCode, projectCreate.Body)
-	}
-	var createdProject struct {
-		Project struct {
-			ID   string `json:"id"`
-			Name string `json:"name"`
-		} `json:"project"`
-	}
-	decodeResponse(t, projectCreate.Body, &createdProject)
-	if createdProject.Project.ID == "" || createdProject.Project.Name != "Payments API" {
-		t.Fatalf("project creation returned an incomplete project: %#v", createdProject.Project)
-	}
-
-	mappingCreate := requestJSON(t, ctx, http.MethodPost,
-		baseURL+"/v1/servers/"+serverID+"/project-mappings", map[string]any{
-			"project_id":         createdProject.Project.ID,
-			"workload_type":      "systemd",
-			"workload_selector":  "payments-api.service",
-			"attribution_method": "systemd",
-		})
-	if mappingCreate.StatusCode != http.StatusCreated {
-		t.Fatalf("owner workload mapping creation: expected 201, got %d: %s", mappingCreate.StatusCode, mappingCreate.Body)
-	}
-	var createdMapping struct {
-		Mapping struct {
-			ID               string `json:"id"`
-			ProjectID        string `json:"project_id"`
-			WorkloadSelector string `json:"workload_selector"`
-		} `json:"mapping"`
-	}
-	decodeResponse(t, mappingCreate.Body, &createdMapping)
-	if createdMapping.Mapping.ID == "" || createdMapping.Mapping.ProjectID != createdProject.Project.ID ||
-		createdMapping.Mapping.WorkloadSelector != "payments-api.service" {
-		t.Fatalf("mapping creation returned an incomplete mapping: %#v", createdMapping.Mapping)
-	}
-
-	mappingList := requestJSON(t, ctx, http.MethodGet,
-		baseURL+"/v1/servers/"+serverID+"/project-mappings", nil)
-	if mappingList.StatusCode != http.StatusOK {
-		t.Fatalf("viewer workload mapping list: expected 200, got %d: %s", mappingList.StatusCode, mappingList.Body)
-	}
-	var listedMappings struct {
-		Mappings []struct {
-			ID        string `json:"id"`
-			ProjectID string `json:"project_id"`
-		} `json:"mappings"`
-	}
-	decodeResponse(t, mappingList.Body, &listedMappings)
-	if len(listedMappings.Mappings) != 1 || listedMappings.Mappings[0].ID != createdMapping.Mapping.ID {
-		t.Fatalf("server workload mapping was not returned in organization scope: %#v", listedMappings.Mappings)
-	}
-
-	mappingDelete := requestJSON(t, ctx, http.MethodDelete,
-		baseURL+"/v1/project-mappings/"+createdMapping.Mapping.ID, map[string]any{})
-	if mappingDelete.StatusCode != http.StatusNoContent {
-		t.Fatalf("owner workload mapping deletion: expected 204, got %d: %s", mappingDelete.StatusCode, mappingDelete.Body)
-	}
-	projectDelete := requestJSON(t, ctx, http.MethodDelete,
-		baseURL+"/v1/projects/"+createdProject.Project.ID, map[string]any{})
-	if projectDelete.StatusCode != http.StatusNoContent {
-		t.Fatalf("owner project deletion: expected 204, got %d: %s", projectDelete.StatusCode, projectDelete.Body)
+	// Project and workload-mapping management is not part of the monitoring-only API.
+	for _, path := range []string{
+		"/v1/projects",
+		"/v1/servers/" + serverID + "/project-mappings",
+	} {
+		response := requestJSON(t, ctx, http.MethodGet, baseURL+path, nil)
+		if response.StatusCode != http.StatusNotFound {
+			t.Fatalf("removed project route %s must not exist: got %d: %s", path, response.StatusCode, response.Body)
+		}
 	}
 
 
@@ -985,78 +927,12 @@ func TestSingleInstallAndAgentLifecycle(t *testing.T) {
 		t.Fatalf("restore fresh agent heartbeat after liveness test: %v", err)
 	}
 
-	identityStore := identity.NewStore(database)
-	operationPrincipal := identity.Principal{
-		UserID: userID, OrganizationID: organizationID, Role: "owner",
-	}
-	const operationTarget = "monitor-me-agent.service"
-	if _, err := database.ExecContext(ctx, `
-		CREATE OR REPLACE FUNCTION test_fail_queued_operation_audit()
-		RETURNS trigger LANGUAGE plpgsql AS $
-		BEGIN
-			IF NEW.action = 'queued' THEN
-				RAISE EXCEPTION 'injected queued audit failure';
-			END IF;
-			RETURN NEW;
-		END;
-		$
-	`); err != nil {
-		t.Fatalf("create remote operation audit failure fixture: %v", err)
-	}
-	if _, err := database.ExecContext(ctx, `
-		CREATE TRIGGER test_fail_queued_operation_audit
-		BEFORE INSERT ON remote_operation_audit
-		FOR EACH ROW EXECUTE FUNCTION test_fail_queued_operation_audit()
-	`); err != nil {
-		t.Fatalf("install remote operation audit failure fixture: %v", err)
-	}
-	t.Cleanup(func() {
-		cleanupContext, cleanupCancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cleanupCancel()
-		_, _ = database.ExecContext(cleanupContext,
-			"DROP TRIGGER IF EXISTS test_fail_queued_operation_audit ON remote_operation_audit")
-		_, _ = database.ExecContext(cleanupContext,
-			"DROP FUNCTION IF EXISTS test_fail_queued_operation_audit()")
-	})
-	if _, err := identityStore.CreateRemoteOperation(
-		ctx, operationPrincipal, serverID, "restart_service", operationTarget, []string{operationTarget},
-	); err == nil {
-		t.Fatal("remote operation should fail when its required audit insert fails")
-	}
-	var uncommittedOperations int
-	if err := database.QueryRowContext(ctx, `
-		SELECT count(*) FROM remote_operations
-		WHERE organization_id = $1 AND server_id = $2 AND target = $3
-	`, operationPrincipal.OrganizationID, serverID, operationTarget).Scan(&uncommittedOperations); err != nil {
-		t.Fatalf("verify remote operation rollback: %v", err)
-	}
-	if uncommittedOperations != 0 {
-		t.Fatalf("remote operation escaped its failed audit transaction: found %d queued rows", uncommittedOperations)
-	}
-	if _, err := database.ExecContext(ctx,
-		"DROP TRIGGER test_fail_queued_operation_audit ON remote_operation_audit"); err != nil {
-		t.Fatalf("remove remote operation audit failure fixture: %v", err)
-	}
-	if _, err := database.ExecContext(ctx,
-		"DROP FUNCTION test_fail_queued_operation_audit()"); err != nil {
-		t.Fatalf("remove remote operation audit failure function: %v", err)
-	}
-	queuedOperation, err := identityStore.CreateRemoteOperation(
-		ctx, operationPrincipal, serverID, "restart_service", operationTarget, []string{operationTarget},
-	)
-	if err != nil {
-		t.Fatalf("queue audited remote operation: %v", err)
-	}
-	var queuedAuditCount int
-	if err := database.QueryRowContext(ctx, `
-		SELECT count(*) FROM remote_operation_audit
-		WHERE organization_id = $1 AND remote_operation_id = $2 AND action = 'queued'
-	`, operationPrincipal.OrganizationID, queuedOperation.ID).Scan(&queuedAuditCount); err != nil {
-		t.Fatalf("verify queued remote operation audit: %v", err)
-	}
-	if queuedAuditCount != 1 || queuedOperation.Status != "queued" {
-		t.Fatalf("remote operation and audit were not committed together: status=%s audit_count=%d",
-			queuedOperation.Status, queuedAuditCount)
+	// Remote host-control endpoints are deliberately absent from the product.
+	for _, path := range []string{"/v1/remote-operations", "/v1/remote-operation-audit", "/v1/remote-operations/config"} {
+		response := requestJSON(t, ctx, http.MethodGet, baseURL+path, nil)
+		if response.StatusCode != http.StatusNotFound {
+			t.Fatalf("removed remote-control route %s must not exist: got %d: %s", path, response.StatusCode, response.Body)
+		}
 	}
 
 	revokeAgent := requestJSON(t, ctx, http.MethodPost,
