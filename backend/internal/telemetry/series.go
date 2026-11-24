@@ -49,7 +49,7 @@ func ValidateRangeQuery(query RangeQuery, now time.Time) error {
 	}
 	if (query.LabelKey == "") != (query.LabelValue == "") ||
 		(query.LabelKey != "" && (!seriesLabelKey.MatchString(query.LabelKey) ||
-			len(query.LabelValue) > 256 || strings.ContainsAny(query.LabelValue, "\\r\\n\\x00"))) {
+			len(query.LabelValue) > 256 || strings.ContainsAny(query.LabelValue, "\r\n\x00"))) {
 		return errors.New("metric label filters require a valid key and a bounded single-line value")
 	}
 	if query.From.IsZero() || query.To.IsZero() || !query.From.Before(query.To) ||

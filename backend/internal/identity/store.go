@@ -33,6 +33,7 @@ var (
 	uuidPattern        = regexp.MustCompile("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$")
 	slugPattern        = regexp.MustCompile("^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$")
 	alertMetricPattern = regexp.MustCompile("^[a-zA-Z][a-zA-Z0-9_.-]{0,127}$")
+	dashboardLabelKeyPattern = regexp.MustCompile("^[a-zA-Z][a-zA-Z0-9_.-]{0,63}$")
 )
 
 // Store contains the durable identity and authorization operations.
@@ -97,8 +98,8 @@ type DashboardPanel struct {
 	TimeRange      string    `json:"time_range"`
 	Position       int       `json:"position"`
 	GridWidth      int       `json:"grid_width"`
-	LabelKey       string    `json:"label_key,omitempty"`
-	LabelValue     string    `json:"label_value,omitempty"`
+	LabelKey       string    `json:"label_key"`
+	LabelValue     string    `json:"label_value"`
 	CreatedAt      time.Time `json:"created_at"`
 	UpdatedAt      time.Time `json:"updated_at"`
 }
@@ -962,8 +963,8 @@ func validPanelLabelSelector(key, value string) bool {
 		return true
 	}
 	return key != "" && value != "" &&
-		regexp.MustCompile("^[a-zA-Z][a-zA-Z0-9_.-]{0,63}$").MatchString(key) &&
-		len(value) <= 256 && !strings.ContainsAny(value, "\\r\\n\\x00")
+		dashboardLabelKeyPattern.MatchString(key) &&
+		len(value) <= 256 && !strings.ContainsAny(value, "\r\n\x00")
 }
 
 func validPanelGridWidth(value int) bool {

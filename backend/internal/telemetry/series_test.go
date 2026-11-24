@@ -112,6 +112,12 @@ func TestValidateRangeQueryLabelFilters(t *testing.T) {
 	if err := ValidateRangeQuery(valid, now); err != nil {
 		t.Fatalf("valid label filter rejected: %v", err)
 	}
+	interfaceFilter := base
+	interfaceFilter.LabelKey = "interface"
+	interfaceFilter.LabelValue = "enp0s31f6"
+	if err := ValidateRangeQuery(interfaceFilter, now); err != nil {
+		t.Fatalf("valid network interface filter rejected: %v", err)
+	}
 	invalid := []RangeQuery{
 		{OrganizationID: base.OrganizationID, ServerID: base.ServerID, MetricName: base.MetricName, From: base.From, To: base.To, Step: base.Step, Limit: base.Limit, LabelKey: "mountpoint"},
 		{OrganizationID: base.OrganizationID, ServerID: base.ServerID, MetricName: base.MetricName, From: base.From, To: base.To, Step: base.Step, Limit: base.Limit, LabelValue: "/"},
