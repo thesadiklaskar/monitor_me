@@ -128,10 +128,6 @@ function AuthScreen({
   const [organizationName, setOrganizationName] = useState("");
   const [organizationSlug, setOrganizationSlug] = useState("");
 
-  useEffect(() => {
-    setTargetPlatform(detectBrowserPlatform());
-  }, []);
-
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setBusy(true);
@@ -369,6 +365,10 @@ function AddServerDialog({
   const [targetPlatform, setTargetPlatform] = useState<AgentPlatform>("linux");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    setTargetPlatform(detectBrowserPlatform());
+  }, []);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
