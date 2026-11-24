@@ -6,9 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 type Server = { id: string; name: string };
-type Project = { id: string; name: string; slug: string };
-type Rule = { id: string; name: string; server_id?: string | null; project_id?: string | null; metric_name: string; operator: "gt" | "gte" | "lt" | "lte"; threshold: number; enabled: boolean; created_at: string };
-type Event = { id: string; rule_id: string; rule_name: string; server_id: string; server_name: string; project_id?: string | null; metric_name: string; status: "firing" | "resolved"; last_value: number; triggered_at: string; last_observed_at: string; resolved_at?: string | null };
+type Rule = { id: string; name: string; server_id?: string | null; metric_name: string; operator: "gt" | "gte" | "lt" | "lte"; threshold: number; enabled: boolean; created_at: string };
+type Event = { id: string; rule_id: string; rule_name: string; server_id: string; server_name: string; metric_name: string; status: "firing" | "resolved"; last_value: number; triggered_at: string; last_observed_at: string; resolved_at?: string | null };
 type Notification = { id: string; event_id: string; kind: "firing" | "recovered"; title: string; message: string; read_at?: string | null; created_at: string };
 
 const METRICS = [
@@ -32,8 +31,8 @@ function formatTime(value: string) {
   return Number.isNaN(date.getTime()) ? "Unknown time" : date.toLocaleString();
 }
 
-export default function AlertsWorkspace({ servers, projects, role, onBack }: {
-  servers: Server[]; projects: Project[]; role: string; onBack: () => void;
+export default function AlertsWorkspace({ servers, role, onBack }: {
+  servers: Server[]; role: string; onBack: () => void;
 }) {
   const [rules, setRules] = useState<Rule[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
@@ -46,7 +45,6 @@ export default function AlertsWorkspace({ servers, projects, role, onBack }: {
   const [operator, setOperator] = useState<Rule["operator"]>("gt");
   const [threshold, setThreshold] = useState("85");
   const [serverId, setServerId] = useState("");
-  const [projectId, setProjectId] = useState("");
   const canAdminister = role === "owner" || role === "admin";
   const unreadCount = useMemo(() => notifications.filter((item) => !item.read_at).length, [notifications]);
 
@@ -82,7 +80,7 @@ export default function AlertsWorkspace({ servers, projects, role, onBack }: {
     try {
       await apiRequest<{ rule: Rule }>("/api/alert-rules", {
         method: "POST",
-        body: JSON.stringify({ name: ruleName.trim(), metric_name: metric, operator, threshold: parsed, server_id: serverId || null, project_id: projectId || null }),
+        body: JSON.stringify({ name: ruleName.trim(), metric_name: metric, operator, threshold: parsed, server_id: serverId || null }),
       });
       setRuleName("");
       await load();
@@ -134,9 +132,8 @@ export default function AlertsWorkspace({ servers, projects, role, onBack }: {
               <label className="field"><span>Condition</span><select value={operator} onChange={(event) => setOperator(event.target.value as Rule["operator"])}><option value="gt">Greater than</option><option value="gte">At least</option><option value="lt">Less than</option><option value="lte">At most</option></select></label>
               <label className="field"><span>Threshold ({metricInfo.unit})</span><Input type="number" step="any" value={threshold} onChange={(event) => setThreshold(event.target.value)} required /></label>
               <label className="field"><span>Server scope</span><select value={serverId} onChange={(event) => setServerId(event.target.value)}><option value="">All servers</option>{servers.map((server) => <option key={server.id} value={server.id}>{server.name}</option>)}</select></label>
-              <label className="field"><span>Project scope</span><select value={projectId} onChange={(event) => setProjectId(event.target.value)}><option value="">All projects</option>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label>
-            </div>
-            <div className="alerts-form-footer"><span>Project rules match samples carrying that project&apos;s attribution.</span><Button className="button button-primary" variant="default" type="submit" disabled={busy}>{busy ? "Saving…" : "Create rule"}</Button></div>
+                          </div>
+            <div className="alerts-form-footer"><span>Rules evaluate metrics from every matching machine.</span><Button className="button button-primary" variant="default" type="submit" disabled={busy}>{busy ? "Saving…" : "Create rule"}</Button></div>
           </form>
         </section>
       )}
@@ -146,9 +143,8 @@ export default function AlertsWorkspace({ servers, projects, role, onBack }: {
           {loading ? <div className="project-empty">Loading alert rules…</div> : rules.length === 0 ? <div className="project-empty">No alert rules configured.</div> : rules.map((rule) => {
             const metricDef = METRICS.find((item) => item.value === rule.metric_name);
             const server = servers.find((item) => item.id === rule.server_id);
-            const project = projects.find((item) => item.id === rule.project_id);
             return <div className="alert-rule-row" key={rule.id}>
-              <div><strong>{rule.name}</strong><small>{metricDef?.label ?? rule.metric_name} {rule.operator} {formatNumber(rule.threshold, metricDef?.unit ?? "")}</small><small>{server?.name ?? "All servers"} · {project?.name ?? "All projects"}</small></div>
+              <div><strong>{rule.name}</strong><small>{metricDef?.label ?? rule.metric_name} {rule.operator} {formatNumber(rule.threshold, metricDef?.unit ?? "")}</small><small>{server?.name ?? "All servers"}</small></div>
               {canAdminister && <Button className="project-inline-delete" variant="destructive" size="sm" type="button" disabled={busy} onClick={() => void deleteRule(rule)}>Delete</Button>}
             </div>;
           })}
