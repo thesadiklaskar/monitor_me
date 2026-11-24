@@ -1,7 +1,8 @@
 param(
     [Parameter(Mandatory = $true)]
     [string]$ServerUrl,
-    [string]$GrpcAddress = ""
+    [string]$GrpcAddress = "",
+    [switch]$ForceEnrollment
 )
 
 $ErrorActionPreference = "Stop"
@@ -28,11 +29,23 @@ if ([string]::IsNullOrWhiteSpace($GrpcAddress)) {
 $temporaryDirectory = Join-Path $env:TEMP ("monitor-me-" + [Guid]::NewGuid().ToString("N"))
 New-Item -ItemType Directory -Force -Path $temporaryDirectory | Out-Null
 try {
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
     $artifactUrl = "$ServerUrl/api/agent-artifacts/windows/amd64"
     $agentDownload = Join-Path $temporaryDirectory "monitor-agent.exe"
-    $artifactResponse = Invoke-WebRequest -UseBasicParsing -Uri $artifactUrl -OutFile $agentDownload -PassThru
-    $expectedHash = [string]$artifactResponse.Headers["X-MonitorMe-SHA256"]
-    $agentVersion = [string]$artifactResponse.Headers["X-MonitorMe-Agent-Version"]
+    $artifactRequest = [System.Net.HttpWebRequest]::Create($artifactUrl)
+    $artifactRequest.Method = "GET"
+    $artifactResponse = $artifactRequest.GetResponse()
+    try {
+        $expectedHash = [string]$artifactResponse.Headers["X-MonitorMe-SHA256"]
+        $agentVersion = [string]$artifactResponse.Headers["X-MonitorMe-Agent-Version"]
+        $inputStream = $artifactResponse.GetResponseStream()
+        $outputStream = [System.IO.File]::Create($agentDownload)
+        try { $inputStream.CopyTo($outputStream) }
+        finally { $outputStream.Dispose(); $inputStream.Dispose() }
+    }
+    finally {
+        $artifactResponse.Close()
+    }
     $actualHash = (Get-FileHash -Algorithm SHA256 -Path $agentDownload).Hash.ToLowerInvariant()
     if ([string]::IsNullOrWhiteSpace($expectedHash) -or $actualHash -ne $expectedHash.ToLowerInvariant() -or [string]::IsNullOrWhiteSpace($agentVersion)) {
         throw "Native agent download failed SHA-256 or release-version verification."
@@ -52,6 +65,15 @@ try {
     $configFile = Join-Path $dataDirectory "agent.env"
     New-Item -ItemType Directory -Force -Path $programDirectory, $spoolDirectory | Out-Null
 
+    $service = Get-Service -Name "MonitorMeAgent" -ErrorAction SilentlyContinue
+    if ($ForceEnrollment) {
+        if ($service -and $service.Status -ne "Stopped") {
+            Stop-Service -Name "MonitorMeAgent" -Force
+            (Get-Service -Name "MonitorMeAgent").WaitForStatus("Stopped", [TimeSpan]::FromSeconds(30))
+        }
+        Remove-Item -LiteralPath $stateFile -Force -ErrorAction SilentlyContinue
+    }
+
     $token = ""
     if (-not (Test-Path $stateFile)) {
         $secureToken = Read-Host "Paste the one-time Monitor Me enrollment token" -AsSecureString
@@ -67,7 +89,6 @@ try {
         }
     }
 
-    $service = Get-Service -Name "MonitorMeAgent" -ErrorAction SilentlyContinue
     if ($service) {
         if ($service.Status -ne "Stopped") {
             Stop-Service -Name "MonitorMeAgent" -Force
@@ -87,6 +108,7 @@ try {
         MONITOR_COLLECTION_INTERVAL = "5s"
         MONITOR_SPOOL_DIR = $spoolDirectory
         MONITOR_AGENT_STATE_FILE = $stateFile
+        MONITOR_LOG_FILE = (Join-Path $dataDirectory "agent.log")
     }
     if (-not [string]::IsNullOrWhiteSpace($token)) {
         $values.MONITOR_ENROLLMENT_TOKEN = $token
@@ -133,7 +155,10 @@ try {
         }
     }
     if (-not $sessionPersisted) {
-        throw "The agent did not persist its enrollment session. Check the Windows Application event log and confirm the target can reach $GrpcAddress."
+        if (Test-Path (Join-Path $dataDirectory "agent.log")) {
+            Get-Content -LiteralPath (Join-Path $dataDirectory "agent.log") -Tail 60
+        }
+        throw "The agent did not persist its enrollment session. Confirm the target can reach $GrpcAddress and inspect the diagnostic log above."
     }
 
     if (Select-String -Path $configFile -Pattern "^MONITOR_ENROLLMENT_TOKEN=" -Quiet) {
