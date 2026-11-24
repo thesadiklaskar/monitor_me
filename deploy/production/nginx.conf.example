@@ -4,7 +4,7 @@ map $http_upgrade $monitor_me_connection_upgrade {
     default upgrade;
     ''      close;
 }
-limit_req_zone $binary_remote_addr zone=monitor_me_agent_bootstrap:10m rate=10r/m;
+limit_req_zone $binary_remote_addr zone=monitor_me_agent_bootstrap:10m rate=30r/s;
 server {
     listen 80;
     listen [::]:80;
@@ -30,7 +30,7 @@ server {
     # Public, rate-limited bootstrap routes: installers, CA and signed-by-checksum
     # native binaries. These contain no operator data or persistent enrollment secrets.
     location = /install/agent-linux.sh {
-        limit_req zone=monitor_me_agent_bootstrap burst=10 nodelay;
+        limit_req zone=monitor_me_agent_bootstrap burst=100 nodelay;
         proxy_pass http://127.0.0.1:13000;
         proxy_set_header Host $host;
         proxy_set_header X-Forwarded-Proto https;
