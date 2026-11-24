@@ -138,7 +138,7 @@ The product owner's latest direction supersedes the earlier login/organization-f
 - [x] Invalid, expired, consumed, and revoked enrollment credentials are rejected.
 - [x] **Phase 2 closeout (historical):** README, development guide, ADR, feature acceptance matrix, and project state recorded Phase 3 as the next phase. They now record Phases 1–3 as complete and Phase 4 as not started.
 
-**CI evidence:** [GitHub Actions run #45030320358](https://github.com/WorkRCS/monitor_me/actions/runs/45030320358) — all three jobs succeeded: Go backend checks, Next.js frontend checks, and Docker Compose integration. The run generated Protobuf sources, built the Go services, started the full stack, exercised user authentication and TLS agent enrollment, verified migrations and Redis connectivity, and tested Redis outage/recovery with durable PostgreSQL state.
+**CI evidence:** GitHub Actions run #45030320358 (historical Actions run) — all three jobs succeeded: Go backend checks, Next.js frontend checks, and Docker Compose integration. The run generated Protobuf sources, built the Go services, started the full stack, exercised user authentication and TLS agent enrollment, verified migrations and Redis connectivity, and tested Redis outage/recovery with durable PostgreSQL state.
 
 **Decision record:** ADR 0002 — User Authentication and Secure Agent Enrollment.
 
@@ -175,7 +175,7 @@ The product owner's latest direction supersedes the earlier login/organization-f
 - [x] Collection, WAL, event preparation, and TLS gRPC/PostgreSQL ingestion are benchmarked in CI.
 - [x] README, metric catalog, development guide, architecture overview, acceptance matrix, roadmap, and project state match the implementation.
 
-**Verification evidence:** [GitHub Actions run #45043161542 — success](https://github.com/WorkRCS/monitor_me/actions/runs/45043161542) verified all four jobs on `main`: Go backend, native Linux agent, Next.js frontend, and Docker Compose integration. The Compose job verified telemetry ingestion, history/retention, Redis outage/recovery, and a PostgreSQL durability canary across service restart.
+**Verification evidence:** GitHub Actions run #45043161542 — success (historical Actions run) verified all four jobs on `main`: Go backend, native Linux agent, Next.js frontend, and Docker Compose integration. The Compose job verified telemetry ingestion, history/retention, Redis outage/recovery, and a PostgreSQL durability canary across service restart.
 
 ## Phase 4 — Dashboard and Operational Features
 

@@ -169,4 +169,4 @@ The browser live endpoint uses a 30-second single-use ticket derived from a vali
 
 This implementation is Linux-first. Windows/macOS collectors, full Docker Engine discovery, per-process CPU metrics, app request instrumentation, persistent rollup tables, dashboard UI, and production installers are not claimed as implemented. Agent process CPU and collector/WAL health metrics are emitted as ordinary metric samples; the AgentHealth protobuf envelope remains reserved.
 
-**Verification:** the full Phase 3 control-plane, native agent, frontend foundation, and Docker Compose integration pipeline passed in [GitHub Actions run #45039191041](https://github.com/WorkRCS/monitor_me/actions/runs/45045054465).
+**Verification:** the full Phase 3 control-plane, native agent, frontend foundation, and Docker Compose integration pipeline passed in GitHub Actions run #45039191041 (historical Actions run).

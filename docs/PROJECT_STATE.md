@@ -1,13 +1,11 @@
-# Project State
-
-This file is the authoritative resume point for Monitor Me. Read it before making changes and update it after every work session.
+| Latest implementation commit | 681d4c06bf942200c35553a573d3a415dccaf488 — alert evaluation now commits atomically with telemetry; recent commits also add idempotent remote-operation audit, heartbeat-derived status, ambiguous-login rejection and repository-independent Go module paths |n | #45336425843 — completed with failure and an empty jobs list; no runner steps or tests executed for the latest changes |nt for Monitor Me. Read it before making changes and update it after every work session.
 
 ## Current Snapshot
 
 | Field | Value |
 | --- | --- |
 | Project | Monitor Me |
-| Repository | WorkRCS/monitor_me |
+| Repository | operator-configured Git remote |
 | Default branch | main |
 | Working branch | main |
 | Branch policy | All work and commits are made directly on main; do not create another branch |
@@ -18,12 +16,29 @@ This file is the authoritative resume point for Monitor Me. Read it before makin
 | MVP status | Core metrics/dashboard foundation and first plug-and-play installers are implemented; Windows/Linux runtime acceptance, raw logs, full console polish and production-host verification remain |
 | Implementation status | The operator product direction is single-install, no-login and plug-and-play. Add Machine no longer asks for target OS; it offers PowerShell/POSIX launchers, a collapsible Lucide icon sidebar and a simplified single-install shell. Linux/Windows agents report OS/platform/architecture and available virtualization hints. The local Compose startup helper auto-generates a development certificate and the Compose artifact-builder now generates protobuf code and builds Linux amd64/arm64 plus Windows x64 binaries. Target-side installers download checksum-verified binaries without Docker/source checkout; Linux installs systemd and Windows installs a restart-enabled Windows Service. These installers and service lifecycles have not yet passed owner runtime acceptance or publisher code-signing. Production no-login is opt-in in the provided env sample and the deploy script generates an Nginx admin allowlist for dashboard/API/WebSocket while leaving installer/CA/artifact paths public; the host firewall helper and real-host IPv4/IPv6/cloud checks still need validation. Raw log ingestion/search is not implemented; ClickHouse is only proposed in ADR 0005. |
 | Last source commit covered by latest successful CI run | 9685e115113123d5f9f8e8a1b222804752f5a283 (Go, frontend and native-agent jobs passed in run #45203706343; Compose integration failed at the web proxy login probe; later commits are not covered) |
-| Latest CI run | [#45208235137 — quota blocked](https://github.com/WorkRCS/monitor_me/actions/runs/45208235137); jobs failed before runner assignment/steps because the repository owner reports GitHub Actions free minutes are exhausted |
-| Latest implementation commit | [2f4e60109a7f1e6cc895b800f10d712ec9ee39b8](https://github.com/WorkRCS/monitor_me/commit/2f4e60109a7f1e6cc895b800f10d712ec9ee39b8) — normalize production no-login gate; preceding commits add Lucide action icons, target-side native service installers, fresh-clone protobuf generation and Nginx/firewall protections |
+| Latest CI run | #45208235137 — quota blocked (historical Actions run); jobs failed before runner assignment/steps because the repository owner reports GitHub Actions free minutes are exhausted |
+| Latest implementation commit | 2f4e60109a7f1e6cc895b800f10d712ec9ee39b8 (commit 2f4e60109a7f1e6cc895b800f10d712ec9ee39b8) — normalize production no-login gate; preceding commits add Lucide action icons, target-side native service installers, fresh-clone protobuf generation and Nginx/firewall protections |
 | Next action | On the owner's Windows PC, pull `main`, run `.\scripts\start-local.ps1` in PowerShell, confirm `agent-artifacts` completed and the no-login dashboard opens, then Add Machine and validate the Windows x64 Service installer using a fresh one-time token. Inspect `Get-Service MonitorMeAgent` and `%ProgramData%\\MonitorMe\\agent.log`. Do not expose local anonymous mode beyond loopback. GitHub Actions currently cannot assign runners due quota, so no fresh CI pass is claimed. |
 
 
 
+
+## Reliability, tenancy and portability audit — 2026-11-24
+
+**Status:** Source review and corrective commits are on `main`; runtime verification remains open.
+
+- [x] Remote operation queueing and its audit record now commit in one PostgreSQL transaction; an injected audit-write failure integration test verifies rollback.
+- [x] Server inventory derives `online/stale/offline` from agent heartbeat age (45-second stale, 90-second offline) while preserving pending/disabled/revoked states; integration coverage asserts 60-second and 120-second cases.
+- [x] Alert rule evaluation, firing/recovery events and in-app notifications now execute in the same transaction as the telemetry batch. Any alert-storage error rejects the batch with gRPC Unavailable so the agent can retry its durable WAL item; an integration fault-injection test covers rollback and replay.
+- [x] Alert rules are loaded once per telemetry batch, scoped by organization/server/metric, then matched by project to avoid one rule query per sample.
+- [x] A user with more than one organization membership now receives `409 organization_selection_required`; login no longer silently selects the oldest organization. Organization switching is not implemented yet, so use one user identity per organization until that UI exists.
+- [x] Go module IDs, source imports, Protobuf package metadata, Docker build flags and generation scripts no longer depend on the old GitHub owner/repository path. Internal module IDs are `example.com/monitor-me/backend` and `example.com/monitor-me/agent`; they are internal build namespaces, not published download URLs.
+- [ ] Execute the new tests and all existing backend/frontend/agent/Compose checks on a real runner. Latest Actions run #45336425843 has an empty jobs list; it did not run tests, so none of the new changes are marked verified.
+- [ ] Complete a full line-by-line audit and local owner acceptance. This checkpoint records critical-path review, not a claim that all 187 files have been executed or manually validated.
+
+**Isolation boundary:** Application queries and composite foreign keys scope servers, projects, telemetry, alerts and operations by organization. This is logical isolation in a shared PostgreSQL schema; PostgreSQL RLS and per-customer physical databases are not implemented. The recommended current deployment for strict customer-owned data is one self-hosted Monitor Me installation and private datastore/volumes per customer. A shared SaaS serving many independent companies needs a separately accepted tenant boundary, organization selection/member management and isolation/load testing before release.
+
+**Current functional gaps:** Raw log ingestion/storage/search/live tail, ClickHouse, traces/APM, project-specific metric dashboards, global dashboard builder, settings/member administration, external alert routing/escalation, advanced alert duration/severity/silences, Windows runtime acceptance, macOS and sustained high-volume tests remain unfinished.
 
 ## Single-install plug-and-play product direction — 2026-11-24
 
@@ -90,7 +105,7 @@ Phase 5 Linux deployment and firewall tooling is prepared, but do not mark it co
 
 ## Phase 1–3 Audit
 
-The final Phase 1–3 audit passed all four jobs in [GitHub Actions run #45045054465 — success](https://github.com/WorkRCS/monitor_me/actions/runs/45045054465). This run includes strict lowercase batch-ID validation, telemetry integration, and a PostgreSQL outage/recovery canary. The audit also identified individual product requirements that remain In Progress or Planned; see docs/PHASE_1_TO_3_AUDIT.md.
+The final Phase 1–3 audit passed all four jobs in GitHub Actions run #45045054465 — success (historical Actions run). This run includes strict lowercase batch-ID validation, telemetry integration, and a PostgreSQL outage/recovery canary. The audit also identified individual product requirements that remain In Progress or Planned; see docs/PHASE_1_TO_3_AUDIT.md.
 
 ### Explicit unfinished product requirements
 
@@ -141,7 +156,7 @@ Key Phase 1 commits:
 
 ### Verification evidence
 
-GitHub Actions run [#45030320358](https://github.com/WorkRCS/monitor_me/actions/runs/45030320358) completed successfully:
+GitHub Actions run #45030320358 (historical Actions run) completed successfully:
 
 - [x] Go dependency resolution and verification, Protobuf generation, gofmt, race-enabled tests, go vet, and backend builds.
 - [x] Frontend dependency install, ESLint, TypeScript check, and production build.
@@ -175,7 +190,7 @@ At the moment Phase 2 was closed, the frontend was a foundation shell and the na
 
 **Status: Completed — Phase 3 acceptance gate verified. The overall P0 MVP remains incomplete until Phase 4 dashboard workflows are delivered.**
 
-**Verification evidence:** [GitHub Actions run #45043161542 — success](https://github.com/WorkRCS/monitor_me/actions/runs/45043161542). All four jobs passed: Go backend, native Linux agent, Next.js frontend, and Docker Compose integration. The Compose job verified migrations, authenticated TLS enrollment, telemetry/history/retention, Redis outage/recovery, and PostgreSQL canary durability across service restart.
+**Verification evidence:** GitHub Actions run #45043161542 — success (historical Actions run). All four jobs passed: Go backend, native Linux agent, Next.js frontend, and Docker Compose integration. The Compose job verified migrations, authenticated TLS enrollment, telemetry/history/retention, Redis outage/recovery, and PostgreSQL canary durability across service restart.
 
 ### Delivered implementation
 
@@ -236,7 +251,7 @@ These measurements are a single CI-runner snapshot, not production capacity guar
 - [x] Bearer credentials are held in an HttpOnly, SameSite=Lax cookie; browser JavaScript only receives the safe user profile.
 - [x] Organization-scoped server inventory, loading/empty/error states, Add Server, one-time enrollment-token display/copy/expiry, and role-aware revoke/reissue controls are implemented.
 - [x] Token reissue revokes all previous unused enrollment credentials in the same PostgreSQL transaction; an integration test covers the replaced-token rejection path.
-- [x] Frontend lint/typecheck/production build and full-stack verification passed in [GitHub Actions run #45188259431](https://github.com/WorkRCS/monitor_me/actions/runs/45188259431).
+- [x] Frontend lint/typecheck/production build and full-stack verification passed in GitHub Actions run #45188259431 (historical Actions run).
 
 ### Exact resume instructions — superseded 2026-11-24
 
@@ -262,7 +277,7 @@ Current priority order:
 
 ## Session History
 
-Phase 1 and Phase 2 implementation/verification history is recorded above. The final Phase 1–3 audit passed all four jobs in [GitHub Actions run #45043161542](https://github.com/WorkRCS/monitor_me/actions/runs/45043161542).
+Phase 1 and Phase 2 implementation/verification history is recorded above. The final Phase 1–3 audit passed all four jobs in GitHub Actions run #45043161542 (historical Actions run).
 
 
 ## Windows Local-Agent Slice — 2026-11-23

@@ -88,7 +88,7 @@ No item may be marked Verified based only on a code stub, mock UI, or documentat
 - [x] Agent revocation rejects future heartbeat requests.
 - [x] **Phase 2 closeout (historical):** the telemetry stream was deferred until Phase 3 implemented durable ingestion. The current stream accepts authenticated telemetry batches and acknowledges only after PostgreSQL commit.
 
-**CI evidence:** [GitHub Actions run #45030320358](https://github.com/WorkRCS/monitor_me/actions/runs/45030320358) — all three jobs passed: Go backend, Next.js frontend, and full Docker Compose integration.
+**CI evidence:** GitHub Actions run #45030320358 (historical Actions run) — all three jobs passed: Go backend, Next.js frontend, and full Docker Compose integration.
 
 ### Phase 3 — Monitoring Agent and Telemetry Data Engine
 
@@ -102,7 +102,7 @@ No item may be marked Verified based only on a code stub, mock UI, or documentat
 - [x] WebSocket tickets are one-use, session-bound, invalidated on logout, isolated by organization, bounded for slow clients, and reconnectable.
 - [x] Workload mappings verify Systemd project attribution while keeping host-total, unclassified, and shared resources separate.
 - [x] Agent collection/WAL, live event preparation, and TLS gRPC/PostgreSQL ingestion benchmarks execute in CI.
-- [x] All Phase 3 gates passed in [GitHub Actions run #45043161542](https://github.com/WorkRCS/monitor_me/actions/runs/45045054465); all four jobs succeeded, including canonical batch-ID validation and PostgreSQL outage/recovery.
+- [x] All Phase 3 gates passed in GitHub Actions run #45043161542 (historical Actions run); all four jobs succeeded, including canonical batch-ID validation and PostgreSQL outage/recovery.
 
 **Phase 3 boundaries:** Linux is the only implemented collector platform. Full Windows/macOS support, complete Docker Engine API discovery, per-process CPU, eBPF, HTTP request latency/error instrumentation, persistent materialized rollups, and dashboard UI remain later-phase work.
 
@@ -111,7 +111,7 @@ No item may be marked Verified based only on a code stub, mock UI, or documentat
 **Status: In Progress — implementation began 2026-11-23.**
 
 - [x] First-owner setup, login/logout and current-session UI connected to existing authenticated APIs through HttpOnly cookie-backed same-origin route handlers.
-- [x] Organization-scoped server inventory, loading/empty/error states, Add Server, one-time token display/copy/expiry, and token rotation/revocation controls pass all four jobs in [GitHub Actions run #45188259431](https://github.com/WorkRCS/monitor_me/actions/runs/45188259431). Full one-command install UX and stale/disconnected component tests remain.
+- [x] Organization-scoped server inventory, loading/empty/error states, Add Server, one-time token display/copy/expiry, and token rotation/revocation controls pass all four jobs in GitHub Actions run #45188259431 (historical Actions run). Full one-command install UX and stale/disconnected component tests remain.
 - [ ] Server and project views display correct scoped data.
 - [ ] Custom charts pass representative rendering tests.
 - [ ] Process, port, and application metrics show documented capabilities.
