@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/WorkRCS/monitor_me/backend/internal/telemetry"
+	"example.com/monitor-me/backend/internal/telemetry"
 )
 
 func (api *API) metrics(writer http.ResponseWriter, request *http.Request) {

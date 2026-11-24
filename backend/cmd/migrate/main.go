@@ -7,8 +7,8 @@ import (
 	"net/url"
 	"os"
 
-	"github.com/WorkRCS/monitor_me/backend/internal/config"
-	"github.com/WorkRCS/monitor_me/backend/migrations"
+	"example.com/monitor-me/backend/internal/config"
+	"example.com/monitor-me/backend/migrations"
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/pgx/v5"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
