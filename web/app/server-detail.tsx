@@ -732,7 +732,7 @@ export function ServerDetail({
         </div>
         {inventoryError && <div className="notice notice-error" role="alert">{inventoryError}</div>}
         {inventoryLoading && latestSamples.length === 0 ? (
-          <div className="project-empty">Loading process and TCP inventory…</div>
+          <div className="monitor-empty">Loading process and TCP inventory…</div>
         ) : (
           <div className="detail-inventory-grid">
             <div>
