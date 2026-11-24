@@ -150,14 +150,29 @@ The monitoring product itself is custom-built. The project will not embed or dep
 
 ### Native agent setup (run on each monitored host)
 
-The Compose stack is the control plane (web, API, PostgreSQL and Redis). A native Monitor Me agent must run on each machine whose host metrics you want to collect; running Compose alone does not grant it reliable access to the Windows/Linux host.
+The Compose stack is the control plane. Every monitored machine runs its own native agent; the installer detects the target OS and architecture there—not in the browser and not from the control-plane container.
 
-- **Windows host:** Add Machine and create a one-time token. From a Monitor Me source checkout on that Windows host run `.\scripts\setup-windows-agent.ps1` (PowerShell). The helper builds the native Windows binary with Docker if absent, then starts the agent and securely prompts for the one-time token.
-- **Linux host:** Add Machine and create a one-time token. Copy the trusted control-plane CA to the monitored host, then run `sudo ./scripts/setup-linux-agent.sh --grpc-address <host:8443> --ca-file <trusted-ca-file>` from a source checkout. It builds the native Linux binary, installs the systemd service, enrolls, and removes the one-time token from the service environment after session persistence.
+After choosing **Add Machine**, copy the command for the terminal available on the target host:
 
-Use a reachable gRPC endpoint and a CA trusted by the target machine. `localhost:8443` is only correct when the agent and control plane are on the same host. The initial Windows helper currently runs in the foreground; native Windows service installation, signed installers and unattended upgrades remain planned.
+**Windows · PowerShell (Run as Administrator)**
 
-Host OS and virtualization labels come from the native agent, not the browser. Virtualization detection is best-effort: hypervisor metadata is reported where available, and provider-specific VPS hints can be missing. A missing signal is shown as unknown rather than guessed. Containers, VMs and the host OS are distinct concepts; a Docker Compose control plane does not itself identify the external host's environment.
+```powershell
+& ([scriptblock]::Create((Invoke-RestMethod -Uri 'https://monitor.example/install/agent-windows.ps1'))) -ServerUrl 'https://monitor.example' -GrpcAddress 'monitor.example:8443'
+```
+
+The installer detects Windows x64, downloads the matching artifact, verifies its SHA-256, installs a restart-enabled Windows Service and securely prompts for the one-time token. The session is stored under ProgramData and the token is removed after enrollment.
+
+**Linux · Shell (systemd, run as root)**
+
+```sh
+curl -fsSL 'https://monitor.example/install/agent-linux.sh' | sudo bash -s -- --server-url 'https://monitor.example' --grpc-address 'monitor.example:8443'
+```
+
+The installer detects Linux amd64/arm64, downloads and checksum-verifies the native agent, installs/enables the systemd service, securely prompts for the one-time token and removes it after session persistence.
+
+These launchers do not need Docker, Go, Node.js or a repository checkout on the monitored host. They require the target to reach the control-plane HTTPS installer and the advertised TLS gRPC endpoint. `localhost:8443` only works when the agent and control plane share a host. The binaries are checksum-verified but are not yet publisher-code-signed; signing and OS publisher verification are release gates.
+
+Host OS, architecture and available VM/hypervisor metadata come from the native agent. Provider detection is best-effort; where a provider or virtualization signal is unavailable, Monitor Me must report unknown rather than guess.
 
 
 See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for prerequisites and current limitations.
