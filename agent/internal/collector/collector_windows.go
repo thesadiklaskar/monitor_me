@@ -233,14 +233,24 @@ func (c *ProcCollector) collectWindows(ctx context.Context) ([]Sample, error) {
 		if hostname == "" {
 			hostname = info.Hostname
 		}
-		add("host.info", 1, "info", map[string]string{
+		labels := map[string]string{
 			"hostname": hostname,
 			"os": runtime.GOOS,
 			"platform": info.Platform,
 			"platform_version": info.PlatformVersion,
 			"kernel_version": info.KernelVersion,
 			"architecture": runtime.GOARCH,
-		})
+		}
+		if info.VirtualizationSystem != "" {
+			labels["virtualization_system"] = info.VirtualizationSystem
+		}
+		if info.VirtualizationRole != "" {
+			labels["virtualization_role"] = info.VirtualizationRole
+		}
+		labels["environment_type"] = classifyEnvironmentType(
+			info.VirtualizationSystem, info.VirtualizationRole, false, false,
+		)
+		add("host.info", 1, "info", labels)
 	}
 
 	pids, processErr := process.PidsWithContext(ctx)
