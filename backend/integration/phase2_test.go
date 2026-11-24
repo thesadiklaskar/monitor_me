@@ -1030,6 +1030,50 @@ func TestPhase2AuthenticationAndAgentLifecycle(t *testing.T) {
 	}
 
 	// A failed audit insert must roll back the queued command as well.
+	// Inventory status is derived from the last authenticated heartbeat,
+	// not a stale status field left behind by a disconnected agent.
+	if _, err := database.ExecContext(ctx, `
+		UPDATE agents SET last_seen_at = now() - interval '60 seconds' WHERE id = $1
+	`, enrolled.GetAgentId()); err != nil {
+		t.Fatalf("age agent heartbeat for stale-state test: %v", err)
+	}
+	readInventoryStatus := func() string {
+		response := requestJSON(t, ctx, http.MethodGet, baseURL+"/v1/servers", bearer, nil)
+		if response.StatusCode != http.StatusOK {
+			t.Fatalf("read server inventory status: expected 200, got %d: %s", response.StatusCode, response.Body)
+		}
+		var inventory struct {
+			Servers []struct {
+				ID     string `json:"id"`
+				Status string `json:"status"`
+			} `json:"servers"`
+		}
+		decodeResponse(t, response.Body, &inventory)
+		for _, item := range inventory.Servers {
+			if item.ID == serverID {
+				return item.Status
+			}
+		}
+		t.Fatalf("server %s is missing from its owning organization inventory", serverID)
+		return ""
+	}
+	if actual := readInventoryStatus(); actual != "stale" {
+		t.Fatalf("a 60-second-old heartbeat must be stale, got %q", actual)
+	}
+	if _, err := database.ExecContext(ctx, `
+		UPDATE agents SET last_seen_at = now() - interval '120 seconds' WHERE id = $1
+	`, enrolled.GetAgentId()); err != nil {
+		t.Fatalf("age agent heartbeat for offline-state test: %v", err)
+	}
+	if actual := readInventoryStatus(); actual != "offline" {
+		t.Fatalf("a 120-second-old heartbeat must be offline, got %q", actual)
+	}
+	if _, err := database.ExecContext(ctx, `
+		UPDATE agents SET last_seen_at = now() WHERE id = $1
+	`, enrolled.GetAgentId()); err != nil {
+		t.Fatalf("restore fresh agent heartbeat after liveness test: %v", err)
+	}
+
 	identityStore := identity.NewStore(database)
 	operationPrincipal := identity.Principal{
 		UserID: registered.User.ID, OrganizationID: registered.User.OrganizationID, Role: "owner",

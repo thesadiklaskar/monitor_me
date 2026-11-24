@@ -80,6 +80,7 @@ function statusLabel(status: string): string {
     case "online": return "Connected";
     case "pending": return "Awaiting agent";
     case "disabled": return "Disabled";
+    case "stale": return "Delayed heartbeat";
     case "offline": return "Disconnected";
     default: return status.replaceAll("_", " ");
   }
@@ -89,6 +90,7 @@ function statusClass(status: string): string {
   switch (status.toLowerCase()) {
     case "online": return "border-emerald-400/25 bg-emerald-400/10 text-emerald-300";
     case "pending": return "border-amber-400/25 bg-amber-400/10 text-amber-200";
+    case "stale": return "border-amber-400/25 bg-amber-400/10 text-amber-200";
     case "disabled":
     case "offline": return "border-slate-500/30 bg-slate-500/10 text-slate-300";
     default: return "border-[var(--border)] bg-[var(--surface-raised)] text-[var(--muted)]";
@@ -465,6 +467,7 @@ export default function DashboardClient() {
   const [view, setView] = useState<ViewState>("checking");
   const [user, setUser] = useState<User | null>(null);
   const [servers, setServers] = useState<Server[]>([]);
+  const [apiStatus, setApiStatus] = useState<"checking" | "online" | "offline">("checking");
   const [inventoryBusy, setInventoryBusy] = useState(false);
   const [inventoryError, setInventoryError] = useState("");
   const [notice, setNotice] = useState("");
@@ -499,15 +502,27 @@ export default function DashboardClient() {
     setInventoryError("");
     try {
       const result = await apiRequest<InventoryResponse>("/api/servers");
-      setServers(Array.isArray(result.servers) ? result.servers : []);
+      const nextServers = Array.isArray(result.servers) ? result.servers : [];
+      setServers(nextServers);
+      setSelectedServer((current) => current
+        ? nextServers.find((server) => server.id === current.id) ?? null
+        : null);
+      setApiStatus("online");
     } catch (loadError) {
       const message = displayError(loadError);
       setInventoryError(message);
+      setApiStatus("offline");
       if (message.toLowerCase().includes("sign in")) setView("signed-out");
     } finally {
       setInventoryBusy(false);
     }
   }, []);
+
+  useEffect(() => {
+    if (view !== "signed-in") return;
+    const refresh = window.setInterval(() => { void loadServers(); }, 15000);
+    return () => window.clearInterval(refresh);
+  }, [loadServers, view]);
 
   const loadWorkspaceMetadata = useCallback(async () => {
     const [configResult, projectResult] = await Promise.allSettled([
@@ -676,7 +691,10 @@ export default function DashboardClient() {
         <header className="topbar">
           <div><span className="breadcrumbs">Workspace / Servers</span><h1>Server overview</h1></div>
           <div className="topbar-actions">
-            <span className="live-label"><span className="status-dot status-dot-online" /> API connected</span>
+            <span className="live-label">
+              <span className={`status-dot ${apiStatus === "online" ? "status-dot-online" : apiStatus === "offline" ? "status-dot-unavailable" : "status-dot-pending"}`} />
+              {apiStatus === "online" ? "API connected" : apiStatus === "offline" ? "API unavailable" : "Checking API"}
+            </span>
             <label className="project-scope-select"><span>Project scope</span>
               <select value={selectedProjectId} onChange={(event) => setSelectedProjectId(event.target.value)}>
                 <option value="">All projects</option>

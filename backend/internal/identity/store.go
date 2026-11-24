@@ -547,7 +547,16 @@ func (s *Store) CreateServer(ctx context.Context, principal Principal, name, hos
 // ListServers returns only the current user's organization inventory.
 func (s *Store) ListServers(ctx context.Context, principal Principal) ([]Server, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT s.id::text, s.name, COALESCE(s.hostname, ''), s.status,
+		SELECT s.id::text, s.name, COALESCE(s.hostname, ''),
+		       CASE
+		           WHEN s.status = 'disabled' THEN 'disabled'
+		           WHEN a.status IN ('revoked', 'offline') THEN 'offline'
+		           WHEN a.status = 'stale' THEN 'stale'
+		           WHEN a.last_seen_at IS NULL THEN s.status
+		           WHEN a.last_seen_at <= now() - interval '90 seconds' THEN 'offline'
+		           WHEN a.last_seen_at <= now() - interval '45 seconds' THEN 'stale'
+		           ELSE 'online'
+		       END AS effective_status,
 		       a.id::text, a.last_seen_at, s.created_at
 		FROM servers s
 		LEFT JOIN agents a ON a.server_id = s.id
