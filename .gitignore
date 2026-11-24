@@ -20,3 +20,4 @@ coverage.out
 *.log
 
 /agent/gen/
+/web/tsconfig.tsbuildinfo
