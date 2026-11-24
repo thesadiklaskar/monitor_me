@@ -15,12 +15,12 @@ This file is the authoritative resume point for Monitor Me. Read it before makin
 | Completed phases | Phase 1 — Product Specification and Technical Blueprint; Phase 2 — Platform Foundation and Secure Connectivity; Phase 3 — Monitoring Agent and Telemetry Data Engine |
 | Current phase | Phase 4 dashboard acceptance and Phase 5 Linux-MVP / Windows local-agent validation |
 | Current phase status | In Progress — implementation is present; end-to-end acceptance is pending |
-| MVP status | Dashboard workflows are implemented; owner-led local acceptance and production-host verification remain before release |
-| Implementation status | The operator product direction is now single-install, no-login and plug-and-play. The dashboard no longer asks for a target OS during Add Machine; it shows PowerShell/POSIX launcher choices, has a collapsible icon-led sidebar and removes org/profile clutter from the local operator shell. Linux/Windows agents report OS/platform/architecture and available virtualization metadata. The local Compose startup helper and HTTPS-downloadable Linux/Windows target installers are committed. The agent bundle is built by Compose; Linux installs systemd and Windows installs a restart-enabled Windows Service. Artifact checksum verification and installer wiring are implemented but not runtime-tested or publisher-code-signed. Production no-login is gated by an Nginx admin allowlist for dashboard/API/WebSocket while public installer/CA/artifact paths remain reachable; host firewall and external IPv4/IPv6 acceptance remain pending. Raw log ingestion/search is not implemented; ClickHouse is proposed in ADR 0005. No-login production must wait for the network access gate and security verification. |
+| MVP status | Core metrics/dashboard foundation and first plug-and-play installers are implemented; Windows/Linux runtime acceptance, raw logs, full console polish and production-host verification remain |
+| Implementation status | The operator product direction is single-install, no-login and plug-and-play. Add Machine no longer asks for target OS; it offers PowerShell/POSIX launchers, a collapsible Lucide icon sidebar and a simplified single-install shell. Linux/Windows agents report OS/platform/architecture and available virtualization hints. The local Compose startup helper auto-generates a development certificate and the Compose artifact-builder now generates protobuf code and builds Linux amd64/arm64 plus Windows x64 binaries. Target-side installers download checksum-verified binaries without Docker/source checkout; Linux installs systemd and Windows installs a restart-enabled Windows Service. These installers and service lifecycles have not yet passed owner runtime acceptance or publisher code-signing. Production no-login is opt-in in the provided env sample and the deploy script generates an Nginx admin allowlist for dashboard/API/WebSocket while leaving installer/CA/artifact paths public; the host firewall helper and real-host IPv4/IPv6/cloud checks still need validation. Raw log ingestion/search is not implemented; ClickHouse is only proposed in ADR 0005. |
 | Last source commit covered by latest successful CI run | 9685e115113123d5f9f8e8a1b222804752f5a283 (Go, frontend and native-agent jobs passed in run #45203706343; Compose integration failed at the web proxy login probe; later commits are not covered) |
 | Latest CI run | [#45208235137 — quota blocked](https://github.com/WorkRCS/monitor_me/actions/runs/45208235137); jobs failed before runner assignment/steps because the repository owner reports GitHub Actions free minutes are exhausted |
-| Latest implementation commit | [979a737ece372efeeed816381b984d05f74f8fc1](https://github.com/WorkRCS/monitor_me/commit/979a737ece372efeeed816381b984d05f74f8fc1) — collapsible sidebar, icon navigation and agent enrollment UI refinements |
-| Next action | Verify the current Next.js dashboard after pulling `main`: run frontend lint/typecheck/build, inspect the OS-agnostic enrollment dialog and collapsed sidebar, then inspect the Nginx administrator allowlist and run `deploy/production/firewall.sh --role control-plane --admin-cidr <ADMIN_CIDR> --verify-admin-ui-allowlist` in dry-run only; confirm public HTTPS is used only for the public bootstrap paths while the dashboard/live stream are admin-restricted. Keep existing data volumes; do not enable production anonymous access or apply firewall changes without a selected host and verified admin CIDR. |
+| Latest implementation commit | [59ff807d1bb2ec75790867169257774ac721fa40](https://github.com/WorkRCS/monitor_me/commit/59ff807d1bb2ec75790867169257774ac721fa40) — production environment defaults and product/agent status alignment; preceding commits add standalone target installers, native service support, Nginx access gate and fresh-clone artifact generation |
+| Next action | On the owner's Windows PC, pull `main`, run `./scripts/start-local.ps1` (PowerShell form: `.` backslash path), confirm `agent-artifacts` completed and the no-login dashboard opens, then Add Machine and validate the Windows x64 Service installer using a fresh one-time token. Inspect `Get-Service MonitorMeAgent` and `%ProgramData%\\MonitorMe\\agent.log`. Do not expose local anonymous mode beyond loopback. GitHub Actions currently cannot assign runners due quota, so no fresh CI pass is claimed. |
 
 
 
@@ -65,7 +65,7 @@ This file is the authoritative resume point for Monitor Me. Read it before makin
 - [x] Kept the existing history API, committed-telemetry WebSocket, project scope, and latest-snapshot/process APIs; no chart dependency or third-party monitoring platform was added.
 - [x] Clarified that TCP state and listening-port inventory are not reported by the initial Windows collector.
 - [ ] Pull the new main commit, rebuild the web container, and verify the refreshed UI against the enrolled Windows host. GitHub Actions quota is currently blocking fresh runner-based CI, so no new CI pass is claimed.
-- **Next action:** Run `git pull origin main` followed by `docker compose up --build -d web`, then open the Windows PC detail page and check current KPI values and the history chart. Keep the agent window running.
+- **Next action — historical slice updated:** Stop any old foreground Windows agent before testing the new `MonitorMeAgent` Windows Service installer; use a new Add Machine token for the new ProgramData service identity.
 
 ## Next Work Session — 2026-11-24
 
@@ -238,20 +238,15 @@ These measurements are a single CI-runner snapshot, not production capacity guar
 - [x] Token reissue revokes all previous unused enrollment credentials in the same PostgreSQL transaction; an integration test covers the replaced-token rejection path.
 - [x] Frontend lint/typecheck/production build and full-stack verification passed in [GitHub Actions run #45188259431](https://github.com/WorkRCS/monitor_me/actions/runs/45188259431).
 
-### Exact resume instructions
+### Exact resume instructions — superseded 2026-11-24
 
-Continue directly on `main`. Do not create a new branch.
+Continue directly on `main`. The older login-first Phase 4 sequence below is historical and is superseded by the single-install no-login product direction recorded in `docs/PRODUCT_VISION_PLUG_AND_PLAY.md` and ADR 0004.
 
-**Next implementation slice:** finish the Phase 4 server-detail experience using the verified historical-series and live-ticket APIs.
-
-1. Add a typed API client for login, current-user, logout and server inventory endpoints.
-2. Implement login and session handling without exposing bearer tokens in logs or URLs.
-3. Build the server inventory list with loading, empty, error and disconnected states.
-4. Add the Add Server flow and show the one-time enrollment token exactly once with copy/install guidance.
-5. Add component/API tests and keep all UI strings, comments and documentation in English.
-6. Update README, feature acceptance matrix and this state file after the slice passes CI.
-
-Do not start charts, alerts, project switching or remote actions until the authenticated server inventory and Add Server flow are accepted and tested.
+Current priority order:
+1. Pull `main` on the owner's Windows PC and run `scripts/start-local.ps1`; confirm the fresh Compose build runs the `agent-artifacts` job successfully and opens the dashboard without login.
+2. Validate Add Machine, one-time token enrollment, the standalone Windows Service installer, restart recovery and bounded agent diagnostic logs. Then validate Linux systemd on a supported disposable Linux host.
+3. Run frontend lint/typecheck/build, agent race tests, Windows cross-build, agent-artifact image build and Compose integration as soon as GitHub Actions quota is available; do not mark these commits verified before then.
+4. Build ClickHouse-backed raw log collection/search and the real professional monitoring console, then run sustained/failure-recovery benchmarks before any high-volume or Grafana-replacement claim.
 
 ## Repository Rules
 
@@ -274,7 +269,7 @@ Phase 1 and Phase 2 implementation/verification history is recorded above. The f
 
 - Added a Windows-specific collector using gopsutil for CPU, memory/swap, mounted-volume capacity, disk/network counters, uptime, host identity and readable process RSS.
 - Added explicit Windows capabilities; Linux-only TCP/listening-port, cgroup/Systemd/container attribution and systemd remote actions are not advertised or run on Windows.
-- Added Windows-specific collector tests, Docker-based x64 cross-build and PowerShell foreground-run helpers. The build helper now invokes a checked-in shell script rather than passing a multiline command through PowerShell native argument parsing.
+- Added Windows-specific collector tests, Docker x64 cross-build helpers, a Windows Service Control Manager entry point, bounded rotating service logs, and a standalone PowerShell installer that downloads/checksums the native binary. Runtime acceptance and publisher-code signing remain pending.
 - Added a Windows-specific atomic spool-file replacement using MoveFileEx so acknowledged batches can be compacted after durable delivery.
 - Added a host-health snapshot and System information panel to server detail.
 - Made persisted agent session handling compatible with Windows FileMode behavior; the supported local helper stores session/WAL below the current user's LOCALAPPDATA.
