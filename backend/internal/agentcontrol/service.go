@@ -285,7 +285,7 @@ func (s *Service) publishCommittedBatch(ctx context.Context, organizationID, ser
 			"server_id", serverID, "batch_id", batch.GetBatchId(), "error", err)
 		return
 	}
-		if s.publisher != nil {
+	if s.publisher != nil {
 		if err := telemetry.PublishCommittedBatch(
 			publishContext, s.publisher, organizationID, serverID, agentID, batch.GetBatchId(), samples,
 		); err != nil {
