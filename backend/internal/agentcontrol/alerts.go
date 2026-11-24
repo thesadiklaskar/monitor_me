@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"example.com/monitor-me/backend/internal/telemetry"
+	"monitor-me.internal/backend/internal/telemetry"
 )
 
 type alertRuleMatch struct {

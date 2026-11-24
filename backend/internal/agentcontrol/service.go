@@ -14,9 +14,9 @@ import (
 	"strings"
 	"time"
 
-	monitorv1 "example.com/monitor-me/backend/gen/monitor/v1"
-	"example.com/monitor-me/backend/internal/telemetry"
-	"example.com/monitor-me/backend/internal/logstore"
+	monitorv1 "monitor-me.internal/backend/gen/monitor/v1"
+	"monitor-me.internal/backend/internal/telemetry"
+	"monitor-me.internal/backend/internal/logstore"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )

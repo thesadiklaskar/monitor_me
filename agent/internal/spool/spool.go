@@ -15,7 +15,7 @@ import (
 	"strings"
 	"sync"
 
-	"example.com/monitor-me/agent/internal/collector"
+	"monitor-me.internal/agent/internal/collector"
 )
 
 var ErrSpoolFull = errors.New("agent spool quota exceeded")

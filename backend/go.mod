@@ -1,4 +1,4 @@
-module example.com/monitor-me/backend
+module monitor-me.internal/backend
 
 go 1.27.0
 
