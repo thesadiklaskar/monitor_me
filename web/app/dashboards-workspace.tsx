@@ -9,14 +9,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Skeleton } from "@/components/ui/skeleton";
 
 type Server = { id: string; name: string; status: string };
-type Project = { id: string; name: string; slug: string };
 type DashboardPanel = {
   id: string;
   dashboard_id: string;
   title: string;
   visualization: "timeseries" | "stat";
   server_id: string;
-  project_id?: string | null;
   metric_name: string;
   time_range: "1h" | "6h" | "24h" | "7d" | "30d";
   position: number;
@@ -27,7 +25,6 @@ type Dashboard = {
   id: string;
   name: string;
   description: string;
-  project_id?: string | null;
   is_default: boolean;
   created_at: string;
   updated_at: string;
@@ -193,14 +190,12 @@ function DashboardPanelCard({
   panel,
   series,
   serverName,
-  projectName,
   canEdit,
   onDelete,
 }: {
   panel: DashboardPanel;
   series: PanelSeries | undefined;
   serverName: string;
-  projectName: string;
   canEdit: boolean;
   onDelete: () => void;
 }) {
@@ -213,7 +208,7 @@ function DashboardPanelCard({
       <CardHeader className="dashboard-panel-heading">
         <div className="dashboard-panel-title">
           <CardTitle>{panel.title}</CardTitle>
-          <CardDescription>{serverName} · {projectName} · {panel.time_range}</CardDescription>
+          <CardDescription>{serverName} · {panel.time_range}</CardDescription>
         </div>
         <div className="dashboard-panel-actions">
           <Badge variant={panel.visualization === "stat" ? "secondary" : "default"}>{panel.visualization === "stat" ? "Stat" : "Time series"}</Badge>
@@ -264,12 +259,10 @@ function DashboardPanelCard({
 
 export default function DashboardsWorkspace({
   servers,
-  projects,
   role,
   onBack,
 }: {
   servers: Server[];
-  projects: Project[];
   role: string;
   onBack: () => void;
 }) {
@@ -284,11 +277,9 @@ export default function DashboardsWorkspace({
   const [showPanelForm, setShowPanelForm] = useState(false);
   const [dashboardName, setDashboardName] = useState("");
   const [dashboardDescription, setDashboardDescription] = useState("");
-  const [dashboardProjectId, setDashboardProjectId] = useState("");
   const [dashboardDefault, setDashboardDefault] = useState(false);
   const [panelTitle, setPanelTitle] = useState("");
   const [panelServerId, setPanelServerId] = useState("");
-  const [panelProjectId, setPanelProjectId] = useState("");
   const [panelMetric, setPanelMetric] = useState<string>(metricCatalog[0].value);
   const [panelVisualization, setPanelVisualization] = useState<"timeseries" | "stat">("timeseries");
   const [panelRange, setPanelRange] = useState<DashboardPanel["time_range"]>("1h");
@@ -333,7 +324,6 @@ export default function DashboardsWorkspace({
         limit: "120",
       });
       query.set("metric", panel.metric_name);
-      if (panel.project_id) query.set("project_id", panel.project_id);
       try {
         const response = await apiRequest<SeriesResponse>(
           "/api/servers/" + encodeURIComponent(panel.server_id) + "/metrics?" + query.toString(),
@@ -372,13 +362,11 @@ export default function DashboardsWorkspace({
         body: JSON.stringify({
           name: dashboardName,
           description: dashboardDescription,
-          project_id: dashboardProjectId || "",
           is_default: dashboardDefault,
         }),
       });
       setDashboardName("");
       setDashboardDescription("");
-      setDashboardProjectId("");
       setDashboardDefault(false);
       setShowDashboardForm(false);
       setNotice("Dashboard saved to this installation.");
@@ -410,7 +398,6 @@ export default function DashboardsWorkspace({
             title: panelTitle.trim() || metric?.label || panelMetric,
             visualization: panelVisualization,
             server_id: panelServerId,
-            project_id: panelProjectId || selectedDashboard.project_id || "",
             metric_name: panelMetric,
             time_range: panelRange,
             position: selectedDashboard.panels.length,
@@ -458,7 +445,6 @@ export default function DashboardsWorkspace({
 
   const selectedServerDefault = servers[0]?.id ?? "";
   const serverLabel = (id: string) => servers.find((server) => server.id === id)?.name ?? "Server unavailable";
-  const projectLabel = (id?: string | null) => projects.find((project) => project.id === id)?.name ?? "All projects";
 
   return (
     <section className="dashboards-workspace">
@@ -467,7 +453,7 @@ export default function DashboardsWorkspace({
           <button className="detail-back-button" type="button" onClick={onBack}>← Back to servers</button>
           <div className="eyebrow">Saved monitoring layouts</div>
           <h1>Dashboards</h1>
-          <p>Build persistent metric views from real server history. Panels refresh automatically and respect installation and project scope.</p>
+          <p>Build persistent metric views from real server history. Panels refresh automatically and show real host metrics from this installation.</p>
         </div>
         <div className="dashboards-header-actions">
           <Button variant="secondary" onClick={() => { void loadDashboards(); void refreshSeries(); }} disabled={loading}><RefreshCw size={14} /> Refresh</Button>
@@ -484,13 +470,7 @@ export default function DashboardsWorkspace({
           <CardContent>
             <form className="dashboard-builder-grid" onSubmit={createDashboard}>
               <label className="field"><span>Name</span><input value={dashboardName} onChange={(event) => setDashboardName(event.target.value)} required minLength={2} maxLength={120} placeholder="Production overview" /></label>
-              <label className="field"><span>Project scope</span>
-                <select value={dashboardProjectId} onChange={(event) => setDashboardProjectId(event.target.value)}>
-                  <option value="">All projects</option>
-                  {projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
-                </select>
-              </label>
-              <label className="field dashboard-description-field"><span>Description</span><textarea value={dashboardDescription} onChange={(event) => setDashboardDescription(event.target.value)} maxLength={500} rows={2} placeholder="What this dashboard is used for" /></label>
+                            <label className="field dashboard-description-field"><span>Description</span><textarea value={dashboardDescription} onChange={(event) => setDashboardDescription(event.target.value)} maxLength={500} rows={2} placeholder="What this dashboard is used for" /></label>
               <label className="dashboard-default-check"><input type="checkbox" checked={dashboardDefault} onChange={(event) => setDashboardDefault(event.target.checked)} /> Make this the default dashboard</label>
               <div className="dashboard-builder-actions">
                 <Button variant="secondary" type="button" onClick={() => setShowDashboardForm(false)}>Cancel</Button>
@@ -518,7 +498,7 @@ export default function DashboardsWorkspace({
             <div className="dashboard-list-heading"><span>Dashboards</span><Badge variant="secondary">{dashboards.length}</Badge></div>
             {dashboards.map((dashboard) => (
               <button key={dashboard.id} type="button" className={selectedId === dashboard.id ? "dashboard-list-item dashboard-list-item-active" : "dashboard-list-item"} onClick={() => setSelectedId(dashboard.id)}>
-                <span><strong>{dashboard.name}</strong><small>{dashboard.panels.length} panels · {projectLabel(dashboard.project_id)}</small></span>
+                <span><strong>{dashboard.name}</strong><small>{dashboard.panels.length} panels</small></span>
                 {dashboard.is_default && <Badge>Default</Badge>}
               </button>
             ))}
@@ -527,7 +507,7 @@ export default function DashboardsWorkspace({
           {selectedDashboard && (
             <div className="dashboard-detail">
               <div className="dashboard-detail-heading">
-                <div><h2>{selectedDashboard.name}</h2><p>{selectedDashboard.description || projectLabel(selectedDashboard.project_id)}</p></div>
+                <div><h2>{selectedDashboard.name}</h2><p>{selectedDashboard.description || "Installation-wide monitoring dashboard."}</p></div>
                 <div className="dashboard-detail-actions">
                   {canEdit && <Button variant="destructive" size="sm" onClick={() => void deleteDashboard()} disabled={busy}><Trash2 size={13} /> Delete dashboard</Button>}
                   {canEdit && <Button size="sm" onClick={() => setShowPanelForm((value) => !value)} disabled={servers.length === 0}><Plus size={14} /> Add panel</Button>}
@@ -542,8 +522,7 @@ export default function DashboardsWorkspace({
                       <label className="field"><span>Panel title</span><input value={panelTitle} onChange={(event) => setPanelTitle(event.target.value)} maxLength={120} placeholder="CPU utilization" /></label>
                       <label className="field"><span>Metric</span><select value={panelMetric} onChange={(event) => setPanelMetric(event.target.value)}>{metricCatalog.map((metric) => <option key={metric.value} value={metric.value}>{metric.label}</option>)}</select></label>
                       <label className="field"><span>Server</span><select value={panelServerId || selectedServerDefault} onChange={(event) => setPanelServerId(event.target.value)} required>{servers.map((server) => <option key={server.id} value={server.id}>{server.name}</option>)}</select></label>
-                      <label className="field"><span>Project scope</span><select value={panelProjectId || selectedDashboard.project_id || ""} onChange={(event) => setPanelProjectId(event.target.value)}><option value="">Dashboard / all projects</option>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label>
-                      <label className="field"><span>Visualization</span><select value={panelVisualization} onChange={(event) => setPanelVisualization(event.target.value as "timeseries" | "stat")}><option value="timeseries">Time series</option><option value="stat">Stat</option></select></label>
+                                            <label className="field"><span>Visualization</span><select value={panelVisualization} onChange={(event) => setPanelVisualization(event.target.value as "timeseries" | "stat")}><option value="timeseries">Time series</option><option value="stat">Stat</option></select></label>
                       <label className="field"><span>Time range</span><select value={panelRange} onChange={(event) => setPanelRange(event.target.value as DashboardPanel["time_range"])}><option value="1h">Last hour</option><option value="6h">Last 6 hours</option><option value="24h">Last 24 hours</option><option value="7d">Last 7 days</option><option value="30d">Last 30 days</option></select></label>
                       <div className="dashboard-builder-actions">
                         <Button variant="secondary" type="button" onClick={() => setShowPanelForm(false)}>Cancel</Button>
@@ -571,7 +550,6 @@ export default function DashboardsWorkspace({
                       panel={panel}
                       series={seriesByPanel[panel.id]}
                       serverName={serverLabel(panel.server_id)}
-                      projectName={projectLabel(panel.project_id)}
                       canEdit={canEdit}
                       onDelete={() => void deletePanel(panel)}
                     />
