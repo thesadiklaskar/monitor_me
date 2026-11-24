@@ -1062,6 +1062,136 @@ func (s *Store) CreateAlertRule(ctx context.Context, principal Principal, input 
 	return result, nil
 }
 
+// UpdateAlertRule replaces a rule's threshold, scope and active state.
+// When a rule's condition changes, any prior firing events are closed and a recovery
+// notification is recorded before the updated rule becomes visible to collectors.
+func (s *Store) UpdateAlertRule(ctx context.Context, principal Principal, ruleID string, input AlertRule) (AlertRule, error) {
+	input.Name = strings.TrimSpace(input.Name)
+	if !validUUID(ruleID) || len(input.Name) < 2 || len(input.Name) > 120 ||
+		!alertMetricPattern.MatchString(input.MetricName) ||
+		(input.Operator != "gt" && input.Operator != "gte" && input.Operator != "lt" && input.Operator != "lte") ||
+		math.IsNaN(input.Threshold) || math.IsInf(input.Threshold, 0) {
+		return AlertRule{}, ErrInvalidInput
+	}
+	if input.ServerID != nil && !validUUID(*input.ServerID) {
+		return AlertRule{}, ErrInvalidInput
+	}
+
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return AlertRule{}, fmt.Errorf("begin alert rule update: %w", err)
+	}
+	defer tx.Rollback()
+
+	var previous AlertRule
+	var previousServerID sql.NullString
+	err = tx.QueryRowContext(ctx, `
+		SELECT id::text, name, server_id::text, metric_name, operator, threshold, enabled, created_at
+		FROM alert_rules
+		WHERE id = $1 AND organization_id = $2
+		FOR UPDATE
+	`, ruleID, principal.OrganizationID).Scan(
+		&previous.ID, &previous.Name, &previousServerID, &previous.MetricName,
+		&previous.Operator, &previous.Threshold, &previous.Enabled, &previous.CreatedAt,
+	)
+	if errors.Is(err, sql.ErrNoRows) {
+		return AlertRule{}, ErrNotFound
+	}
+	if err != nil {
+		return AlertRule{}, fmt.Errorf("load alert rule for update: %w", err)
+	}
+	if previousServerID.Valid {
+		previous.ServerID = &previousServerID.String
+	}
+
+	if input.ServerID != nil {
+		var exists bool
+		if err := tx.QueryRowContext(ctx,
+			"SELECT EXISTS (SELECT 1 FROM servers WHERE id = $1 AND organization_id = $2)",
+			*input.ServerID, principal.OrganizationID).Scan(&exists); err != nil {
+			return AlertRule{}, fmt.Errorf("validate updated alert rule machine: %w", err)
+		}
+		if !exists {
+			return AlertRule{}, ErrNotFound
+		}
+	}
+
+	changed := previous.Name != input.Name ||
+		previous.MetricName != input.MetricName ||
+		previous.Operator != input.Operator ||
+		previous.Threshold != input.Threshold ||
+		previous.Enabled != input.Enabled ||
+		nullableUUID(previous.ServerID) != nullableUUID(input.ServerID)
+
+	var updated AlertRule
+	var updatedServerID sql.NullString
+	err = tx.QueryRowContext(ctx, `
+		UPDATE alert_rules
+		SET name = $3, server_id = $4::uuid, metric_name = $5,
+		    operator = $6, threshold = $7, enabled = $8
+		WHERE id = $1 AND organization_id = $2
+		RETURNING id::text, name, server_id::text, metric_name, operator, threshold, enabled, created_at
+	`, ruleID, principal.OrganizationID, input.Name, nullableUUID(input.ServerID),
+		input.MetricName, input.Operator, input.Threshold, input.Enabled).Scan(
+		&updated.ID, &updated.Name, &updatedServerID, &updated.MetricName,
+		&updated.Operator, &updated.Threshold, &updated.Enabled, &updated.CreatedAt,
+	)
+	if err != nil {
+		return AlertRule{}, fmt.Errorf("save alert rule update: %w", err)
+	}
+	if updatedServerID.Valid {
+		updated.ServerID = &updatedServerID.String
+	}
+
+	if changed {
+		rows, err := tx.QueryContext(ctx, `
+			UPDATE alert_events
+			SET status = 'resolved', last_observed_at = now(), resolved_at = now()
+			WHERE rule_id = $1 AND organization_id = $2 AND status = 'firing'
+			RETURNING id::text
+		`, ruleID, principal.OrganizationID)
+		if err != nil {
+			return AlertRule{}, fmt.Errorf("close events for changed alert rule: %w", err)
+		}
+		eventIDs := make([]string, 0)
+		for rows.Next() {
+			var eventID string
+			if err := rows.Scan(&eventID); err != nil {
+				_ = rows.Close()
+				return AlertRule{}, fmt.Errorf("scan resolved alert event: %w", err)
+			}
+			eventIDs = append(eventIDs, eventID)
+		}
+		rowsErr := rows.Err()
+		closeErr := rows.Close()
+		if rowsErr != nil {
+			return AlertRule{}, fmt.Errorf("iterate resolved alert events: %w", rowsErr)
+		}
+		if closeErr != nil {
+			return AlertRule{}, fmt.Errorf("close resolved alert event rows: %w", closeErr)
+		}
+		for _, eventID := range eventIDs {
+			_, err := tx.ExecContext(ctx, `
+				INSERT INTO alert_notifications (organization_id, event_id, user_id, kind, title, message)
+				SELECT $1, $2, membership.user_id, 'recovered', $3, $4
+				FROM organization_memberships membership
+				WHERE membership.organization_id = $1
+				ON CONFLICT (event_id, user_id, kind) DO NOTHING
+			`, principal.OrganizationID, eventID,
+					"Alert updated: "+previous.Name,
+					"The alert condition or scope changed. The previous firing event was closed.")
+			if err != nil {
+				return AlertRule{}, fmt.Errorf("notify changed alert rule recovery: %w", err)
+			}
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return AlertRule{}, fmt.Errorf("commit alert rule update: %w", err)
+	}
+	return updated, nil
+}
+
 func nullableUUID(value *string) any {
 	if value == nil || *value == "" {
 		return nil

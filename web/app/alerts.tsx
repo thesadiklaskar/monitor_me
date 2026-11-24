@@ -46,6 +46,8 @@ export default function AlertsView({ servers }: {
   const [operator, setOperator] = useState<Rule["operator"]>("gt");
   const [threshold, setThreshold] = useState("85");
   const [serverId, setServerId] = useState("");
+  const [editingRule, setEditingRule] = useState<Rule | null>(null);
+  const [ruleEnabled, setRuleEnabled] = useState(true);
   const canAdminister = true;
   const unreadCount = useMemo(() => notifications.filter((item) => !item.read_at).length, [notifications]);
 
@@ -73,20 +75,72 @@ export default function AlertsView({ servers }: {
     return () => { window.clearTimeout(timer); window.clearInterval(refresh); };
   }, [load]);
 
+  function editRule(rule: Rule) {
+    setEditingRule(rule);
+    setRuleName(rule.name);
+    setMetric(rule.metric_name);
+    setOperator(rule.operator);
+    setThreshold(String(rule.threshold));
+    setServerId(rule.server_id ?? "");
+    setRuleEnabled(rule.enabled);
+    setError("");
+  }
+
+  function resetRuleForm() {
+    setEditingRule(null);
+    setRuleName("");
+    setMetric(METRICS[0].value);
+    setOperator("gt");
+    setThreshold("85");
+    setServerId("");
+    setRuleEnabled(true);
+  }
+
   async function createRule(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const parsed = Number(threshold);
     if (!ruleName.trim() || !Number.isFinite(parsed)) { setError("Enter a rule name and finite threshold."); return; }
     setBusy(true); setError("");
     try {
-      await apiRequest<{ rule: Rule }>("/api/alert-rules", {
-        method: "POST",
-        body: JSON.stringify({ name: ruleName.trim(), metric_name: metric, operator, threshold: parsed, server_id: serverId || null }),
-      });
-      setRuleName("");
+      const body = {
+        name: ruleName.trim(), metric_name: metric, operator, threshold: parsed,
+        server_id: serverId || null, enabled: editingRule ? ruleEnabled : true,
+      };
+      if (editingRule) {
+        await apiRequest<{ rule: Rule }>("/api/alert-rules/" + encodeURIComponent(editingRule.id), {
+          method: "PATCH",
+          body: JSON.stringify(body),
+        });
+      } else {
+        await apiRequest<{ rule: Rule }>("/api/alert-rules", {
+          method: "POST",
+          body: JSON.stringify(body),
+        });
+      }
+      resetRuleForm();
       await load();
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : "Alert rule could not be created.");
+      setError(submitError instanceof Error ? submitError.message : "Alert rule could not be saved.");
+    } finally { setBusy(false); }
+  }
+
+  async function toggleRule(rule: Rule) {
+    setBusy(true); setError("");
+    try {
+      await apiRequest<{ rule: Rule }>("/api/alert-rules/" + encodeURIComponent(rule.id), {
+        method: "PATCH",
+        body: JSON.stringify({
+          name: rule.name,
+          metric_name: rule.metric_name,
+          operator: rule.operator,
+          threshold: rule.threshold,
+          server_id: rule.server_id ?? null,
+          enabled: !rule.enabled,
+        }),
+      });
+      await load();
+    } catch (toggleError) {
+      setError(toggleError instanceof Error ? toggleError.message : "Alert rule state could not be changed.");
     } finally { setBusy(false); }
   }
 
@@ -124,7 +178,7 @@ export default function AlertsView({ servers }: {
       {error && <div className="notice notice-error" role="alert">{error}</div>}
       {canAdminister && (
         <section className="alert-form-card">
-          <h2>Create threshold rule</h2>
+          <h2>{editingRule ? "Edit threshold rule" : "Create threshold rule"}</h2>
           <form className="form-stack" onSubmit={createRule}>
             <div className="alert-form-grid">
               <label className="field"><span>Rule name</span><Input value={ruleName} onChange={(event) => setRuleName(event.target.value)} required minLength={2} maxLength={120} placeholder="High CPU utilization" /></label>
@@ -133,7 +187,7 @@ export default function AlertsView({ servers }: {
               <label className="field"><span>Threshold ({metricInfo.unit})</span><Input type="number" step="any" value={threshold} onChange={(event) => setThreshold(event.target.value)} required /></label>
               <label className="field"><span>Server scope</span><select value={serverId} onChange={(event) => setServerId(event.target.value)}><option value="">All servers</option>{servers.map((server) => <option key={server.id} value={server.id}>{server.name}</option>)}</select></label>
                           </div>
-            <div className="alerts-form-footer"><span>Rules evaluate metrics from every matching machine.</span><Button className="button button-primary" variant="default" type="submit" disabled={busy}>{busy ? "Saving…" : "Create rule"}</Button></div>
+            <div className="alerts-form-footer"><span>Rules evaluate metrics from every matching machine.</span><div className="alerts-form-actions">{editingRule && <label className="alert-enabled-toggle"><input type="checkbox" checked={ruleEnabled} onChange={(event) => setRuleEnabled(event.target.checked)} /> Enabled</label>}{editingRule && <Button variant="secondary" type="button" onClick={resetRuleForm}>Cancel edit</Button>}<Button className="button button-primary" variant="default" type="submit" disabled={busy}>{busy ? "Saving…" : editingRule ? "Save changes" : "Create rule"}</Button></div></div>
           </form>
         </section>
       )}
@@ -145,7 +199,7 @@ export default function AlertsView({ servers }: {
             const server = servers.find((item) => item.id === rule.server_id);
             return <div className="alert-rule-row" key={rule.id}>
               <div><strong>{rule.name}</strong><small>{metricDef?.label ?? rule.metric_name} {rule.operator} {formatNumber(rule.threshold, metricDef?.unit ?? "")}</small><small>{server?.name ?? "All servers"}</small></div>
-              {canAdminister && <Button className="inline-text-action" variant="destructive" size="sm" type="button" disabled={busy} onClick={() => void deleteRule(rule)}>Delete</Button>}
+              {canAdminister && <div className="alert-rule-actions"><span className={rule.enabled ? "alert-state alert-state-resolved" : "alert-state"}>{rule.enabled ? "Enabled" : "Paused"}</span><Button className="inline-text-action" variant="secondary" size="sm" type="button" disabled={busy} onClick={() => editRule(rule)}>Edit</Button><Button className="inline-text-action" variant="secondary" size="sm" type="button" disabled={busy} onClick={() => void toggleRule(rule)}>{rule.enabled ? "Pause" : "Resume"}</Button><Button className="inline-text-action" variant="destructive" size="sm" type="button" disabled={busy} onClick={() => void deleteRule(rule)}>Delete</Button></div>}
             </div>;
           })}
         </section>

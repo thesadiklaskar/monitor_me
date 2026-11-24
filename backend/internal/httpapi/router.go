@@ -45,6 +45,7 @@ func NewRouter(version string, dependencies []Dependency, identities *identity.S
 		mux.Handle("GET /v1/installation", api.requireInstallation(http.HandlerFunc(api.installation)))
 		mux.Handle("GET /v1/alert-rules", api.requireInstallation(http.HandlerFunc(api.listAlertRules)))
 		mux.Handle("POST /v1/alert-rules", api.requireInstallation(http.HandlerFunc(api.createAlertRule)))
+		mux.Handle("PATCH /v1/alert-rules/{ruleID}", api.requireInstallation(http.HandlerFunc(api.updateAlertRule)))
 		mux.Handle("DELETE /v1/alert-rules/{ruleID}", api.requireInstallation(http.HandlerFunc(api.deleteAlertRule)))
 		mux.Handle("GET /v1/alerts", api.requireInstallation(http.HandlerFunc(api.listAlertEvents)))
 		mux.Handle("GET /v1/notifications", api.requireInstallation(http.HandlerFunc(api.listAlertNotifications)))

@@ -37,6 +37,28 @@ func (api *API) createAlertRule(writer http.ResponseWriter, request *http.Reques
 	}
 }
 
+func (api *API) updateAlertRule(writer http.ResponseWriter, request *http.Request) {
+	var input identity.AlertRule
+	if !decodeJSON(writer, request, &input) {
+		return
+	}
+	rule, err := api.identities.UpdateAlertRule(
+		request.Context(), principalFromRequest(request), strings.TrimSpace(request.PathValue("ruleID")), input,
+	)
+	switch {
+	case errors.Is(err, identity.ErrForbidden):
+		writeAPIError(writer, http.StatusForbidden, "forbidden", "Alert rule changes are not permitted.")
+	case errors.Is(err, identity.ErrInvalidInput):
+		writeAPIError(writer, http.StatusBadRequest, "invalid_alert_rule", "The alert rule fields are invalid.")
+	case errors.Is(err, identity.ErrNotFound):
+		writeAPIError(writer, http.StatusNotFound, "alert_scope_not_found", "The alert rule or selected machine was not found.")
+	case err != nil:
+		writeAPIError(writer, http.StatusInternalServerError, "alert_rule_update_failed", "The alert rule could not be updated.")
+	default:
+		writeJSON(writer, http.StatusOK, map[string]any{"rule": rule})
+	}
+}
+
 func (api *API) deleteAlertRule(writer http.ResponseWriter, request *http.Request) {
 	ruleID := strings.TrimSpace(request.PathValue("ruleID"))
 	err := api.identities.DeleteAlertRule(request.Context(), principalFromRequest(request), ruleID)
