@@ -210,8 +210,10 @@ jobs:
           chmod 640 .data/certs/server.key
       - name: Validate Compose configuration
         run: docker compose config --quiet
-      - name: Build and start the complete local stack
-        run: docker compose up --build -d
+      - name: Build every application image before starting services
+        run: docker compose build
+      - name: Start the complete stack from the verified images
+        run: docker compose up -d --no-build
       - name: Wait for API readiness
         shell: bash
         run: |
