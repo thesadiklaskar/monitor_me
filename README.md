@@ -58,7 +58,7 @@ The complete product contract, architecture boundaries and acceptance targets ar
 | Telemetry history and live transport | **Phase 3 verified** | Bounded PostgreSQL range query, 30-day raw retention, 90-day idempotency retention, one-use session-bound WebSocket tickets, cross-tenant isolation, and bounded subscriber queues pass CI |
 | Project/workload attribution | **Phase 3 verified (Linux mapping path)** | cgroup/Systemd/container selectors, exact server/project mappings, and explicit host-total/unclassified/shared attribution pass database integration tests; full Docker Engine discovery remains later work |
 | Monitoring dashboard | **In Progress** | Operator shell polish, responsive collapse, vector icons, no-login local mode and host detail telemetry are implemented; professional fleet overview, log explorer, global selectors and complete UI acceptance remain |
-| Production firewall setup | **In Progress** | Additive UFW/firewalld helper is present; new HTTPS rules are now restricted to explicit administrator CIDRs. Full remote no-login gate, real-host IPv4/IPv6 verification and cloud security-group integration remain |
+| Production firewall setup | **In Progress** | UFW/firewalld helper opens HTTPS for public node bootstrap while Nginx restricts dashboard/API/WebSocket paths to ADMIN_CIDR; deployment validates this allowlist before enabling remote no-login. Real-host IPv4/IPv6 and cloud security-group checks remain |
 | Production release | Not started | Planned for Phase 5 |
 
 **Status vocabulary:** Completed means implemented and verified for the documented environment. Specified means requirements are documented but implementation is not complete. Planned means work has not started. A design document or mock screen does not count as a working feature.
@@ -286,7 +286,7 @@ The initial collection target is configurable in the 100ms–500ms range where h
 
 ## Security Principles
 
-The default local Compose profile is no-login and is published only on loopback. The production profile is not yet switched to anonymous access; remote no-login must not be enabled until source-restricted HTTPS, HTTPS certificates, cloud-network review and IPv4/IPv6 verification are enforced. See ADR 0004.
+The default local Compose profile is no-login and is published only on loopback. The production profile keeps no-login opt-in; deploy refuses to enable it until the HTTPS certificate, Nginx administrator allowlist and host-firewall checks succeed. See ADR 0004.
 
 - TLS-protected agent communication with short-lived, single-use, revocable enrollment credentials.
 - Default single-install operation removes the signup/login workflow; the workspace identity is created internally.
@@ -303,7 +303,7 @@ The default local Compose profile is no-login and is published only on loopback.
 
 ## Production Firewall Requirements
 
-The production firewall policy is defined for two roles: a control-plane VPS/VM and agent-only monitored Linux hosts. Agent-only hosts require no inbound Monitor Me ports; they send outbound TLS gRPC to the control plane. The no-login control-plane profile exposes TCP 443 only from the administrator CIDR/VPN, TCP 8443 to enrolled-agent networks (or public agent networks when required), optional TCP 80 for ACME HTTP-01, and SSH only from a trusted administrator CIDR. PostgreSQL 5432, Redis 6379, API 8080, and web 3000 must remain private. See [Production Firewall Requirements](docs/PRODUCTION_FIREWALL.md) for UFW/firewalld examples, Docker firewall caveats, and local/LAN deployment rules. Firewall automation is a Phase 5 deliverable, not a currently implemented installer feature.
+The production firewall policy is defined for two roles: a control-plane VPS/VM and agent-only monitored Linux hosts. Agent-only hosts require no inbound Monitor Me ports; they send outbound TLS gRPC to the control plane. The no-login control-plane profile exposes TCP 443 to Nginx for public installer/CA/artifact routes; Nginx restricts the dashboard/API/WebSocket to the administrator CIDR/VPN. TCP 8443 is the TLS agent endpoint (public or source-restricted), optional TCP 80 is for ACME HTTP-01, and SSH is limited to a trusted administrator CIDR. PostgreSQL 5432, Redis 6379, API 8080, and web 3000 must remain private. See [Production Firewall Requirements](docs/PRODUCTION_FIREWALL.md) for UFW/firewalld examples, Docker firewall caveats, and local/LAN deployment rules. Firewall automation is a Phase 5 deliverable, not a currently implemented installer feature.
 
 ## Five-Phase Delivery Roadmap
 
