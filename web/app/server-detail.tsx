@@ -172,32 +172,51 @@ function ServerMetricChart({
     const min = Math.min(0, rawMin - padding);
     const max = rawMax + padding;
     const verticalRange = max - min || 1;
-
     const segments: string[] = [];
-    let current: string[] = [];
+    const areaSegments: string[] = [];
+    let current: Array<{ x: number; y: number }> = [];
     let previousTime: number | null = null;
-    for (const point of values) {
-      if (previousTime !== null && point.time - previousTime > config.stepMs * 2.2) {
-        if (current.length > 0) segments.push(current.join(" "));
-        current = [];
+
+    const finishSegment = () => {
+      if (current.length === 0) return;
+      const coordinates = current.map((point) => point.x.toFixed(1) + "," + point.y.toFixed(1));
+      segments.push(coordinates.join(" "));
+      if (current.length > 1) {
+        const first = current[0];
+        const last = current[current.length - 1];
+        areaSegments.push(coordinates.join(" ") + " " + last.x.toFixed(1) + ",214 " + first.x.toFixed(1) + ",214");
       }
-      const x = Math.min(890, Math.max(10, ((point.time - start) / config.durationMs) * 890 + 10));
-      const y = 224 - ((point.average - min) / verticalRange) * 190;
-      current.push(`${x.toFixed(1)},${y.toFixed(1)}`);
+      current = [];
+    };
+
+    for (const point of values) {
+      if (previousTime !== null && point.time - previousTime > config.stepMs * 2.2) finishSegment();
+      const x = Math.min(900, Math.max(54, ((point.time - start) / config.durationMs) * 846 + 54));
+      const y = 28 + ((max - point.average) / verticalRange) * 186;
+      current.push({ x, y });
       previousTime = point.time;
     }
-    if (current.length > 0) segments.push(current.join(" "));
+    finishSegment();
 
     const latest = values[values.length - 1];
+    const latestX = Math.min(900, Math.max(54, ((latest.time - start) / config.durationMs) * 846 + 54));
+    const latestY = 28 + ((max - latest.average) / verticalRange) * 186;
     const average = values.reduce((sum, point) => sum + point.average, 0) / values.length;
+    const ticks = Array.from({ length: 5 }, (_, index) => ({
+      y: 28 + index * 46.5,
+      value: max - (verticalRange * index) / 4,
+    }));
     return {
       segments,
+      areaSegments,
+      latestX,
+      latestY,
+      ticks,
       min: rawMin,
       max: rawMax,
       average,
       latest,
       count: values.reduce((sum, point) => sum + point.sample_count, 0),
-      values,
     };
   }, [points, range, startTime]);
 
@@ -216,25 +235,43 @@ function ServerMetricChart({
   return (
     <div className="metric-chart-wrap">
       <div className="metric-summary-row">
-        <div><span>Latest average</span><strong>{formatValue(chart.latest.average, unit)}</strong></div>
-        <div><span>Range average</span><strong>{formatValue(chart.average, unit)}</strong></div>
+        <div className="metric-primary-reading">
+          <span>Latest reading</span>
+          <strong>{formatValue(chart.latest.average, unit)}</strong>
+          <small>{formatTimestamp(chart.latest.bucket)}</small>
+        </div>
+        <div><span>Period average</span><strong>{formatValue(chart.average, unit)}</strong></div>
         <div><span>Minimum</span><strong>{formatValue(chart.min, unit)}</strong></div>
         <div><span>Maximum</span><strong>{formatValue(chart.max, unit)}</strong></div>
       </div>
-      <svg className="metric-chart" viewBox="0 0 920 260" role="img" aria-label={`Historical ${unit} metric over the selected time range`}>
-        <title>Historical metric values. Empty periods are left as gaps.</title>
-        {[34, 81, 128, 175, 224].map((y) => (
-          <line key={y} x1="10" x2="900" y1={y} y2={y} className="chart-grid-line" />
-        ))}
-        {chart.segments.map((segment, index) => (
-          <polyline key={index} points={segment} className="chart-series-line" />
-        ))}
-      </svg>
+      <div className="metric-chart-scroll">
+        <svg className="metric-chart" viewBox="0 0 930 250" role="img" aria-label={`Historical ${unit} metric over the selected time range`}>
+          <title>Historical metric values. Empty periods remain visible as gaps.</title>
+          <defs>
+            <linearGradient id="monitorMetricFill" x1="0" x2="0" y1="0" y2="1">
+              <stop offset="0%" stopColor="#66e0bb" stopOpacity="0.30" />
+              <stop offset="100%" stopColor="#66e0bb" stopOpacity="0.015" />
+            </linearGradient>
+          </defs>
+          {chart.ticks.map((tick, index) => (
+            <g key={index}>
+              <line x1="54" x2="900" y1={tick.y} y2={tick.y} className="chart-grid-line" />
+              <text x="43" y={tick.y + 4} textAnchor="end" className="chart-axis-label">{formatValue(tick.value, unit)}</text>
+            </g>
+          ))}
+          {chart.areaSegments.map((segment, index) => <polygon key={index} points={segment} fill="url(#monitorMetricFill)" />)}
+          {chart.segments.map((segment, index) => <polyline key={index} points={segment} className="chart-series-line" />)}
+          <line x1={chart.latestX} x2={chart.latestX} y1="28" y2="214" className="chart-latest-guide" />
+          <circle cx={chart.latestX} cy={chart.latestY} r="5.5" className="chart-latest-halo" />
+          <circle cx={chart.latestX} cy={chart.latestY} r="3" className="chart-latest-dot" />
+        </svg>
+      </div>
       <div className="chart-axis-row">
         <span>{formatTimestamp(startTime)}</span>
-        <span>{chart.count.toLocaleString()} stored samples · gaps remain visible</span>
-        <span>Now</span>
+        <span>{chart.count.toLocaleString()} stored samples · missing intervals remain visible</span>
+        <span>{formatTimestamp(chart.latest.bucket)}</span>
       </div>
+      <div className="chart-footnote">Historical values use committed telemetry. Live readings are added while this view is open.</div>
     </div>
   );
 }
@@ -455,6 +492,20 @@ export function ServerDetail({
     );
   }, [livePoints, series]);
 
+  const diskPeak = diskVolumes.reduce<LatestSample | null>(
+    (peak, sample) => (!peak || sample.value > peak.value ? sample : peak),
+    null,
+  );
+  const receiveRate = networkReceive.reduce((sum, sample) => sum + sample.value, 0);
+  const transmitRate = networkTransmit.reduce((sum, sample) => sum + sample.value, 0);
+  const memoryUsagePercent = memoryUsed && memoryTotal && memoryTotal.value > 0
+    ? Math.max(0, Math.min(100, (memoryUsed.value / memoryTotal.value) * 100))
+    : null;
+  const cpuPercent = cpuLatest ? Math.max(0, Math.min(100, cpuLatest.value)) : null;
+  const diskPercent = diskPeak ? Math.max(0, Math.min(100, diskPeak.value)) : null;
+  const platformName = hostInfo?.labels?.platform ?? hostInfo?.labels?.os ?? "Host platform";
+  const isWindows = /windows/i.test(platformName);
+
   const isStale = ["stale", "offline"].includes(server.status.toLowerCase());
   const effectiveLiveState = apiPublicURL ? liveState : "disabled";
   const effectiveLiveMessage = apiPublicURL
@@ -462,100 +513,131 @@ export function ServerDetail({
     : "Live updates are not configured. Historical data remains available.";
 
   return (
-    <section className="server-detail">
-      <header className="detail-topbar">
-        <div>
-          <button className="detail-back-button" type="button" onClick={onBack}>← Back to servers</button>
-          <div className="eyebrow">Server detail</div>
+    <section className="server-detail monitor-detail">
+      <header className="detail-topbar monitor-detail-header">
+        <div className="monitor-title-block">
+          <button className="detail-back-button" type="button" onClick={onBack}>← All servers</button>
+          <div className="monitor-title-eyebrow"><span className="monitor-eyebrow-mark" /> HOST MONITORING</div>
           <h2>{server.name}</h2>
-          <p>{server.hostname || "Hostname not provided"} · Added {new Date(server.created_at).toLocaleString()}</p>
+          <div className="monitor-host-meta">
+            <span>{server.hostname || "Hostname not provided"}</span>
+            <span className="monitor-meta-divider">/</span>
+            <span>{platformName}</span>
+            {hostInfo?.labels?.architecture && <><span className="monitor-meta-divider">/</span><span>{hostInfo.labels.architecture}</span></>}
+          </div>
         </div>
-        <div className="detail-status">
-          <span className={`status-pill ${server.status.toLowerCase() === "online" && !isStale ? "status-pill-online" : "status-pill-pending"}`}>
-            {isStale ? "Stale / no recent heartbeat" : server.status === "online" ? "Connected" : server.status}
+        <div className="monitor-status-stack">
+          <span className={server.status.toLowerCase() === "online" && !isStale ? "monitor-connection-pill is-connected" : "monitor-connection-pill is-disconnected"}>
+            <span className="monitor-connection-dot" />
+            {isStale ? "STALE" : server.status.toLowerCase() === "online" ? "CONNECTED" : server.status.toUpperCase()}
           </span>
-          <span>Last heartbeat: {server.agent_last_seen_at ? new Date(server.agent_last_seen_at).toLocaleString() : "Not received"}</span>
+          <span className="monitor-heartbeat">Last heartbeat · {formatTimestamp(server.agent_last_seen_at)}</span>
         </div>
       </header>
 
-      <div className="detail-toolbar">
-        <label className="metric-select-field">
-          <span>Metric</span>
-          <select value={metric} onChange={(event) => { setLivePoints([]); setLoading(true); setHistoryError(""); setMetric(event.target.value); }}>
-            {metricDefinitions.map((definition) => (
-              <option key={definition.name} value={definition.name}>{definition.label}</option>
-            ))}
-          </select>
-        </label>
-        <div className="range-switch" role="group" aria-label="Historical time range">
-          {(["1h", "6h", "24h"] as const).map((value) => (
-            <button
-              key={value}
-              type="button"
-              className={range === value ? "range-button range-button-active" : "range-button"}
-              onClick={() => { setLivePoints([]); setLoading(true); setHistoryError(""); setRange(value); }}
-            >
-              {value}
-            </button>
-          ))}
-        </div>
-        <button className="button button-secondary" type="button" onClick={() => { setLoading(true); setHistoryError(""); void loadHistory(); }} disabled={loading}>
-          {loading ? "Refreshing…" : "Refresh history"}
-        </button>
-      </div>
-
-      <div className="live-status-strip">
-        <span className={`status-dot ${effectiveLiveState === "live" ? "status-dot-online" : effectiveLiveState === "disabled" ? "status-dot-disabled" : "status-dot-pending"}`} />
-        <strong>{effectiveLiveState === "live" ? "Live" : effectiveLiveState === "disabled" ? "History only" : effectiveLiveState === "connecting" ? "Connecting" : "Reconnecting"}</strong>
+      <div className="live-status-strip monitor-live-strip">
+        <span className={effectiveLiveState === "live" ? "monitor-live-indicator is-live" : effectiveLiveState === "disabled" ? "monitor-live-indicator is-muted" : "monitor-live-indicator is-waiting"} />
+        <strong>{effectiveLiveState === "live" ? "LIVE TELEMETRY" : effectiveLiveState === "disabled" ? "HISTORY ONLY" : effectiveLiveState === "connecting" ? "CONNECTING TO LIVE STREAM" : "RECONNECTING"}</strong>
         <span>{effectiveLiveMessage}</span>
+        <span className="monitor-updated-label">Agent collection interval · 5s</span>
       </div>
 
       {historyError && <div className="notice notice-error" role="alert">{historyError}</div>}
+      {inventoryError && <div className="notice notice-error" role="alert">{inventoryError}</div>}
 
-      <article className="metric-panel">
-        <div className="metric-panel-heading">
-          <div>
-            <h3>{selectedMetric.label}</h3>
-            <p>{selectedMetric.name} · {selectedMetric.unit} · {ranges[range].label}</p>
+      <section className="resource-kpi-grid" aria-label="Current resource utilization">
+        <article className="resource-kpi-card resource-kpi-cpu">
+          <div className="resource-kpi-heading"><span className="resource-kpi-icon">CPU</span><span>Processor</span><span className="resource-kpi-dot" /></div>
+          <div className="resource-kpi-reading">{cpuLatest ? formatValue(cpuLatest.value, "percent") : "—"}</div>
+          <div className="resource-kpi-track"><span style={{ width: String(cpuPercent ?? 0) + "%" }} /></div>
+          <div className="resource-kpi-footer"><span>Current utilization</span><span>{cpuLatest ? "Latest sample" : "Waiting for sample"}</span></div>
+        </article>
+        <article className="resource-kpi-card resource-kpi-memory">
+          <div className="resource-kpi-heading"><span className="resource-kpi-icon">RAM</span><span>Memory</span><span className="resource-kpi-dot" /></div>
+          <div className="resource-kpi-reading">{memoryUsed ? formatBytes(memoryUsed.value) : "—"}</div>
+          <div className="resource-kpi-track"><span style={{ width: String(memoryUsagePercent ?? 0) + "%" }} /></div>
+          <div className="resource-kpi-footer">
+            <span>{memoryTotal ? "of " + formatBytes(memoryTotal.value) : "Total unavailable"}</span>
+            <span>{memoryUsagePercent === null ? "Waiting for sample" : memoryUsagePercent.toFixed(1) + "% used"}</span>
           </div>
-          <span className="metric-sample-count">{points.reduce((sum, point) => sum + point.sample_count, 0).toLocaleString()} points</span>
+        </article>
+        <article className="resource-kpi-card resource-kpi-disk">
+          <div className="resource-kpi-heading"><span className="resource-kpi-icon">DSK</span><span>Storage</span><span className="resource-kpi-dot" /></div>
+          <div className="resource-kpi-reading">{diskPeak ? formatValue(diskPeak.value, "percent") : "—"}</div>
+          <div className="resource-kpi-track"><span style={{ width: String(diskPercent ?? 0) + "%" }} /></div>
+          <div className="resource-kpi-footer">
+            <span>{diskPeak?.labels?.mountpoint ?? diskPeak?.labels?.device ?? "Mounted volumes"}</span>
+            <span>{diskVolumes.length ? diskVolumes.length + " volume(s)" : "Waiting for sample"}</span>
+          </div>
+        </article>
+        <article className="resource-kpi-card resource-kpi-network">
+          <div className="resource-kpi-heading"><span className="resource-kpi-icon">NET</span><span>Network throughput</span><span className="resource-kpi-dot" /></div>
+          <div className="resource-kpi-reading">{networkReceive.length + networkTransmit.length > 0 ? formatValue(receiveRate + transmitRate, "bytes/second") : "—"}</div>
+          <div className="resource-kpi-network-split">
+            <span>↓ {formatValue(receiveRate, "bytes/second")}</span>
+            <span>↑ {formatValue(transmitRate, "bytes/second")}</span>
+          </div>
+          <div className="resource-kpi-footer"><span>Combined interface traffic</span><span>{networkReceive.length + networkTransmit.length} series</span></div>
+        </article>
+      </section>
+
+      <article className="metric-panel metric-panel-primary">
+        <div className="metric-panel-heading monitor-chart-heading">
+          <div>
+            <div className="monitor-section-kicker">PERFORMANCE OVERVIEW</div>
+            <h3>{selectedMetric.label}</h3>
+            <p>{selectedMetric.name} <span>·</span> {selectedMetric.unit}</p>
+          </div>
+          <div className="monitor-chart-heading-meta">
+            <span className={effectiveLiveState === "live" ? "monitor-chart-live is-live" : "monitor-chart-live"}><span />{effectiveLiveState === "live" ? "LIVE" : "HISTORY"}</span>
+            <span>{points.reduce((sum, point) => sum + point.sample_count, 0).toLocaleString()} samples</span>
+          </div>
+        </div>
+        <div className="monitor-chart-controls">
+          <div className="metric-preset-row" aria-label="Quick metric selection">
+            {[
+              { label: "CPU", value: "host.cpu.utilization" },
+              { label: "Memory", value: "host.memory.used" },
+              { label: "Disk", value: "host.disk.used.percent" },
+              { label: "Network", value: "host.network.receive.bytes_per_second" },
+            ].map((item) => (
+              <button key={item.value} type="button" className={metric === item.value ? "metric-preset metric-preset-active" : "metric-preset"} aria-pressed={metric === item.value} onClick={() => { setLivePoints([]); setLoading(true); setHistoryError(""); setMetric(item.value); }}>
+                {item.label}
+              </button>
+            ))}
+          </div>
+          <div className="monitor-chart-control-right">
+            <label className="metric-select-field monitor-extra-metric">
+              <span>More metrics</span>
+              <select value={metric} onChange={(event) => { setLivePoints([]); setLoading(true); setHistoryError(""); setMetric(event.target.value); }}>
+                {metricDefinitions.map((definition) => <option key={definition.name} value={definition.name}>{definition.label}</option>)}
+              </select>
+            </label>
+            <div className="range-switch" role="group" aria-label="Historical time range">
+              {(["1h", "6h", "24h"] as const).map((value) => (
+                <button key={value} type="button" className={range === value ? "range-button range-button-active" : "range-button"} onClick={() => { setLivePoints([]); setLoading(true); setHistoryError(""); setRange(value); }}>
+                  {value.toUpperCase()}
+                </button>
+              ))}
+            </div>
+            <button className="button button-secondary monitor-refresh-button" type="button" onClick={() => { setLoading(true); setHistoryError(""); void loadHistory(); void loadLatest(); }} disabled={loading}>
+              {loading ? "Refreshing…" : "↻ Refresh"}
+            </button>
+          </div>
         </div>
         <ServerMetricChart points={points} range={range} unit={selectedMetric.unit} loading={loading} startTime={series?.from ?? null} />
       </article>
-
 
       {latestSamples.length > 0 && (
         <section className="inventory-panel detail-inventory-panel">
           <div className="panel-heading">
             <div>
-              <h2>Host health snapshot</h2>
-              <p>Latest reported CPU, memory, disk, network and uptime values.</p>
+              <h2>Storage and network interfaces</h2>
+              <p>Mounted-volume capacity and per-interface traffic from the latest host snapshot.</p>
             </div>
             <button className="button button-secondary" type="button" onClick={() => { void loadLatest(); }} disabled={inventoryLoading}>
               {inventoryLoading ? "Refreshing…" : "Refresh snapshot"}
             </button>
-          </div>
-          <div className="summary-grid">
-            <article className="summary-card">
-              <span>CPU utilization</span>
-              <strong>{cpuLatest ? formatValue(cpuLatest.value, "percent") : "Waiting for sample"}</strong>
-              <small>Aggregate processor usage</small>
-            </article>
-            <article className="summary-card">
-              <span>Memory used</span>
-              <strong>{memoryUsed ? formatBytes(memoryUsed.value) : "Unavailable"}</strong>
-              <small>{memoryTotal ? `of ${formatBytes(memoryTotal.value)}` : memoryAvailable ? `${formatBytes(memoryAvailable.value)} available` : "Total memory unavailable"}</small>
-            </article>
-            <article className="summary-card">
-              <span>Uptime</span>
-              <strong>{uptimeLatest ? formatUptime(uptimeLatest.value) : "Unavailable"}</strong>
-              <small>Host running time</small>
-            </article>
-            <article className="summary-card">
-              <span>Processes</span>
-              <strong>{processCount ? Math.round(processCount.value).toLocaleString() : "Unavailable"}</strong>
-              <small>Current process count</small>
-            </article>
           </div>
           {diskVolumes.length > 0 && (
             <div>
@@ -666,7 +748,7 @@ export function ServerDetail({
             </div>
             <div>
               <h3>TCP connection states</h3>
-              {tcpStates.length === 0 ? <p className="detail-footnote">No TCP state samples in the latest snapshot.</p> : (
+              {tcpStates.length === 0 ? <p className="detail-footnote">{isWindows ? "Windows TCP state collection is not included in this agent version yet." : "No TCP state samples in the latest snapshot."}</p> : (
                 <div className="table-wrap"><table>
                   <thead><tr><th>Family</th><th>State</th><th>Connections</th></tr></thead>
                   <tbody>{tcpStates.map((sample, index) => (
@@ -677,7 +759,7 @@ export function ServerDetail({
                 </table></div>
               )}
               <h3 className="detail-subheading">Listening ports</h3>
-              {listeningPorts.length === 0 ? <p className="detail-footnote">No listening-port samples in the latest snapshot.</p> : (
+              {listeningPorts.length === 0 ? <p className="detail-footnote">{isWindows ? "Windows listening-port collection is not included in this agent version yet." : "No listening-port samples in the latest snapshot."}</p> : (
                 <div className="table-wrap"><table>
                   <thead><tr><th>Family</th><th>Port</th><th>Sockets</th></tr></thead>
                   <tbody>{listeningPorts.slice(0, 24).map((sample, index) => (
