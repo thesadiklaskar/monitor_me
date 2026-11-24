@@ -20,7 +20,7 @@ const (
 var (
 	seriesUUID       = regexp.MustCompile("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$")
 	seriesMetricName = regexp.MustCompile("^[a-zA-Z][a-zA-Z0-9_.-]{0,127}$")
-	seriesLabelKey  = regexp.MustCompile("^[a-zA-Z][a-zA-Z0-9_.-]{0,63}$")
+	seriesLabelKey   = regexp.MustCompile("^[a-zA-Z][a-zA-Z0-9_.-]{0,63}$")
 )
 
 type RangeQuery struct {
@@ -128,4 +128,3 @@ func QueryRange(ctx context.Context, db *sql.DB, query RangeQuery) ([]SeriesPoin
 	}
 	return points, nil
 }
-
