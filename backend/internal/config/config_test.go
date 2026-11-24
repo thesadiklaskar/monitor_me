@@ -59,7 +59,6 @@ func TestParseWebAllowedOrigins(t *testing.T) {
 
 
 func TestLoadDoesNotRequireInteractiveAuthenticationConfiguration(t *testing.T) {
-	t.Setenv("MONITOR_ME_AUTH_DISABLED", "false")
 	t.Setenv("DATABASE_URL", "postgres://monitor_me:password@localhost:5432/monitor_me?sslmode=disable")
 	t.Setenv("REDIS_ADDR", "localhost:6379")
 	t.Setenv("WEB_ALLOWED_ORIGINS", "http://localhost:3000")
