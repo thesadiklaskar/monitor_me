@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"example.com/monitor-me/backend/internal/identity"
+	"example.com/monitor-me/backend/internal/logstore"
 	"example.com/monitor-me/backend/internal/telemetry"
 	redisv9 "github.com/redis/go-redis/v9"
 )
@@ -22,6 +23,7 @@ type LiveDependencies struct {
 	AllowedOrigins         []string
 	RemoteAllowedUnits     []string
 	DisableAuthentication  bool
+	Logs                   *logstore.Store
 }
 
 // NewRouter registers health, identity, inventory, telemetry, and live routes.
@@ -38,6 +40,7 @@ func NewRouter(version string, dependencies []Dependency, identities *identity.S
 			api.disableAuthentication = live[0].DisableAuthentication
 			api.cache = live[0].Cache
 			api.telemetry = live[0].Telemetry
+			api.logs = live[0].Logs
 			api.allowedLiveOrigins = make(map[string]struct{}, len(live[0].AllowedOrigins))
 			for _, origin := range live[0].AllowedOrigins {
 				api.allowedLiveOrigins[origin] = struct{}{}
@@ -79,6 +82,9 @@ func NewRouter(version string, dependencies []Dependency, identities *identity.S
 		mux.Handle("POST /v1/enrollment-tokens/{tokenID}/revoke", api.requireAuth(http.HandlerFunc(api.revokeEnrollmentToken)))
 		mux.Handle("POST /v1/agents/{agentID}/revoke", api.requireAuth(http.HandlerFunc(api.revokeAgent)))
 
+		if api.logs != nil {
+			mux.Handle("GET /v1/servers/{serverID}/logs", api.requireAuth(http.HandlerFunc(api.logsSearch)))
+		}
 		if api.telemetry != nil {
 			mux.Handle("GET /v1/servers/{serverID}/metrics", api.requireAuth(http.HandlerFunc(api.metrics)))
 			mux.Handle("GET /v1/servers/{serverID}/metrics/latest", api.requireAuth(http.HandlerFunc(api.latestMetrics)))

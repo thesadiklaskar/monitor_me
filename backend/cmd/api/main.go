@@ -18,6 +18,7 @@ import (
 	"example.com/monitor-me/backend/internal/config"
 	"example.com/monitor-me/backend/internal/httpapi"
 	"example.com/monitor-me/backend/internal/identity"
+	"example.com/monitor-me/backend/internal/logstore"
 	"example.com/monitor-me/backend/internal/storage/postgres"
 	"example.com/monitor-me/backend/internal/telemetry"
 	"google.golang.org/grpc"
@@ -80,16 +81,25 @@ func run(logger *slog.Logger) error {
 		}
 	}()
 
+	logs, err := logstore.New(startupContext, database, logstore.Config{
+		URL: cfg.ClickHouseURL, Username: cfg.ClickHouseUsername, Password: cfg.ClickHousePassword,
+		Database: "monitor_me", RequestTimeout: 8 * time.Second,
+	})
+	if err != nil {
+		return err
+	}
+
 	dependencies := []httpapi.Dependency{
 		{Name: "postgres", Check: database.PingContext},
 		{Name: "redis", Check: func(ctx context.Context) error { return cache.Ping(ctx).Err() }},
+		{Name: "clickhouse", Check: logs.Ping},
 	}
 
 	httpServer := &http.Server{
 		Addr: cfg.APIAddress,
 		Handler: httpapi.NewRouter(cfg.ServiceVersion, dependencies, identity.NewStore(database), httpapi.LiveDependencies{
 			Cache: cache, Telemetry: telemetry.NewStore(database), AllowedOrigins: cfg.WebAllowedOrigins,
-			RemoteAllowedUnits: cfg.RemoteAllowedUnits,
+			RemoteAllowedUnits: cfg.RemoteAllowedUnits, Logs: logs,
 			DisableAuthentication: cfg.DisableAuthentication,
 		}),
 		ReadHeaderTimeout: 5 * time.Second,
@@ -111,7 +121,7 @@ func run(logger *slog.Logger) error {
 		grpc.MaxSendMsgSize(1<<20),
 		grpc.MaxConcurrentStreams(128),
 	)
-	monitorv1.RegisterAgentControlServer(grpcServer, agentcontrol.NewService(database, telemetry.RedisPublisher{Client: cache}))
+	monitorv1.RegisterAgentControlServer(grpcServer, agentcontrol.NewService(database, telemetry.RedisPublisher{Client: cache}, logs))
 
 	shutdownSignals, stopSignals := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stopSignals()

@@ -16,6 +16,7 @@ import (
 
 	monitorv1 "example.com/monitor-me/backend/gen/monitor/v1"
 	"example.com/monitor-me/backend/internal/telemetry"
+	"example.com/monitor-me/backend/internal/logstore"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -35,13 +36,17 @@ type Service struct {
 	monitorv1.UnimplementedAgentControlServer
 	db        *sql.DB
 	publisher telemetry.EventPublisher
+	logs      *logstore.Store
 }
 
 // NewService creates an agent-control service backed by PostgreSQL.
-func NewService(db *sql.DB, publishers ...telemetry.EventPublisher) *Service {
+func NewService(db *sql.DB, publisher telemetry.EventPublisher, logStores ...*logstore.Store) *Service {
 	service := &Service{db: db}
-	if len(publishers) > 0 {
-		service.publisher = publishers[0]
+	if publisher != nil {
+		service.publisher = publisher
+	}
+	if len(logStores) > 0 {
+		service.logs = logStores[0]
 	}
 	return service
 }

@@ -26,6 +26,9 @@ type Config struct {
 	WebAllowedOrigins      []string
 	RemoteAllowedUnits     []string
 	DisableAuthentication  bool
+	ClickHouseURL          string
+	ClickHouseUsername     string
+	ClickHousePassword     string
 }
 
 // Load reads and validates environment-based configuration.
@@ -40,6 +43,9 @@ func Load() (Config, error) {
 		AgentGRPCAddress:     getEnv("AGENT_GRPC_ADDR", ":8443"),
 		AgentTLSCertFile:     getEnv("AGENT_TLS_CERT_FILE", ".data/certs/server.crt"),
 		AgentTLSKeyFile:      getEnv("AGENT_TLS_KEY_FILE", ".data/certs/server.key"),
+		ClickHouseURL:        getEnv("CLICKHOUSE_URL", "http://localhost:8123"),
+		ClickHouseUsername:   getEnv("CLICKHOUSE_USER", "monitor_me"),
+		ClickHousePassword:   os.Getenv("CLICKHOUSE_PASSWORD"),
 		DBMaxOpenConnections: 25,
 		DBMaxIdleConnections: 10,
 		DBConnectionLifetime: 30 * time.Minute,
@@ -69,6 +75,9 @@ func Load() (Config, error) {
 	}
 	if cfg.AgentGRPCAddress == "" || cfg.AgentTLSCertFile == "" || cfg.AgentTLSKeyFile == "" {
 		return Config{}, fmt.Errorf("agent gRPC address and TLS certificate/key files are required")
+	}
+	if cfg.ClickHouseURL == "" {
+		return Config{}, fmt.Errorf("CLICKHOUSE_URL must not be empty")
 	}
 	if cfg.AgentTLSCertFile == cfg.AgentTLSKeyFile {
 		return Config{}, fmt.Errorf("agent TLS certificate and key paths must be different")

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"example.com/monitor-me/backend/internal/identity"
+	"example.com/monitor-me/backend/internal/logstore"
 	"example.com/monitor-me/backend/internal/telemetry"
 	redisv9 "github.com/redis/go-redis/v9"
 )
@@ -19,6 +20,7 @@ type API struct {
 	identities                *identity.Store
 	cache                     *redisv9.Client
 	telemetry                 *telemetry.Store
+	logs                      *logstore.Store
 	allowedLiveOrigins        map[string]struct{}
 	allowedRemoteUnits        []string
 	disableAuthentication     bool
