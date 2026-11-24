@@ -30,7 +30,7 @@ For strict data ownership today, deploy one self-hosted installation per custome
 
 ## Major gaps — do not advertise as finished
 
-- **Logs: 0%.** There is no raw log agent pipeline, no ClickHouse deployment/schema, no indexed search, no Log Explorer and no live tail.
+- **Logs: approximately 25–30% of the intended feature scope.** Linux journald collection, bounded durable agent queue, TLS gRPC delivery, ClickHouse MergeTree storage, tenant/server-scoped bounded search and an initial Log Explorer with 10-second polling are implemented. Windows Event Log/file-tail collectors, richer live-tail transport, saved queries, full-text indexing/optimization, production retention/backup acceptance and sustained-volume/replay tests remain open.
 - **Traces/APM: 0%.** No trace ingestion or service-map/request instrumentation.
 - **Alerting is basic.** No `for` duration, severity model, routing tree, webhook/email/SMS integrations, escalation, silences/maintenance windows or multi-condition expressions. The current notification channel is in-app only.
 - **Projects are not full workspaces yet.** They persist and map workloads, but do not have project-specific metric dashboards, saved queries or project-level overview charts.
@@ -64,7 +64,7 @@ These percentages are **subjective feature-scope estimates**, not benchmark scor
 | Basic host metrics collection/history | 45–55% | Linux host collection, persisted metric history, bounded queries and basic charts exist; source coverage and dashboard customisation are limited |
 | Server and project operations | 40–50% | Inventory and real project/mapping entities exist; no project dashboards, broader orchestration or team settings |
 | Alerting | 15–20% | Basic threshold rules and in-app firing/recovery only |
-| Logs | 0% | No end-to-end log data plane |
+| Logs | 25–30% | Initial Linux journald → ClickHouse pipeline and Log Explorer exist; Windows/file collectors, advanced search, retention/backup acceptance and scale tests remain |
 | Traces/APM | 0% | Not implemented |
 | Dashboard/UI breadth | 20–25% | A few monitoring workspaces exist; no general dashboard builder, panel ecosystem or Log Explorer |
 | Plug-and-play lifecycle | 45–55% | One-use enrollment, checksum-verified native artifacts and initial service installers exist; control-plane bootstrap, signing and runtime acceptance remain |
@@ -74,7 +74,7 @@ These percentages are **subjective feature-scope estimates**, not benchmark scor
 
 ## Verification status
 
-The new regression tests are committed but unexecuted. The latest workflow run, #45336425843, is marked completed/failure and returned no jobs. This means no Go, frontend, agent or Compose test result exists for these changes. Do not infer that source compiles or runtime behavior passes from the commit alone.
+The new regression tests are committed but unexecuted. The latest observed workflow run #45342852870, is marked completed/failure and returned no jobs. This means no Go, frontend, agent or Compose test result exists for these changes. Do not infer that source compiles or runtime behavior passes from the commit alone.
 
 Before release, run:
 - Go formatting, race-enabled unit tests, vet and backend integration tests;
@@ -88,7 +88,7 @@ Before release, run:
 
 1. Run all committed tests and repair every failure before feature expansion.
 2. Finish authenticated organization selection, membership invitations and admin settings—or keep one user per customer in the self-hosted product.
-3. Build the durable Linux journald/file log collector and Windows Event Log collector, ClickHouse schema/ingest/search/retention, bounded paging and live tail.
+3. Complete Windows Event Log/file collectors, harden ClickHouse ingestion/search, add retention/backup acceptance, and run bounded queue/outage/replay and sustained-volume tests.
 4. Expand alerting with duration, severity, routing, notification destinations, silences and delivery retry/outbox.
 5. Add project dashboards, dashboard builder, panel library, variables and saved queries.
 6. Adopt shadcn/ui primitives incrementally for consistent accessible dialogs, forms, menus, tables and tabs after the current UI tests are green.
