@@ -13,34 +13,26 @@ compose() { docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" "$@"; }
 
 compose config --quiet
 
-auth_disabled="$(sed -n 's/^MONITOR_ME_AUTH_DISABLED=//p' "$ENV_FILE" | tail -n 1 | tr -d '"' | tr -d '\r' | tr '[:upper:]' '[:lower:]' | xargs)"
+admin_cidr="$(sed -n 's/^ADMIN_CIDR=//p' "$ENV_FILE" | tail -n 1 | tr -d '"' | tr -d '\r')"
 access_file="/etc/nginx/snippets/monitor-me-admin-allowlist.conf"
 access_directory="$(dirname "$access_file")"
 access_tmp="$(mktemp)"
 access_backup=""
-mkdir -p "$access_directory"
 
-if [[ "$auth_disabled" == "true" ]]; then
-  admin_cidr="$(sed -n 's/^ADMIN_CIDR=//p' "$ENV_FILE" | tail -n 1 | tr -d '"' | tr -d '\r')"
-  if [[ -z "$admin_cidr" ]]; then
-    echo "Refusing production no-login mode: set ADMIN_CIDR to the trusted administrator/VPN source range." >&2
-    exit 2
-  fi
-  if [[ "$EUID" -ne 0 ]]; then
-    echo "Production no-login mode requires root to install the Nginx access allowlist and host firewall rules." >&2
-    exit 2
-  fi
-  python3 -c 'import ipaddress,sys; n=ipaddress.ip_network(sys.argv[1], strict=False); sys.exit(1 if n.prefixlen == 0 else 0)' "$admin_cidr" || {
-    echo "ADMIN_CIDR must be a specific IPv4/IPv6 source range, not a default route." >&2
-    exit 2
-  }
-  printf 'allow %s;\ndeny all;\n' "$admin_cidr" > "$access_tmp"
-else
-  # In authenticated mode, the application enforces browser/API credentials.
-  # Keep the Nginx include present but do not add IP filtering.
-  printf '# Application authentication is enabled; Nginx does not add an IP allowlist.\n' > "$access_tmp"
+if [[ -z "$admin_cidr" || "$admin_cidr" == *REPLACE* ]]; then
+  echo "Refusing no-login production deployment: set ADMIN_CIDR to the trusted administrator/VPN source range." >&2
+  exit 2
 fi
-
+if [[ "$EUID" -ne 0 ]]; then
+  echo "No-login production deployment requires root to install the Nginx allowlist and host firewall rules." >&2
+  exit 2
+fi
+python3 -c 'import ipaddress,sys; n=ipaddress.ip_network(sys.argv[1], strict=False); sys.exit(1 if n.prefixlen == 0 else 0)' "$admin_cidr" || {
+  echo "ADMIN_CIDR must be a specific IPv4/IPv6 source range, not a default route." >&2
+  exit 2
+}
+mkdir -p "$access_directory"
+printf 'allow %s;\ndeny all;\n' "$admin_cidr" > "$access_tmp"
 chmod 0644 "$access_tmp"
 if [[ -f "$access_file" ]]; then
   access_backup="$(mktemp)"
@@ -62,13 +54,11 @@ fi
 rm -f "$access_backup"
 systemctl reload nginx
 
-if [[ "$auth_disabled" == "true" ]]; then
-  firewall_args=(--role control-plane --admin-cidr "$admin_cidr" --verify-admin-ui-allowlist)
-  # Verify the reverse-proxy boundary before opening public HTTPS for the
-  # installer/artifact paths.
-  "$ROOT/deploy/production/firewall.sh" "${firewall_args[@]}"
-  "$ROOT/deploy/production/firewall.sh" "${firewall_args[@]}" --apply
-fi
+firewall_args=(--role control-plane --admin-cidr "$admin_cidr" --verify-admin-ui-allowlist)
+# The dashboard has no user login: install and verify its network boundary
+# before exposing HTTPS routes used by remote agent bootstrap.
+"$ROOT/deploy/production/firewall.sh" "${firewall_args[@]}"
+"$ROOT/deploy/production/firewall.sh" "${firewall_args[@]}" --apply
 
 compose build api web agent-artifacts
 compose up -d postgres redis
