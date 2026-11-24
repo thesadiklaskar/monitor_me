@@ -117,22 +117,17 @@ Edit `/etc/monitor-me/agent.env` with the organization's gRPC address and truste
 Follow logs with `journalctl -u monitor-me-agent -f`. Use `systemctl restart monitor-me-agent` to restart and `systemctl disable --now monitor-me-agent` to disable and stop the service.
 
 
-## Windows local acceptance
+## Windows service installation
 
-1. Start the control plane with the local startup helper documented in the repository README, or use an existing local Compose stack.
-2. Choose **Add Machine**, create the node record and copy its one-time enrollment token. Do not choose an OS in the dashboard; target-side installation is the intended detection point.
-3. From the repository root on the monitored Windows host, run:
-
-   ```powershell
-   .\\scripts\\setup-windows-agent.ps1
-   ```
-
-4. The helper builds the Windows x64 agent with Docker if the binary is absent, then starts it. Paste the one-time token when the hidden prompt appears. For a remote host, pass the reachable gRPC address and trusted CA explicitly:
+1. Open the dashboard, choose **Add Machine**, and create a one-time enrollment token.
+2. On the monitored Windows x64 host, open PowerShell as Administrator and run the copied command:
 
    ```powershell
-   .\\scripts\\setup-windows-agent.ps1 -GrpcAddress monitor.example.com:8443 -CaFile C:\\certs\\monitor-me-ca.crt
+   & ([scriptblock]::Create((Invoke-RestMethod -Uri 'https://monitor.example/install/agent-windows.ps1'))) -ServerUrl 'https://monitor.example' -GrpcAddress 'monitor.example:8443'
    ```
 
-5. The agent stores its session/WAL under `%LOCALAPPDATA%\\MonitorMe`. Open the server in the dashboard and inspect CPU, memory, disk capacity/I/O, network throughput, uptime, process inventory and System information.
+3. Paste the token at the hidden prompt. The installer downloads the Windows binary and public control-plane CA, verifies SHA-256, installs a restart-enabled Windows Service, stores the private session under ProgramData and removes the one-time token after enrollment.
+4. Confirm the service with `Get-Service MonitorMeAgent`. Diagnostic output is stored in the bounded rotating log `%ProgramData%\MonitorMe\agent.log`.
 
-Keep the PowerShell window open during local acceptance. Press Ctrl+C to stop the foreground agent. On later runs, the persisted session is reused and no new enrollment token is needed. The initial Windows helper does not yet install a Windows service or configure automatic startup.
+No Docker, Go toolchain or repository checkout is required on the monitored Windows host. Use `-ForceEnrollment` only after creating a replacement token and when you deliberately want to discard the current session. Windows x64 support is the current release target; code-signing/publisher verification and runtime acceptance remain release gates.
+
