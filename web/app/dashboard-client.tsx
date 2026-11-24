@@ -251,6 +251,7 @@ function EnrollmentDialog({
   canRevoke: boolean;
 }) {
   const [copied, setCopied] = useState(false);
+  const [commandCopied, setCommandCopied] = useState(false);
   const [revoking, setRevoking] = useState(false);
   const [error, setError] = useState("");
   const expires = formatDate(issued.enrollment.expires_at);
@@ -261,6 +262,19 @@ function EnrollmentDialog({
       setCopied(true);
     } catch {
       setError("Clipboard access was blocked. Select and copy the token manually.");
+    }
+  }
+
+  async function copySetupCommand() {
+    const endpoint = grpcAddress || "localhost:8443";
+    const command = issued.target_platform === "windows"
+      ? `.\\scripts\\setup-windows-agent.ps1 -GrpcAddress ${endpoint}`
+      : `sudo ./scripts/setup-linux-agent.sh --grpc-address ${endpoint}`;
+    try {
+      await navigator.clipboard.writeText(command);
+      setCommandCopied(true);
+    } catch {
+      setError("Clipboard access was blocked. Select and copy the setup command manually.");
     }
   }
 
@@ -316,7 +330,10 @@ function EnrollmentDialog({
           {issued.target_platform === "windows" ? (
             <>
               <div className="install-command-wrap">
-                <code className="install-command">.\scripts\setup-windows-agent.ps1 -GrpcAddress {grpcAddress || "localhost:8443"}</code>
+                <div className="install-command-row">
+                  <code className="install-command">.\scripts\setup-windows-agent.ps1 -GrpcAddress {grpcAddress || "localhost:8443"}</code>
+                  <button className="button button-table" type="button" onClick={() => void copySetupCommand()}>{commandCopied ? "Copied" : "Copy command"}</button>
+                </div>
               </div>
               <ol>
                 <li>Run this from the Monitor Me repository folder in an elevated or normal PowerShell window.</li>
@@ -328,7 +345,10 @@ function EnrollmentDialog({
           ) : (
             <>
               <div className="install-command-wrap">
-                <code className="install-command">sudo ./scripts/setup-linux-agent.sh --grpc-address {grpcAddress || "localhost:8443"}</code>
+                <div className="install-command-row">
+                  <code className="install-command">sudo ./scripts/setup-linux-agent.sh --grpc-address {grpcAddress || "localhost:8443"}</code>
+                  <button className="button button-table" type="button" onClick={() => void copySetupCommand()}>{commandCopied ? "Copied" : "Copy command"}</button>
+                </div>
               </div>
               <ol>
                 <li>Run this from a Linux checkout of the Monitor Me repository on a systemd host.</li>
