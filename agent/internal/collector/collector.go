@@ -13,6 +13,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/shirou/gopsutil/v4/host"
 )
 
 // Sample is a timestamped telemetry value stored in the local write-ahead log.
@@ -80,7 +82,7 @@ func (c *ProcCollector) Capabilities() []string {
 	return []string{
 		"host.cpu", "host.cpu.per_core", "host.memory", "host.swap",
 		"host.disk", "host.network", "host.network.tcp", "host.uptime",
-		"host.process_inventory", "workload.cgroup", "workload.systemd", "workload.container",
+		"host.process_inventory", "host.system_info", "workload.cgroup", "workload.systemd", "workload.container",
 		"agent.health", "agent.spool",
 	}
 }
@@ -291,6 +293,35 @@ func (c *ProcCollector) Collect(ctx context.Context) ([]Sample, error) {
 		}
 	} else {
 		collectionErrors = append(collectionErrors, fmt.Errorf("read procfs uptime: %w", err))
+	}
+
+	if info, infoErr := host.InfoWithContext(ctx); infoErr == nil && info != nil {
+		hostname, _ := os.Hostname()
+		if hostname == "" {
+			hostname = info.Hostname
+		}
+		labels := map[string]string{
+			"hostname": hostname,
+			"os": runtime.GOOS,
+			"platform": info.Platform,
+			"platform_version": info.PlatformVersion,
+			"kernel_version": info.KernelVersion,
+			"architecture": runtime.GOARCH,
+		}
+		if info.VirtualizationSystem != "" {
+			labels["virtualization_system"] = info.VirtualizationSystem
+		}
+		if info.VirtualizationRole != "" {
+			labels["virtualization_role"] = info.VirtualizationRole
+		}
+		if provider := detectLinuxCloudProviderHint(); provider != "" {
+			labels["cloud_provider_hint"] = provider
+		}
+		labels["environment_type"] = classifyEnvironmentType(
+			info.VirtualizationSystem, info.VirtualizationRole, isLinuxContainer(),
+			labels["cloud_provider_hint"] != "",
+		)
+		add("host.info", 1, "info", labels)
 	}
 
 	processes, processErr := readProcesses(c.root)
@@ -530,6 +561,73 @@ func readProcesses(procRoot string) (processSnapshot, error) {
 		process.attributionMethod = workload.AttributionMethod
 	}
 	return snapshot, nil
+}
+
+// classifyEnvironmentType uses native metadata where available. Cloud vendor
+// identification remains a hint because providers do not expose uniform DMI data.
+func classifyEnvironmentType(virtualizationSystem, virtualizationRole string, inContainer, cloudProviderHint bool) string {
+	if inContainer {
+		return "container"
+	}
+	if cloudProviderHint {
+		return "cloud_vm"
+	}
+	if virtualizationSystem != "" || strings.EqualFold(virtualizationRole, "guest") {
+		return "virtual_machine"
+	}
+	return "physical_or_unknown"
+}
+
+func isLinuxContainer() bool {
+	if value := strings.ToLower(os.Getenv("container")); value != "" && value != "0" {
+		return true
+	}
+	for _, marker := range []string{"/.dockerenv", "/run/.containerenv"} {
+		if _, err := os.Stat(marker); err == nil {
+			return true
+		}
+	}
+	return false
+}
+
+func detectLinuxCloudProviderHint() string {
+	paths := []string{
+		"/sys/class/dmi/id/sys_vendor",
+		"/sys/class/dmi/id/product_name",
+		"/sys/class/dmi/id/product_version",
+		"/sys/class/dmi/id/board_vendor",
+	}
+	var details strings.Builder
+	for _, path := range paths {
+		raw, err := os.ReadFile(path)
+		if err == nil {
+			details.WriteByte(' ')
+			details.WriteString(strings.ToLower(string(raw)))
+		}
+	}
+	value := details.String()
+	switch {
+	case strings.Contains(value, "amazon ec2") || strings.Contains(value, "amazon"):
+		return "aws"
+	case strings.Contains(value, "google"):
+		return "gcp"
+	case strings.Contains(value, "digitalocean"):
+		return "digitalocean"
+	case strings.Contains(value, "hetzner"):
+		return "hetzner"
+	case strings.Contains(value, "vultr"):
+		return "vultr"
+	case strings.Contains(value, "linode") || strings.Contains(value, "akamai"):
+		return "linode"
+	case strings.Contains(value, "microsoft corporation") || strings.Contains(value, "virtual machine"):
+		return "azure_or_hyperv"
+	case strings.Contains(value, "oracle"):
+		return "oracle_cloud"
+	case strings.Contains(value, "alibaba"):
+		return "alibaba_cloud"
+	default:
+		return ""
+	}
 }
 
 // CounterRate converts a cumulative counter into a per-second rate. Counter
