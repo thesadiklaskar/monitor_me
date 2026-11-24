@@ -260,11 +260,9 @@ function DashboardPanelCard({
 export default function DashboardsWorkspace({
   servers,
   role,
-  onBack,
 }: {
   servers: Server[];
   role: string;
-  onBack: () => void;
 }) {
   const [dashboards, setDashboards] = useState<Dashboard[]>([]);
   const [selectedId, setSelectedId] = useState("");
@@ -450,10 +448,9 @@ export default function DashboardsWorkspace({
     <section className="dashboards-workspace">
       <header className="dashboards-workspace-header">
         <div>
-          <button className="detail-back-button" type="button" onClick={onBack}>← Back to servers</button>
-          <div className="eyebrow">Saved monitoring layouts</div>
+          <div className="eyebrow">VISUALIZE / METRICS</div>
           <h1>Dashboards</h1>
-          <p>Build persistent metric views from real server history. Panels refresh automatically and show real host metrics from this installation.</p>
+          <p>Create and save reusable views of CPU, memory, storage and network metrics from your connected machines.</p>
         </div>
         <div className="dashboards-header-actions">
           <Button variant="secondary" onClick={() => { void loadDashboards(); void refreshSeries(); }} disabled={loading}><RefreshCw size={14} /> Refresh</Button>
