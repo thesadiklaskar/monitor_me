@@ -18,8 +18,8 @@ import (
 	"testing"
 	"time"
 
-	monitorv1 "example.com/monitor-me/backend/gen/monitor/v1"
-	"example.com/monitor-me/backend/internal/identity"
+	monitorv1 "monitor-me.internal/backend/gen/monitor/v1"
+	"monitor-me.internal/backend/internal/identity"
 	"github.com/gorilla/websocket"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"google.golang.org/grpc"

@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	monitorv1 "example.com/monitor-me/backend/gen/monitor/v1"
+	monitorv1 "monitor-me.internal/backend/gen/monitor/v1"
 )
 
 func TestNormalizeCapabilities(t *testing.T) {

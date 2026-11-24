@@ -17,7 +17,7 @@ import (
 	"testing"
 	"time"
 
-	monitorv1 "example.com/monitor-me/backend/gen/monitor/v1"
+	monitorv1 "monitor-me.internal/backend/gen/monitor/v1"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"

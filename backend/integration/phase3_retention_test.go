@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"example.com/monitor-me/backend/internal/telemetry"
+	"monitor-me.internal/backend/internal/telemetry"
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
 

@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"example.com/monitor-me/agent/internal/collector"
+	"monitor-me.internal/agent/internal/collector"
 )
 
 func fixtureBatch(t *testing.T, value float64) Batch {
