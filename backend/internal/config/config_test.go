@@ -58,7 +58,7 @@ func TestParseWebAllowedOrigins(t *testing.T) {
 }
 
 
-func TestLoadParsesAnonymousAuthenticationMode(t *testing.T) {
+func TestLoadDoesNotRequireInteractiveAuthenticationConfiguration(t *testing.T) {
 	t.Setenv("MONITOR_ME_AUTH_DISABLED", "false")
 	t.Setenv("DATABASE_URL", "postgres://monitor_me:password@localhost:5432/monitor_me?sslmode=disable")
 	t.Setenv("REDIS_ADDR", "localhost:6379")
@@ -68,26 +68,7 @@ func TestLoadParsesAnonymousAuthenticationMode(t *testing.T) {
 	t.Setenv("AGENT_TLS_KEY_FILE", "/tmp/monitor-me-server.key")
 	t.Setenv("REMOTE_ALLOWED_SYSTEMD_UNITS", "")
 
-	t.Setenv("MONITOR_ME_AUTH_DISABLED", "true")
-	cfg, err := Load()
-	if err != nil {
-		t.Fatalf("Load() with anonymous mode enabled: %v", err)
-	}
-	if !cfg.DisableAuthentication {
-		t.Fatal("DisableAuthentication = false, want true")
-	}
-
-	t.Setenv("MONITOR_ME_AUTH_DISABLED", "false")
-	cfg, err = Load()
-	if err != nil {
-		t.Fatalf("Load() with authentication enabled: %v", err)
-	}
-	if cfg.DisableAuthentication {
-		t.Fatal("DisableAuthentication = true, want false")
-	}
-
-	t.Setenv("MONITOR_ME_AUTH_DISABLED", "sometimes")
-	if _, err := Load(); err == nil {
-		t.Fatal("Load() accepted an invalid MONITOR_ME_AUTH_DISABLED value")
+	if _, err := Load(); err != nil {
+		t.Fatalf("Load() should not depend on interactive authentication settings: %v", err)
 	}
 }
