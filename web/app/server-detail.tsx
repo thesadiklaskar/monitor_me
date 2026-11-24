@@ -711,6 +711,20 @@ export function ServerDetail({
               <strong>{hostInfo.labels?.kernel_version ?? "Unavailable"}</strong>
               <small>{hostInfo.labels?.architecture ?? "Architecture unavailable"}</small>
             </article>
+            <article className="summary-card">
+              <span>Environment type</span>
+              <strong>
+                {hostInfo.labels?.environment_type === "cloud_vm" ? "Cloud VM / VPS" :
+                  hostInfo.labels?.environment_type === "virtual_machine" ? "Virtual machine" :
+                  hostInfo.labels?.environment_type === "container" ? "Container" :
+                  hostInfo.labels?.environment_type === "physical_or_unknown" ? "Physical / unknown" : "Not detected"}
+              </strong>
+              <small>
+                {hostInfo.labels?.cloud_provider_hint ??
+                  hostInfo.labels?.virtualization_system ??
+                  (hostInfo.labels?.environment_type === "physical_or_unknown" ? "No hypervisor metadata detected" : "Provider or hypervisor not reported")}
+              </small>
+            </article>
           </div>
         </section>
       )}
