@@ -44,16 +44,6 @@ func (s *Service) Stream(stream monitorv1.AgentControl_StreamServer) error {
 			len(message.GetSessionToken()) < 32 || len(message.GetSessionToken()) > 128 {
 			return status.Error(codes.Unauthenticated, "agent stream identity is invalid")
 		}
-		if event := message.GetEvent(); event != nil {
-			response, eventErr := s.handleAgentEvent(stream.Context(), message.GetAgentId(), message.GetSessionToken(), event)
-			if eventErr != nil {
-				return eventErr
-			}
-			if err := stream.Send(response); err != nil {
-				return err
-			}
-			continue
-		}
 		logBatch := message.GetLogBatch()
 		if logBatch == nil {
 			batch := message.GetTelemetryBatch()
