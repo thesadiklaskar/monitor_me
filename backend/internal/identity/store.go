@@ -809,7 +809,7 @@ func (s *Store) UpdateDashboardPanel(ctx context.Context, principal Principal, p
 
 func validPanelVisualization(value string) bool {
 	switch value {
-	case "timeseries", "stat", "table", "bar", "area", "gauge", "heatmap":
+	case "timeseries", "stat", "table", "bar", "area", "gauge", "heatmap", "logs":
 		return true
 	default:
 		return false

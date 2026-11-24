@@ -934,7 +934,7 @@ td { font-size: 13px; }
 .dashboard-heatmap { display:grid; grid-template-columns:repeat(24,minmax(0,1fr)); gap:4px; }
 .dashboard-heatmap span { min-height:19px; border:1px solid rgba(142,205,196,.2); border-radius:3px; background:#70c6b9; }
 .dashboard-heatmap-wrap .dashboard-chart-footer { display:flex; justify-content:space-between; gap:10px; color:#9eacbd; font-size:10px; }
-@media(max-width:1200px) { .dashboard-panels-grid-v2 { grid-template-columns:repeat(6,minmax(0,1fr)); } }
+@media(max-width:1200px) { .dashboard-panels-grid-v2 { grid-template-columns:1fr; } .dashboard-panels-grid-v2 > * { grid-column:1 / -1 !important; } }
 @media(max-width:760px) {
   .dashboard-panels-grid-v2 { grid-template-columns:1fr; }
   .dashboard-panels-grid-v2 > * { grid-column:1 / -1 !important; }
@@ -942,3 +942,18 @@ td { font-size: 13px; }
   .dashboard-variable-bar .field { min-width:0; width:100%; }
   .dashboard-panel-actions-v2 { flex-wrap:wrap; }
 }
+
+
+.dashboard-log-panel { display:flex; min-width:0; flex-direction:column; gap:7px; }
+.dashboard-log-panel-meta { color:#91a2b6; font-size:10px; }
+.dashboard-log-panel-list { max-height:340px; overflow:auto; border:1px solid rgba(65,88,116,.45); border-radius:9px; background:rgba(10,18,29,.45); }
+.dashboard-log-row { display:grid; grid-template-columns:minmax(140px,170px) 78px minmax(100px,160px) minmax(180px,1fr); align-items:start; gap:9px; padding:9px 10px; border-top:1px solid rgba(65,88,116,.28); font-size:10px; }
+.dashboard-log-row:first-child { border-top:0; }
+.dashboard-log-row time { color:#a8b6c8; font-variant-numeric:tabular-nums; }
+.dashboard-log-row strong { overflow:hidden; color:#c9d4e1; text-overflow:ellipsis; white-space:nowrap; }
+.dashboard-log-row p { margin:0; overflow-wrap:anywhere; color:#e0e7ef; font-family:ui-monospace,SFMono-Regular,Consolas,monospace; line-height:1.5; }
+.dashboard-log-severity { display:inline-flex; width:fit-content; padding:3px 6px; border:1px solid #435267; border-radius:5px; color:#b8c5d5; font-size:9px; text-transform:uppercase; }
+.dashboard-log-severity-error { border-color:rgba(242,143,145,.35); background:rgba(126,39,52,.16); color:#ffb5b8; }
+.dashboard-log-severity-warning { border-color:rgba(235,183,95,.35); background:rgba(135,92,25,.16); color:#f2d29a; }
+.dashboard-log-severity-info { border-color:rgba(142,205,196,.3); background:rgba(50,110,103,.16); color:#b4e5dc; }
+@media(max-width:860px) { .dashboard-log-row { grid-template-columns:minmax(130px,1fr) 72px; } .dashboard-log-row strong,.dashboard-log-row p { grid-column:1 / -1; } }

@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Skeleton } from "@/components/ui/skeleton";
 
 type Server = { id: string; name: string; status: string };
-type Visualization = "timeseries" | "stat" | "table" | "bar" | "area" | "gauge" | "heatmap";
+type Visualization = "timeseries" | "stat" | "table" | "bar" | "area" | "gauge" | "heatmap" | "logs";
 type TimeRange = "1h" | "6h" | "24h" | "7d" | "30d";
 type GridWidth = 4 | 6 | 8 | 12;
 type DashboardPanel = {
@@ -37,7 +37,16 @@ type Dashboard = {
 };
 type SeriesPoint = { bucket: string; average: number; minimum: number; maximum: number; sample_count: number };
 type SeriesResponse = { points: SeriesPoint[] };
-type PanelSeries = { points: SeriesPoint[]; error?: string };
+type DashboardLogEvent = {
+  event_id: string;
+  event_time_unix_nanos: number;
+  source: string;
+  severity: string;
+  body: string;
+  attributes: Record<string, string>;
+};
+type LogResponse = { events: DashboardLogEvent[]; count: number; has_more: boolean };
+type PanelSeries = { points?: SeriesPoint[]; logs?: DashboardLogEvent[]; error?: string };
 type MetricDefinition = { value: string; label: string; unit: string; category: string };
 
 const metricCatalog: MetricDefinition[] = [
@@ -92,6 +101,18 @@ function formatMetric(value: number, unit: string): string {
 
 function formatCompact(value: number): string {
   return Intl.NumberFormat(undefined, { notation: "compact", maximumFractionDigits: 1 }).format(value);
+}
+
+function formatLogTimestamp(unixNanos: number): string {
+  const value = new Date(unixNanos / 1_000_000);
+  return Number.isNaN(value.getTime()) ? "Invalid event time" : value.toLocaleString();
+}
+
+function severityTone(severity: string): string {
+  if (["emergency", "alert", "critical", "error"].includes(severity)) return "dashboard-log-severity dashboard-log-severity-error";
+  if (severity === "warning") return "dashboard-log-severity dashboard-log-severity-warning";
+  if (severity === "info") return "dashboard-log-severity dashboard-log-severity-info";
+  return "dashboard-log-severity";
 }
 
 type ChartPoint = {
@@ -176,6 +197,28 @@ function MetricVisualization({ panel, series, durationMs }: {
   durationMs: number;
 }) {
   const metric = metricCatalog.find((item) => item.value === panel.metric_name);
+  if (panel.visualization === "logs") {
+    if (series === undefined) return <div className="dashboard-chart-loading"><Skeleton className="h-36 w-full" /></div>;
+    if (series.error) return <div className="dashboard-chart-error" role="alert">{series.error}</div>;
+    const events = series.logs ?? [];
+    return events.length === 0 ? (
+      <div className="dashboard-chart-empty">No host log events in this time range. Check the machine's log collection capability and agent status.</div>
+    ) : (
+      <div className="dashboard-log-panel">
+        <div className="dashboard-log-panel-meta">{events.length} events · newest first · latest 50 shown</div>
+        <div className="dashboard-log-panel-list">
+          {events.slice(0, 50).map((event) => (
+            <article className="dashboard-log-row" key={event.event_id}>
+              <time>{formatLogTimestamp(event.event_time_unix_nanos)}</time>
+              <span className={severityTone(event.severity)}>{event.severity}</span>
+              <strong>{event.source}</strong>
+              <p>{event.body}</p>
+            </article>
+          ))}
+        </div>
+      </div>
+    );
+  }
   const points = series?.points;
   const latest = points?.[points.length - 1];
   const chart = points ? chartGeometry(points, durationMs) : null;
@@ -338,6 +381,18 @@ export default function DashboardsView({ servers }: { servers: Server[] }) {
       const duration = rangeMilliseconds[range];
       const from = new Date(now - duration).toISOString();
       const to = new Date(now).toISOString();
+      if (panel.visualization === "logs") {
+        const query = new URLSearchParams({ from, to, limit: "201" });
+        try {
+          const response = await apiRequest<LogResponse>(
+            "/api/servers/" + encodeURIComponent(serverId) + "/logs?" + query.toString(),
+          );
+          if (!response || !Array.isArray(response.events)) throw new Error("Host log query returned an invalid response.");
+          return [panel.id, { logs: response.events }] as const;
+        } catch (queryError) {
+          return [panel.id, { logs: [], error: queryError instanceof Error ? queryError.message : "Host logs could not be loaded." }] as const;
+        }
+      }
       const query = new URLSearchParams({
         from,
         to,
@@ -374,7 +429,7 @@ export default function DashboardsView({ servers }: { servers: Server[] }) {
     setEditingPanel(panel ?? null);
     setPanelTitle(panel?.title ?? "");
     setPanelServerId(panel?.server_id ?? servers[0]?.id ?? "");
-    setPanelMetric(panel?.metric_name ?? metricCatalog[0].value);
+    setPanelMetric(panel?.visualization === "logs" ? "host.logs.events" : panel?.metric_name ?? metricCatalog[0].value);
     setPanelVisualization(panel?.visualization ?? "timeseries");
     setPanelRange(panel?.time_range ?? "1h");
     setPanelGridWidth(panel?.grid_width ?? 6);
@@ -416,7 +471,7 @@ export default function DashboardsView({ servers }: { servers: Server[] }) {
       title: panelTitle.trim() || metric?.label || panelMetric,
       visualization: panelVisualization,
       server_id: panelServerId,
-      metric_name: panelMetric,
+      metric_name: panelVisualization === "logs" ? "host.logs.events" : panelMetric,
       time_range: panelRange,
       grid_width: panelGridWidth,
       ...(editingPanel ? {} : { position: selectedDashboard.panels.length }),
@@ -585,9 +640,9 @@ export default function DashboardsView({ servers }: { servers: Server[] }) {
                   <CardContent>
                     <form className="dashboard-builder-grid dashboard-panel-builder" onSubmit={savePanel}>
                       <label className="field"><span>Panel title</span><input value={panelTitle} onChange={(event) => setPanelTitle(event.target.value)} maxLength={120} placeholder="CPU utilization" /></label>
-                      <label className="field"><span>Metric</span><select value={panelMetric} onChange={(event) => setPanelMetric(event.target.value)}>{Object.entries(metricCatalog.reduce<Record<string, MetricDefinition[]>>((groups, metric) => { (groups[metric.category] ||= []).push(metric); return groups; }, {})).map(([category, metrics]) => <optgroup key={category} label={category}>{metrics.map((metric) => <option key={metric.value} value={metric.value}>{metric.label}</option>)}</optgroup>)}</select></label>
+                      {panelVisualization !== "logs" && <label className="field"><span>Metric</span><select value={panelMetric} onChange={(event) => setPanelMetric(event.target.value)}>{Object.entries(metricCatalog.reduce<Record<string, MetricDefinition[]>>((groups, metric) => { (groups[metric.category] ||= []).push(metric); return groups; }, {})).map(([category, metrics]) => <optgroup key={category} label={category}>{metrics.map((metric) => <option key={metric.value} value={metric.value}>{metric.label}</option>)}</optgroup>)}</select></label>}
                       <label className="field"><span>Machine</span><select value={panelServerId} onChange={(event) => setPanelServerId(event.target.value)} required>{servers.map((server) => <option key={server.id} value={server.id}>{server.name}</option>)}</select></label>
-                      <label className="field"><span>Visualization</span><select value={panelVisualization} onChange={(event) => setPanelVisualization(event.target.value as Visualization)}><option value="timeseries">Time series</option><option value="area">Area</option><option value="bar">Bar</option><option value="stat">Stat</option><option value="gauge">Gauge</option><option value="heatmap">Heatmap</option><option value="table">Table</option></select></label>
+                      <label className="field"><span>Visualization</span><select value={panelVisualization} onChange={(event) => setPanelVisualization(event.target.value as Visualization)}><option value="timeseries">Time series</option><option value="area">Area</option><option value="bar">Bar</option><option value="stat">Stat</option><option value="gauge">Gauge</option><option value="heatmap">Heatmap</option><option value="table">Table</option><option value="logs">Host logs</option></select></label>
                       <label className="field"><span>Default time range</span><select value={panelRange} onChange={(event) => setPanelRange(event.target.value as TimeRange)}>{Object.entries(rangeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
                       <label className="field"><span>Panel width</span><select value={panelGridWidth} onChange={(event) => setPanelGridWidth(Number(event.target.value) as GridWidth)}><option value={4}>Compact · ⅓</option><option value={6}>Half · ½</option><option value={8}>Wide · ⅔</option><option value={12}>Full width</option></select></label>
                       <div className="dashboard-builder-actions">
@@ -624,7 +679,7 @@ export default function DashboardsView({ servers }: { servers: Server[] }) {
                         <CardHeader className="dashboard-panel-heading dashboard-panel-heading-v2">
                           <div className="dashboard-panel-title">
                             <div className="dashboard-panel-title-line"><span className="dashboard-panel-grip" title="Drag to reorder"><GripVertical size={16} /></span><CardTitle>{panel.title}</CardTitle></div>
-                            <CardDescription>{selectedServerName} · {rangeLabels[effectiveRange]} · {metricCatalog.find((metric) => metric.value === panel.metric_name)?.label ?? panel.metric_name}</CardDescription>
+                            <CardDescription>{selectedServerName} · {rangeLabels[effectiveRange]} · {panel.visualization === "logs" ? "Host log events" : metricCatalog.find((metric) => metric.value === panel.metric_name)?.label ?? panel.metric_name}</CardDescription>
                           </div>
                           <div className="dashboard-panel-actions dashboard-panel-actions-v2">
                             <Badge variant="secondary">{panel.visualization}</Badge>

@@ -5,7 +5,7 @@ ALTER TABLE dashboard_panels
 
 ALTER TABLE dashboard_panels
     ADD CONSTRAINT dashboard_panels_visualization_check
-    CHECK (visualization IN ('timeseries', 'stat', 'table'));
+    CHECK (visualization IN ('timeseries', 'stat', 'table', 'bar', 'area', 'gauge', 'heatmap'));
 
 ALTER TABLE dashboard_panels
     DROP COLUMN IF EXISTS grid_width;
