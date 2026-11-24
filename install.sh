@@ -180,6 +180,34 @@ printf '#!/usr/bin/env bash\nset -Eeuo pipefail\nexport CERT_GROUP_ID="%s"\nexpo
 chmod 0750 "$RENEWAL_HOOK"
 RENEWED_LINEAGE="/etc/letsencrypt/live/$PUBLIC_HOSTNAME" CERT_GROUP_ID="$CERT_GROUP_ID" AGENT_TLS_CERT_DIR="$CERT_DIR" "$RENEWAL_HOOK"
 
+log "Enabling automatic certificate renewal."
+if systemctl list-unit-files --no-legend certbot.timer 2>/dev/null | awk '{print $1}' | grep -qx 'certbot.timer'; then
+  systemctl enable --now certbot.timer
+else
+  cat > /etc/systemd/system/monitor-me-certbot-renew.service <<'UNIT'
+[Unit]
+Description=Renew Monitor Me HTTPS and gRPC certificates
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/certbot renew -q
+UNIT
+  cat > /etc/systemd/system/monitor-me-certbot-renew.timer <<'UNIT'
+[Unit]
+Description=Twice-daily check for Monitor Me certificate renewal
+
+[Timer]
+OnCalendar=daily
+RandomizedDelaySec=3600
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+UNIT
+  systemctl daemon-reload
+  systemctl enable --now monitor-me-certbot-renew.timer
+fi
+
 log "Installing HTTPS Nginx site and administrator CIDR allowlist."
 sed "s/REPLACE_WITH_PUBLIC_HOSTNAME/$PUBLIC_HOSTNAME/g" "$PROD/nginx.conf.example" > "$NGINX_SITE"
 printf 'allow %s;\ndeny all;\n' "$ADMIN_CIDR" > "$NGINX_ACCESS"
