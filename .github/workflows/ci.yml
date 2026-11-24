@@ -127,10 +127,9 @@ jobs:
         run: go build -trimpath -o /tmp/monitor-me-agent-linux-arm64 ./cmd/monitor-agent
       - name: Build and verify the downloadable native-agent bundle
         run: |
-          docker build -f deploy/agent-artifacts/Dockerfile -t monitor-me-agent-artifacts:ci .
+          docker build --build-arg MONITOR_AGENT_VERSION=ci -f deploy/agent-artifacts/Dockerfile -t monitor-me-agent-artifacts:ci .
           mkdir -p /tmp/monitor-me-agent-artifacts
           docker run --rm \
-            -e MONITOR_AGENT_VERSION=ci \
             -e MONITOR_AGENT_ARTIFACT_DIR=/out \
             --mount type=bind,source=/tmp/monitor-me-agent-artifacts,target=/out \
             monitor-me-agent-artifacts:ci
