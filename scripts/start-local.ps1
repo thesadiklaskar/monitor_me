@@ -68,7 +68,10 @@ function Assert-CurrentSource {
 
     $dirtyFiles = & git status --short 2>$null
     if ($LASTEXITCODE -eq 0 -and $dirtyFiles) {
-        Write-Warning "The working tree has local changes. The Docker build will include those changes."
+        if ($env:MONITOR_ME_ALLOW_DIRTY_SOURCE -ne "1") {
+            throw "The working tree contains local changes. Review and preserve them, then commit/stash before building. Set MONITOR_ME_ALLOW_DIRTY_SOURCE=1 only when you intentionally want to build modified source. No Docker services were changed."
+        }
+        Write-Warning "Explicit dirty-source override is enabled; the Docker build will include local modifications."
     }
 }
 
