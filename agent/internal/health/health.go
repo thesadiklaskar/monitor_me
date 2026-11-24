@@ -4,7 +4,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"example.com/monitor-me/agent/internal/collector"
+	"monitor-me.internal/agent/internal/collector"
 )
 
 // State stores process-lifetime delivery state shared by collection and
