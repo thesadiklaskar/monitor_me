@@ -19,11 +19,11 @@ A successful compile alone will not make this release-ready. The application mus
 | Area | Estimate | Evidence and remaining blockers |
 |---|---:|---|
 | Core metrics and agent pipeline | 55% | Native Go agent, host metrics, durable telemetry spool, TLS gRPC and backend persistence paths exist. End-to-end clean-host and sustained-load acceptance remain open. |
-| Logs and log exploration | 30% | Linux journald → bounded spool → TLS gRPC → ClickHouse ingestion and bounded search exist. Windows Event Log is source-only pending runtime tests; file/syslog tail and log push/replay are missing. The UI polls every 10 seconds. |
-| Dashboard and UX | 35% | A working dashboard shell, inventory, metrics views and initial log explorer exist in source. It is not yet a full Grafana-equivalent panel/query editor; some views poll at 10–15 seconds. |
+| Logs and log exploration | 30% | Linux journald → bounded spool → TLS gRPC → ClickHouse ingestion and bounded search exist. Windows Application/System Event Log reader source and Windows artifact target exist, but runtime acceptance is pending; file/syslog tail and push/replay are missing. The UI now shows structured labels and an explicit 10-second auto-refresh (HTTP polling, not live push). |
+| Dashboard and UX | 38% | A calmer slate/periwinkle theme, always-expanded full-name navigation, time-aware average charts with min/max range, y-axis, latest-point tooltip and log label columns are implemented in source. The product is still not a full Grafana-equivalent panel/query editor; variables, annotations, advanced query builder and owner browser acceptance remain. |
 | Single-install architecture | 35% | Browser login/signup UI and routes have been removed. SQL tables, foreign keys and query paths still use legacy users, organizations, memberships, sessions and organization_id. A safe data-preserving forward migration is not implemented. |
 | Installation and operations | 30% | Local Compose and Linux production Compose/deploy, firewall, TLS, backup/restore and rollback scripts exist. Production still needs manual host prerequisites, DNS, Nginx/Certbot and endpoint configuration; the clean one-command control-plane bootstrap is not complete. |
-| Cross-platform support | 30% | Linux amd64/arm64 and Windows amd64 agent artifacts are targeted by the build. Windows service, metrics and Event Log source exists but has not passed a real Windows runtime acceptance. macOS native log collection is explicitly unsupported. |
+| Cross-platform support | 30% | The artifact builder targets Linux amd64, Linux arm64 and Windows amd64. Linux installer requires systemd; Windows x64 installer requires an elevated PowerShell session. Windows service, metrics and Application/System Event Log code has not passed real runtime acceptance. macOS and Windows control-plane hosting are unsupported. Full matrix: [PLATFORM_SUPPORT_MATRIX.md](PLATFORM_SUPPORT_MATRIX.md). |
 | Build reproducibility and CI | 20% | The reported unused import, missing UI component and Windows service constant are fixed in current source. A later local build reached a Go checksum-database HTTP/2 stream error. Backend go.sum and web package-lock.json are missing. Recent Actions jobs have runner_id 0 and zero steps, so they ran no tests. |
 | Repository portability | 70% | Go imports use the owner-independent internal module namespace monitor-me.internal; source and installer docs have been audited to remove current owner/repository URLs and sample deployment hosts. Dependency lockfiles, release publishing and signed artifacts still need completion. |
 
@@ -39,6 +39,8 @@ A successful compile alone will not make this release-ready. The application mus
 The above is a source review, not a statement that all these paths passed a clean installation or production test.
 
 ## Platform and operating-system support
+
+See the detailed [Platform and Operating-System Support Matrix](PLATFORM_SUPPORT_MATRIX.md) for the distinction between control-plane hosting and monitored-agent targets, including VPS/VM/cloud/bare-metal prerequisites and current certification gaps.
 
 | Environment | Intended role | Current support assessment |
 |---|---|---|
