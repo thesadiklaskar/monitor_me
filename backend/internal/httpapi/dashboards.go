@@ -108,3 +108,31 @@ func (api *API) deleteDashboardPanel(writer http.ResponseWriter, request *http.R
 		writer.WriteHeader(http.StatusNoContent)
 	}
 }
+
+
+func (api *API) moveDashboardPanel(writer http.ResponseWriter, request *http.Request) {
+	var input struct {
+		Position int `json:"position"`
+	}
+	if !decodeJSON(writer, request, &input) {
+		return
+	}
+	err := api.identities.MoveDashboardPanel(
+		request.Context(),
+		principalFromRequest(request),
+		strings.TrimSpace(request.PathValue("panelID")),
+		input.Position,
+	)
+	switch {
+	case errors.Is(err, identity.ErrForbidden):
+		writeAPIError(writer, http.StatusForbidden, "forbidden", "This panel cannot be reordered in the current installation.")
+	case errors.Is(err, identity.ErrNotFound):
+		writeAPIError(writer, http.StatusNotFound, "not_found", "The dashboard panel no longer exists.")
+	case errors.Is(err, identity.ErrInvalidInput):
+		writeAPIError(writer, http.StatusBadRequest, "invalid_position", "The requested panel position is outside the dashboard.")
+	case err != nil:
+		writeAPIError(writer, http.StatusInternalServerError, "panel_reorder_failed", "The dashboard panel could not be moved.")
+	default:
+		writer.WriteHeader(http.StatusNoContent)
+	}
+}
