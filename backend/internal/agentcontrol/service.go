@@ -248,10 +248,9 @@ func (s *Service) publishCommittedBatch(ctx context.Context, organizationID, ser
 	publishContext, cancel := context.WithTimeout(context.WithoutCancel(ctx), 2*time.Second)
 	defer cancel()
 
-	// Read committed rows so live events carry the exact project attribution
-	// assigned by the PostgreSQL transaction used for historical queries.
+	// Read committed rows so live events carry the values used by history queries.
 	rows, err := s.db.QueryContext(publishContext, `
-		SELECT metric_name, value, unit, labels, COALESCE(project_id::text, ''),
+		SELECT metric_name, value, unit, labels,
 		       (EXTRACT(EPOCH FROM observed_at) * 1000000000)::bigint
 		FROM telemetry_samples
 		WHERE agent_id = $1 AND batch_id = $2
@@ -270,7 +269,7 @@ func (s *Service) publishCommittedBatch(ctx context.Context, organizationID, ser
 		var labelsJSON []byte
 		if err := rows.Scan(
 			&sample.MetricName, &sample.Value, &sample.Unit, &labelsJSON,
-			&sample.ProjectID, &sample.ObservedAtUnixNanos,
+			&sample.ObservedAtUnixNanos,
 		); err != nil {
 			slog.Default().Warn("committed telemetry row could not be read for live delivery",
 				"server_id", serverID, "batch_id", batch.GetBatchId(), "error", err)
