@@ -20,9 +20,6 @@ services:
     restart: unless-stopped
     environment:
       REDIS_PASSWORD: "${REDIS_PASSWORD:?Set REDIS_PASSWORD}"
-      CLICKHOUSE_URL: "http://clickhouse:8123"
-      CLICKHOUSE_USER: "monitor_me"
-      CLICKHOUSE_PASSWORD: "${CLICKHOUSE_PASSWORD:?Set CLICKHOUSE_PASSWORD}"
     command: ["sh", "-c", "exec redis-server --appendonly yes --requirepass \"$$REDIS_PASSWORD\""]
     volumes: [redis_data:/data]
     healthcheck:
@@ -71,6 +68,9 @@ services:
       DATABASE_URL: "${DATABASE_URL:?Set DATABASE_URL}"
       REDIS_ADDR: "redis:6379"
       REDIS_PASSWORD: "${REDIS_PASSWORD:?Set REDIS_PASSWORD}"
+      CLICKHOUSE_URL: "http://clickhouse:8123"
+      CLICKHOUSE_USER: "monitor_me"
+      CLICKHOUSE_PASSWORD: "${CLICKHOUSE_PASSWORD:?Set CLICKHOUSE_PASSWORD}"
       WEB_ALLOWED_ORIGINS: "https://${PUBLIC_HOSTNAME:?Set PUBLIC_HOSTNAME}"
       REMOTE_ALLOWED_SYSTEMD_UNITS: "${REMOTE_ALLOWED_SYSTEMD_UNITS:-}"
       AGENT_GRPC_ADDR: ":8443"
