@@ -601,10 +601,10 @@ func (s *Store) RevokeAgent(ctx context.Context, principal Principal, agentID st
 // ListDashboards returns organization-owned dashboards and their configured panels.
 func (s *Store) ListDashboards(ctx context.Context, principal Principal) ([]Dashboard, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT d.id::text, d.name, d.description, d.project_id::text, d.is_default,
+		SELECT d.id::text, d.name, d.description, d.is_default,
 		       d.created_at, d.updated_at,
 		       panel.id::text, panel.title, panel.visualization, panel.server_id::text,
-		       panel.project_id::text, panel.metric_name, panel.time_range, panel.position,
+		       panel.metric_name, panel.time_range, panel.position,
 		       panel.created_at, panel.updated_at
 		FROM dashboards d
 		LEFT JOIN dashboard_panels panel
@@ -614,7 +614,7 @@ func (s *Store) ListDashboards(ctx context.Context, principal Principal) ([]Dash
 		ORDER BY d.is_default DESC, lower(d.name), d.id, panel.position, panel.id
 	`, principal.OrganizationID)
 	if err != nil {
-		return nil, fmt.Errorf("list organization dashboards: %w", err)
+		return nil, fmt.Errorf("list installation dashboards: %w", err)
 	}
 	defer rows.Close()
 
@@ -622,20 +622,16 @@ func (s *Store) ListDashboards(ctx context.Context, principal Principal) ([]Dash
 	indexByID := make(map[string]int)
 	for rows.Next() {
 		var dashboard Dashboard
-		var dashboardProjectID sql.NullString
-		var panelID, panelTitle, visualization, serverID, panelProjectID, metricName, timeRange sql.NullString
+		var panelID, panelTitle, visualization, serverID, metricName, timeRange sql.NullString
 		var position sql.NullInt64
 		var panelCreatedAt, panelUpdatedAt sql.NullTime
 		if err := rows.Scan(
-			&dashboard.ID, &dashboard.Name, &dashboard.Description, &dashboardProjectID, &dashboard.IsDefault,
+			&dashboard.ID, &dashboard.Name, &dashboard.Description, &dashboard.IsDefault,
 			&dashboard.CreatedAt, &dashboard.UpdatedAt,
-			&panelID, &panelTitle, &visualization, &serverID, &panelProjectID,
+			&panelID, &panelTitle, &visualization, &serverID,
 			&metricName, &timeRange, &position, &panelCreatedAt, &panelUpdatedAt,
 		); err != nil {
-			return nil, fmt.Errorf("scan organization dashboard: %w", err)
-		}
-		if dashboardProjectID.Valid {
-			dashboard.ProjectID = &dashboardProjectID.String
+			return nil, fmt.Errorf("scan installation dashboard: %w", err)
 		}
 		if index, exists := indexByID[dashboard.ID]; exists {
 			dashboard = dashboards[index]
@@ -651,20 +647,17 @@ func (s *Store) ListDashboards(ctx context.Context, principal Principal) ([]Dash
 				MetricName: metricName.String, TimeRange: timeRange.String,
 				Position: int(position.Int64), CreatedAt: panelCreatedAt.Time, UpdatedAt: panelUpdatedAt.Time,
 			}
-			if panelProjectID.Valid {
-				panel.ProjectID = &panelProjectID.String
-			}
 			dashboards[indexByID[dashboard.ID]].Panels = append(dashboards[indexByID[dashboard.ID]].Panels, panel)
 		}
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate organization dashboards: %w", err)
+		return nil, fmt.Errorf("iterate installation dashboards: %w", err)
 	}
 	return dashboards, nil
 }
 
 // CreateDashboard persists a dashboard in the caller's organization.
-func (s *Store) CreateDashboard(ctx context.Context, principal Principal, name, description, projectID string, isDefault bool) (Dashboard, error) {
+func (s *Store) CreateDashboard(ctx context.Context, principal Principal, name, description string, isDefault bool) (Dashboard, error) {
 	if !canAdminister(principal.Role) {
 		return Dashboard{}, ErrForbidden
 	}
@@ -673,26 +666,11 @@ func (s *Store) CreateDashboard(ctx context.Context, principal Principal, name, 
 	if len(name) < 2 || len(name) > 120 || len(description) > 500 {
 		return Dashboard{}, ErrInvalidInput
 	}
-	if projectID != "" && !validUUID(projectID) {
-		return Dashboard{}, ErrInvalidInput
-	}
-
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return Dashboard{}, fmt.Errorf("begin dashboard creation: %w", err)
 	}
 	defer tx.Rollback()
-	if projectID != "" {
-		var exists bool
-		if err := tx.QueryRowContext(ctx,
-			"SELECT EXISTS (SELECT 1 FROM projects WHERE id = $1 AND organization_id = $2)",
-			projectID, principal.OrganizationID).Scan(&exists); err != nil {
-			return Dashboard{}, fmt.Errorf("validate dashboard project: %w", err)
-		}
-		if !exists {
-			return Dashboard{}, ErrNotFound
-		}
-	}
 	if isDefault {
 		if _, err := tx.ExecContext(ctx,
 			"UPDATE dashboards SET is_default = false, updated_at = now() WHERE organization_id = $1 AND is_default = true",
@@ -701,24 +679,20 @@ func (s *Store) CreateDashboard(ctx context.Context, principal Principal, name, 
 		}
 	}
 	var dashboard Dashboard
-	var project sql.NullString
 	err = tx.QueryRowContext(ctx, `
-		INSERT INTO dashboards (organization_id, name, description, project_id, is_default, created_by, updated_by)
-		VALUES ($1, $2, $3, NULLIF($4, '')::uuid, $5, $6, $6)
-		RETURNING id::text, name, description, project_id::text, is_default, created_at, updated_at
-	`, principal.OrganizationID, name, description, projectID, isDefault, principal.UserID).Scan(
-		&dashboard.ID, &dashboard.Name, &dashboard.Description, &project,
+		INSERT INTO dashboards (organization_id, name, description, is_default, created_by, updated_by)
+		VALUES ($1, $2, $3, $4, $5, $5)
+		RETURNING id::text, name, description, is_default, created_at, updated_at
+	`, principal.OrganizationID, name, description, isDefault, principal.UserID).Scan(
+		&dashboard.ID, &dashboard.Name, &dashboard.Description,
 		&dashboard.IsDefault, &dashboard.CreatedAt, &dashboard.UpdatedAt,
 	)
 	if err != nil {
-		return Dashboard{}, fmt.Errorf("create organization dashboard: %w", err)
-	}
-	if project.Valid {
-		dashboard.ProjectID = &project.String
+		return Dashboard{}, fmt.Errorf("create installation dashboard: %w", err)
 	}
 	dashboard.Panels = make([]DashboardPanel, 0)
 	if err := tx.Commit(); err != nil {
-		return Dashboard{}, fmt.Errorf("commit organization dashboard: %w", err)
+		return Dashboard{}, fmt.Errorf("commit installation dashboard: %w", err)
 	}
 	return dashboard, nil
 }
@@ -754,7 +728,6 @@ func (s *Store) CreateDashboardPanel(ctx context.Context, principal Principal, d
 	}
 	input.Title = strings.TrimSpace(input.Title)
 	if !validUUID(dashboardID) || !validUUID(input.ServerID) ||
-		(input.ProjectID != "" && !validUUID(input.ProjectID)) ||
 		len(input.Title) < 2 || len(input.Title) > 120 ||
 		!alertMetricPattern.MatchString(input.MetricName) ||
 		(input.Visualization != "timeseries" && input.Visualization != "stat") ||
@@ -764,31 +737,24 @@ func (s *Store) CreateDashboardPanel(ctx context.Context, principal Principal, d
 		return DashboardPanel{}, ErrInvalidInput
 	}
 	var panel DashboardPanel
-	var project sql.NullString
 	err := s.db.QueryRowContext(ctx, `
 		INSERT INTO dashboard_panels (
 			organization_id, dashboard_id, title, visualization, server_id,
-			project_id, metric_name, time_range, position, created_by, updated_by
+			metric_name, time_range, position, created_by, updated_by
 		)
-		SELECT d.organization_id, d.id, $4, $5, server.id,
-		       COALESCE(NULLIF($6, '')::uuid, d.project_id), $7, $8, $9, $10, $10
+		SELECT d.organization_id, d.id, $4, $5, server.id, $6, $7, $8, $9, $9
 		FROM dashboards d
 		JOIN servers server
 		  ON server.id = $3
 		 AND server.organization_id = d.organization_id
 		WHERE d.id = $1
 		  AND d.organization_id = $2
-		  AND ($6 = '' OR EXISTS (
-		      SELECT 1 FROM projects project
-		      WHERE project.id = $6::uuid AND project.organization_id = d.organization_id
-		  ))
-		  AND (d.project_id IS NULL OR COALESCE(NULLIF($6, '')::uuid, d.project_id) = d.project_id)
 		RETURNING id::text, dashboard_id::text, title, visualization, server_id::text,
-		          project_id::text, metric_name, time_range, position, created_at, updated_at
+		          metric_name, time_range, position, created_at, updated_at
 	`, dashboardID, principal.OrganizationID, input.ServerID, input.Title, input.Visualization,
-		input.ProjectID, input.MetricName, input.TimeRange, input.Position, principal.UserID).Scan(
+		input.MetricName, input.TimeRange, input.Position, principal.UserID).Scan(
 		&panel.ID, &panel.DashboardID, &panel.Title, &panel.Visualization,
-		&panel.ServerID, &project, &panel.MetricName, &panel.TimeRange,
+		&panel.ServerID, &panel.MetricName, &panel.TimeRange,
 		&panel.Position, &panel.CreatedAt, &panel.UpdatedAt,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -797,12 +763,8 @@ func (s *Store) CreateDashboardPanel(ctx context.Context, principal Principal, d
 	if err != nil {
 		return DashboardPanel{}, fmt.Errorf("create dashboard panel: %w", err)
 	}
-	if project.Valid {
-		panel.ProjectID = &project.String
-	}
 	return panel, nil
 }
-
 
 // MoveDashboardPanel updates the persisted ordering of panels within one dashboard.
 // The dashboard row is locked so concurrent reorder requests cannot interleave.
@@ -983,8 +945,7 @@ func newOpaqueToken() (string, error) {
 
 func (s *Store) ListAlertRules(ctx context.Context, principal Principal) ([]AlertRule, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT id::text, name, server_id::text, project_id::text, metric_name,
-		       operator, threshold, enabled, created_at
+		SELECT id::text, name, server_id::text, metric_name, operator, threshold, enabled, created_at
 		FROM alert_rules
 		WHERE organization_id = $1
 		ORDER BY created_at DESC
@@ -994,20 +955,16 @@ func (s *Store) ListAlertRules(ctx context.Context, principal Principal) ([]Aler
 		return nil, fmt.Errorf("list alert rules: %w", err)
 	}
 	defer rows.Close()
-
 	items := make([]AlertRule, 0)
 	for rows.Next() {
 		var item AlertRule
-		var serverID, projectID sql.NullString
-		if err := rows.Scan(&item.ID, &item.Name, &serverID, &projectID, &item.MetricName,
+		var serverID sql.NullString
+		if err := rows.Scan(&item.ID, &item.Name, &serverID, &item.MetricName,
 			&item.Operator, &item.Threshold, &item.Enabled, &item.CreatedAt); err != nil {
 			return nil, fmt.Errorf("scan alert rule: %w", err)
 		}
 		if serverID.Valid {
 			item.ServerID = &serverID.String
-		}
-		if projectID.Valid {
-			item.ProjectID = &projectID.String
 		}
 		items = append(items, item)
 	}
@@ -1030,41 +987,32 @@ func (s *Store) CreateAlertRule(ctx context.Context, principal Principal, input 
 	if input.ServerID != nil && !validUUID(*input.ServerID) {
 		return AlertRule{}, ErrInvalidInput
 	}
-	if input.ProjectID != nil && !validUUID(*input.ProjectID) {
-		return AlertRule{}, ErrInvalidInput
-	}
-	if input.ServerID != nil || input.ProjectID != nil {
-		var allowed bool
-		err := s.db.QueryRowContext(ctx, `
-			SELECT
-				($2::uuid IS NULL OR EXISTS (SELECT 1 FROM servers WHERE id = $2::uuid AND organization_id = $1))
-				AND ($3::uuid IS NULL OR EXISTS (SELECT 1 FROM projects WHERE id = $3::uuid AND organization_id = $1))
-		`, principal.OrganizationID, nullableUUID(input.ServerID), nullableUUID(input.ProjectID)).Scan(&allowed)
-		if err != nil {
-			return AlertRule{}, fmt.Errorf("validate alert rule scope: %w", err)
+	if input.ServerID != nil {
+		var exists bool
+		if err := s.db.QueryRowContext(ctx,
+			"SELECT EXISTS (SELECT 1 FROM servers WHERE id = $1 AND organization_id = $2)",
+			*input.ServerID, principal.OrganizationID).Scan(&exists); err != nil {
+			return AlertRule{}, fmt.Errorf("validate alert rule server: %w", err)
 		}
-		if !allowed {
+		if !exists {
 			return AlertRule{}, ErrNotFound
 		}
 	}
-	var serverID, projectID sql.NullString
+	var serverID sql.NullString
 	var result AlertRule
 	err := s.db.QueryRowContext(ctx, `
-		INSERT INTO alert_rules (organization_id, name, server_id, project_id, metric_name, operator, threshold, enabled, created_by)
-		VALUES ($1, $2, $3::uuid, $4::uuid, $5, $6, $7, true, $8)
-		RETURNING id::text, name, server_id::text, project_id::text, metric_name, operator, threshold, enabled, created_at
-	`, principal.OrganizationID, input.Name, nullableUUID(input.ServerID), nullableUUID(input.ProjectID),
+		INSERT INTO alert_rules (organization_id, name, server_id, metric_name, operator, threshold, enabled, created_by)
+		VALUES ($1, $2, $3::uuid, $4, $5, $6, true, $7)
+		RETURNING id::text, name, server_id::text, metric_name, operator, threshold, enabled, created_at
+	`, principal.OrganizationID, input.Name, nullableUUID(input.ServerID),
 		input.MetricName, input.Operator, input.Threshold, principal.UserID).Scan(
-		&result.ID, &result.Name, &serverID, &projectID, &result.MetricName,
+		&result.ID, &result.Name, &serverID, &result.MetricName,
 		&result.Operator, &result.Threshold, &result.Enabled, &result.CreatedAt)
 	if err != nil {
 		return AlertRule{}, fmt.Errorf("create alert rule: %w", err)
 	}
 	if serverID.Valid {
 		result.ServerID = &serverID.String
-	}
-	if projectID.Valid {
-		result.ProjectID = &projectID.String
 	}
 	return result, nil
 }
@@ -1101,7 +1049,7 @@ func (s *Store) DeleteAlertRule(ctx context.Context, principal Principal, ruleID
 func (s *Store) ListAlertEvents(ctx context.Context, principal Principal) ([]AlertEvent, error) {
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT event.id::text, event.rule_id::text, rule.name, event.server_id::text,
-		       server.name, event.project_id::text, event.metric_name, event.status,
+		       server.name, event.metric_name, event.status,
 		       event.last_value, event.triggered_at, event.last_observed_at, event.resolved_at
 		FROM alert_events event
 		JOIN alert_rules rule ON rule.id = event.rule_id AND rule.organization_id = event.organization_id
@@ -1114,19 +1062,14 @@ func (s *Store) ListAlertEvents(ctx context.Context, principal Principal) ([]Ale
 		return nil, fmt.Errorf("list alert events: %w", err)
 	}
 	defer rows.Close()
-
 	items := make([]AlertEvent, 0)
 	for rows.Next() {
 		var item AlertEvent
-		var projectID sql.NullString
 		var resolvedAt sql.NullTime
 		if err := rows.Scan(&item.ID, &item.RuleID, &item.RuleName, &item.ServerID, &item.ServerName,
-			&projectID, &item.MetricName, &item.Status, &item.LastValue, &item.TriggeredAt,
+			&item.MetricName, &item.Status, &item.LastValue, &item.TriggeredAt,
 			&item.LastObserved, &resolvedAt); err != nil {
 			return nil, fmt.Errorf("scan alert event: %w", err)
-		}
-		if projectID.Valid {
-			item.ProjectID = &projectID.String
 		}
 		if resolvedAt.Valid {
 			item.ResolvedAt = &resolvedAt.Time
