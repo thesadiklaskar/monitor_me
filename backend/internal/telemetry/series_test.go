@@ -98,7 +98,6 @@ func TestSeriesBucketCountUsesEpochAlignedBoundaries(t *testing.T) {
 	}
 }
 
-
 func TestValidateRangeQueryLabelFilters(t *testing.T) {
 	now := time.Date(2026, 11, 24, 12, 0, 0, 0, time.UTC)
 	base := RangeQuery{
