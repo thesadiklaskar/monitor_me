@@ -113,8 +113,6 @@ services:
       args:
         MONITOR_AGENT_VERSION: "${MONITOR_AGENT_VERSION:-0.1.0-dev}"
     restart: "no"
-    environment:
-      MONITOR_AGENT_VERSION: "${MONITOR_AGENT_VERSION:-0.1.0-dev}"
     volumes:
       - agent_artifacts:/out
 
