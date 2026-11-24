@@ -65,7 +65,6 @@ func TestLoadDoesNotRequireInteractiveAuthenticationConfiguration(t *testing.T) 
 	t.Setenv("AGENT_GRPC_ADDR", ":8443")
 	t.Setenv("AGENT_TLS_CERT_FILE", "/tmp/monitor-me-server.crt")
 	t.Setenv("AGENT_TLS_KEY_FILE", "/tmp/monitor-me-server.key")
-	t.Setenv("REMOTE_ALLOWED_SYSTEMD_UNITS", "")
 
 	if _, err := Load(); err != nil {
 		t.Fatalf("Load() should not depend on interactive authentication settings: %v", err)
