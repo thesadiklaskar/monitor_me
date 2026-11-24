@@ -37,9 +37,7 @@ GRANT USAGE ON SCHEMA public TO grafana_reader;
 REVOKE CREATE ON SCHEMA public FROM grafana_reader;
 REVOKE CREATE, TEMPORARY ON DATABASE :"database" FROM grafana_reader;
 REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM grafana_reader;
-GRANT SELECT ON ALL TABLES IN SCHEMA public TO grafana_reader;
-ALTER DEFAULT PRIVILEGES FOR ROLE :"owner" IN SCHEMA public
-  GRANT SELECT ON TABLES TO grafana_reader;
+GRANT SELECT ON TABLE public.servers, public.telemetry_samples TO grafana_reader;
 SQL
 
 unset PGPASSWORD
