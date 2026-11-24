@@ -35,9 +35,12 @@ type Enrollment = {
   protocol: string;
 };
 
+type AgentPlatform = "windows" | "linux";
+
 type IssuedServer = {
   server: Server;
   enrollment: Enrollment;
+  target_platform?: AgentPlatform;
 };
 
 type AuthResponse = { user: User; expires_at: string };
@@ -106,6 +109,11 @@ function slugFromName(value: string): string {
   return value.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 64);
 }
 
+function detectBrowserPlatform(): AgentPlatform {
+  if (typeof navigator !== "undefined" && /Windows/i.test(navigator.userAgent)) return "windows";
+  return "linux";
+}
+
 function AuthScreen({
   onAuthenticated,
 }: {
@@ -119,6 +127,10 @@ function AuthScreen({
   const [displayName, setDisplayName] = useState("");
   const [organizationName, setOrganizationName] = useState("");
   const [organizationSlug, setOrganizationSlug] = useState("");
+
+  useEffect(() => {
+    setTargetPlatform(detectBrowserPlatform());
+  }, []);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -293,20 +305,42 @@ function EnrollmentDialog({
         </button>
 
         <div className="install-instructions">
-          <h3>Linux agent setup</h3>
+          <div className="install-heading-row">
+            <div>
+              <h3>{issued.target_platform === "windows" ? "Windows agent setup" : "Linux agent setup"}</h3>
+              <p className="install-platform-note">The agent reports its actual OS, architecture and virtualization details after connecting.</p>
+            </div>
+            <span className="install-platform-badge">{issued.target_platform === "windows" ? "WINDOWS" : "LINUX"}</span>
+          </div>
           {grpcAddress ? (
-            <p>Configure the agent to connect to <code>{grpcAddress}</code>.</p>
+            <p>Agent endpoint: <code>{grpcAddress}</code></p>
           ) : (
-            <p className="text-warning">The public agent gRPC address has not been configured. Set MONITOR_ME_AGENT_GRPC_ADDRESS in the web service environment before using this installation guidance.</p>
+            <p className="text-warning">This local setup defaults to <code>localhost:8443</code>. For a remote VPS/VM, configure a publicly reachable TLS gRPC address and provide its trusted CA certificate on the target host.</p>
           )}
-          <ol>
-            <li>Install the Monitor Me agent binary and systemd unit on the Linux host.</li>
-            <li>Copy the control-plane TLS CA certificate to <code>/etc/monitor-me/server-ca.crt</code>.</li>
-            <li>Edit <code>/etc/monitor-me/agent.env</code> with the configured gRPC address, CA path and this token.</li>
-            <li>Run <code>sudo chmod 0600 /etc/monitor-me/agent.env</code>, then <code>sudo systemctl enable --now monitor-me-agent</code>.</li>
-            <li>After the private agent state file exists, remove the enrollment token from the environment file and restart the service.</li>
-          </ol>
-          <p className="install-note">Never paste the token into a URL, shell command, shared ticket, or log. The host does not need Docker.</p>
+          {issued.target_platform === "windows" ? (
+            <>
+              <div className="install-command-wrap">
+                <code className="install-command">.\scripts\setup-windows-agent.ps1 -GrpcAddress {grpcAddress || "localhost:8443"}</code>
+              </div>
+              <ol>
+                <li>Run this from the Monitor Me repository folder in an elevated or normal PowerShell window.</li>
+                <li>The helper builds the Windows agent with Docker when needed, then starts it.</li>
+                <li>Paste the one-time token when prompted; input is hidden and the token is not saved.</li>
+              </ol>
+            </>
+          ) : (
+            <>
+              <div className="install-command-wrap">
+                <code className="install-command">sudo ./scripts/setup-linux-agent.sh --grpc-address {grpcAddress || "localhost:8443"}</code>
+              </div>
+              <ol>
+                <li>Run this from a Linux checkout of the Monitor Me repository on a systemd host.</li>
+                <li>The helper builds the native Linux agent with Docker, installs the systemd service and starts it.</li>
+                <li>Paste the one-time token when prompted; the installer removes it from the service environment after enrollment.</li>
+              </ol>
+            </>
+          )}
+          <p className="install-note">These helpers require the repository source and the control-plane CA certificate on the target host. A remote machine must be able to reach the advertised gRPC endpoint; <code>localhost</code> only works when the agent and control plane share that host.</p>
         </div>
 
         {error && <div className="notice notice-error" role="alert">{error}</div>}
@@ -332,6 +366,7 @@ function AddServerDialog({
 }) {
   const [name, setName] = useState("");
   const [hostname, setHostname] = useState("");
+  const [targetPlatform, setTargetPlatform] = useState<AgentPlatform>("linux");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -344,7 +379,7 @@ function AddServerDialog({
         method: "POST",
         body: JSON.stringify({ name, hostname }),
       });
-      onCreated(issued);
+      onCreated({ ...issued, target_platform: targetPlatform });
     } catch (submitError) {
       setError(displayError(submitError));
     } finally {
@@ -362,7 +397,7 @@ function AddServerDialog({
           </div>
           <button className="icon-button" type="button" onClick={onClose} aria-label="Close">×</button>
         </div>
-        <p className="modal-copy">Create an organization-scoped, single-use enrollment credential for a Linux host.</p>
+        <p className="modal-copy">Create a single-use credential. Choose the target host OS for the matching one-command installer; the agent will report the real OS and virtualization metadata once it connects.</p>
         <form onSubmit={submit} className="form-stack">
           <label className="field">
             <span>Server display name</span>
@@ -372,6 +407,21 @@ function AddServerDialog({
             <span>Hostname (optional)</span>
             <input maxLength={253} value={hostname} onChange={(event) => setHostname(event.target.value)} placeholder="api-01.example.com" />
           </label>
+          <fieldset className="platform-fieldset">
+            <legend>Target operating system</legend>
+            <div className="platform-choice-grid">
+              <button type="button" className={targetPlatform === "windows" ? "platform-choice platform-choice-active" : "platform-choice"} aria-pressed={targetPlatform === "windows"} onClick={() => setTargetPlatform("windows")}>
+                <span className="platform-choice-icon">⊞</span>
+                <span><strong>Windows</strong><small>PowerShell installer</small></span>
+              </button>
+              <button type="button" className={targetPlatform === "linux" ? "platform-choice platform-choice-active" : "platform-choice"} aria-pressed={targetPlatform === "linux"} onClick={() => setTargetPlatform("linux")}>
+                <span className="platform-choice-icon">⌘</span>
+                <span><strong>Linux</strong><small>systemd installer</small></span>
+              </button>
+            </div>
+            <p className="platform-detection-note">Suggested from this browser: {detectBrowserPlatform() === "windows" ? "Windows" : "Linux"}. Change this for a remote host. VM/VPS classification is based on agent-reported host metadata, not the browser.</p>
+          </fieldset>
+
           {error && <div className="notice notice-error" role="alert">{error}</div>}
           <div className="modal-actions">
             <button className="button button-secondary" type="button" onClick={onClose}>Cancel</button>
