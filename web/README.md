@@ -8,7 +8,7 @@ The navigation is intentionally limited to four areas:
 
 - **Servers** — machine inventory, enrollment and per-machine health/metrics.
 - **Logs** — time-bounded search, severity/source filters, event details and paged results.
-- **Dashboards** — saved installation-wide dashboards with metric panels.
+- **Dashboards** — editable saved views with persisted default machine/time filters, panel editor, responsive grid, drag/drop ordering, metrics visualizations and host-log panels.
 - **Alerts** — editable threshold rules, pause/resume, firing/recovered events and in-app notifications.
 
 There is no login/signup, customer profile, organization, project, workspace or remote host-control UI. Do not add those concepts back. Processes, systemd units, containers, cgroups, disks and network interfaces are host metadata, not customer projects.
@@ -59,7 +59,7 @@ A committed npm lockfile is a release requirement; until it exists, `npm install
 - `app/dashboard-client.tsx` — application shell, sidebar, machine inventory and enrollment.
 - `app/server-detail.tsx` — host metrics, historical/live charts and process/socket inventory.
 - `app/log-explorer.tsx` — searchable log explorer.
-- `app/dashboards.tsx` — saved dashboards and metric panels.
+- `app/dashboards.tsx` — dashboard settings, saved filters, panel editor, metric/log renderers and custom visualizations.
 - `app/alerts.tsx` — threshold rules and notifications.
 - `app/api/` — same-origin API proxies.
 - `app/globals.css` — design tokens, layout, responsive and component styles.
