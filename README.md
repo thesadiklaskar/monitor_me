@@ -163,7 +163,7 @@ The backend is the source of truth for telemetry; Redis messages are notificatio
 - Dashboard/API/WebSocket access is network-restricted by Nginx to `ADMIN_CIDR`; agents use their own short-lived credentials.
 - PostgreSQL, Redis and ClickHouse are private to the Compose network. Do not publish ports 5432, 6379, 8080, 8123 or 9000.
 - PostgreSQL backups are provided by `deploy/production/backup.sh` and `restore.sh`. ClickHouse backup/restore must be designed and tested before a production retention commitment.
-- The current schema still contains legacy organization/user/project compatibility paths. They are not user-facing features and must be removed using data-preserving forward migrations before calling the architecture fully single-install.
+- The current schema still contains legacy organization/user/session compatibility plumbing used internally for installation-local ownership and live tickets. It is not a customer account system and is not exposed in the UI; removing it fully requires a separate data-preserving schema refactor.
 - `scripts/demo-load.sh` creates load only when explicitly confirmed. It does not write fabricated telemetry.
 
 ## Repository map
