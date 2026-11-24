@@ -49,6 +49,7 @@ type ProcCollector struct {
 	root                    string
 	startedAt               time.Time
 	previousAt              time.Time
+	previousDiskCapacityAt  time.Time
 	previousCPU             map[string]cpuCounters
 	previousDisk            map[string]diskCounters
 	previousNetwork         map[string]networkCounters
@@ -205,29 +206,33 @@ func (c *ProcCollector) Collect(ctx context.Context) ([]Sample, error) {
 	}
 
 
-	// Filesystem capacity is collected per mounted volume so dashboards can
-	// distinguish physical capacity from block-device throughput. Pseudo
-	// filesystems and inaccessible mounts are omitted rather than reported as 0.
-	if partitions, partitionErr := disk.PartitionsWithContext(ctx, false); partitionErr == nil {
-		seenMounts := make(map[string]struct{}, len(partitions))
-		for _, partition := range partitions {
-			mountpoint := strings.TrimSpace(partition.Mountpoint)
-			if mountpoint == "" {
-				continue
-			}
-			mountKey := filepath.Clean(mountpoint)
-			if _, exists := seenMounts[mountKey]; exists {
-				continue
-			}
-			seenMounts[mountKey] = struct{}{}
+	// Filesystem capacity changes slowly; collect it once per minute rather
+	// than running statfs on every high-frequency CPU/network snapshot.
+	if c.previousDiskCapacityAt.IsZero() || now.Sub(c.previousDiskCapacityAt) >= time.Minute {
+		c.previousDiskCapacityAt = now
+		// Pseudo filesystems and inaccessible mounts are omitted rather than
+		// reported as zero.
+		if partitions, partitionErr := disk.PartitionsWithContext(ctx, false); partitionErr == nil {
+			seenMounts := make(map[string]struct{}, len(partitions))
+			for _, partition := range partitions {
+				mountpoint := strings.TrimSpace(partition.Mountpoint)
+				if mountpoint == "" {
+					continue
+				}
+				mountKey := filepath.Clean(mountpoint)
+				if _, exists := seenMounts[mountKey]; exists {
+					continue
+				}
+				seenMounts[mountKey] = struct{}{}
 
-			usage, usageErr := disk.UsageWithContext(ctx, mountpoint)
-			if usageErr != nil || usage == nil || usage.Total == 0 {
-				continue
+				usage, usageErr := disk.UsageWithContext(ctx, mountpoint)
+				if usageErr != nil || usage == nil || usage.Total == 0 {
+					continue
+				}
+				samples = append(samples, filesystemCapacitySamples(
+					mountpoint, partition.Device, partition.Fstype, usage, observedAt,
+				)...)
 			}
-			samples = append(samples, filesystemCapacitySamples(
-				mountpoint, partition.Device, partition.Fstype, usage, observedAt,
-			)... )
 		}
 	}
 

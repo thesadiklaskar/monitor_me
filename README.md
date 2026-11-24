@@ -64,14 +64,22 @@ A monitored host needs outbound HTTPS for the installer/artifact and outbound TL
 
 | Role | Platform | Status |
 |---|---|---|
-| Control plane | Ubuntu/Debian Linux x86-64 | Primary intended target; clean-host/release certification remains pending |
-| Agent | Linux amd64 | Primary agent target; clean-host runtime acceptance required |
-| Agent | Linux arm64/aarch64 | Build/installer target; real hardware runtime acceptance required |
+| Control plane | Ubuntu/Debian Linux amd64 | Automated installer target; clean-host/release certification remains pending |
+| Agent | systemd-based Linux amd64 | Native agent target; clean-host runtime acceptance is required per distribution |
+| Agent | systemd-based Linux arm64/aarch64 | Native agent target; real ARM hardware runtime acceptance is required |
 | Agent | Windows x64 | Service and metrics/Event Log code exists; Windows runtime acceptance required |
 | Control plane | Native Windows Server | Unsupported |
 | Agent/control plane | macOS, Windows ARM64, BSD | Not currently supported as released targets |
 
-VPS, VM, cloud VM, VPC and bare metal are hosting types, not operating systems. Compatibility depends on the guest OS, CPU architecture, service manager, storage, DNS, TLS and network rules.
+VPS, VM, cloud VM, VPC and bare metal are hosting types, not operating systems. For monitored hosts, the current Linux agent installer requires systemd, readable procfs counters, curl and SHA-256 tooling; journald collection additionally requires readable system journals. Non-systemd distributions such as Alpine/OpenRC are not current supported agent targets. The Linux control-plane installer is narrower: Ubuntu/Debian amd64 only. The read-only preflight checks these assumptions before installation:
+
+```bash
+sudo bash ./scripts/linux-preflight.sh --control-plane
+# On each monitored Linux host:
+sudo bash ./scripts/linux-preflight.sh --agent
+``
+
+A passing preflight checks prerequisites only; it does not replace a clean install, runtime, upgrade, backup/restore or hardware acceptance test. Provider security groups/VPC ACLs must be configured separately.
 
 ## Real-data demo and README screenshots
 
