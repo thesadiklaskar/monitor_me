@@ -12,7 +12,7 @@ command -v curl >/dev/null || { echo "curl is required." >&2; exit 2; }
 compose() { docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" "$@"; }
 
 compose config --quiet
-compose build api web
+compose build api web agent-artifacts
 compose up -d postgres redis
 ready=0
 for attempt in $(seq 1 60); do
