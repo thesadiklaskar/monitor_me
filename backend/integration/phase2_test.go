@@ -426,21 +426,53 @@ func TestSingleInstallAndAgentLifecycle(t *testing.T) {
 		createdPanel.Panel.MetricName != "host.cpu.utilization" {
 		t.Fatalf("dashboard panel creation returned incomplete or mis-scoped data: %#v", createdPanel.Panel)
 	}
+	secondPanelCreate := requestJSON(t, ctx, http.MethodPost,
+		baseURL+"/v1/dashboards/"+createdDashboard.Dashboard.ID+"/panels", map[string]any{
+			"title": "Host memory", "visualization": "stat", "server_id": serverID,
+			"metric_name": "host.memory.used", "time_range": "6h", "position": 1,
+		})
+	if secondPanelCreate.StatusCode != http.StatusCreated {
+		t.Fatalf("create second dashboard panel: expected 201, got %d: %s", secondPanelCreate.StatusCode, secondPanelCreate.Body)
+	}
+	var secondPanel struct {
+		Panel struct {
+			ID string `json:"id"`
+		} `json:"panel"`
+	}
+	decodeResponse(t, secondPanelCreate.Body, &secondPanel)
+	if secondPanel.Panel.ID == "" || secondPanel.Panel.ID == createdPanel.Panel.ID {
+		t.Fatalf("second panel creation returned an invalid identifier: %#v", secondPanel.Panel)
+	}
+
+	movePanelResponse := requestJSON(t, ctx, http.MethodPatch,
+		baseURL+"/v1/dashboard-panels/"+createdPanel.Panel.ID+"/position", map[string]any{"position": 1})
+	if movePanelResponse.StatusCode != http.StatusNoContent {
+		t.Fatalf("move dashboard panel: expected 204, got %d: %s", movePanelResponse.StatusCode, movePanelResponse.Body)
+	}
+
 	dashboardList := requestJSON(t, ctx, http.MethodGet, baseURL+"/v1/dashboards", nil)
 	if dashboardList.StatusCode != http.StatusOK {
 		t.Fatalf("owner dashboard list: expected 200, got %d: %s", dashboardList.StatusCode, dashboardList.Body)
 	}
 	var ownerDashboards struct {
 		Dashboards []struct {
-			ID     string            `json:"id"`
-			Panels []json.RawMessage `json:"panels"`
+			ID     string `json:"id"`
+			Panels []struct {
+				ID       string `json:"id"`
+				Position int    `json:"position"`
+			} `json:"panels"`
 		} `json:"dashboards"`
 	}
 	decodeResponse(t, dashboardList.Body, &ownerDashboards)
 	if len(ownerDashboards.Dashboards) != 1 ||
 		ownerDashboards.Dashboards[0].ID != createdDashboard.Dashboard.ID ||
-		len(ownerDashboards.Dashboards[0].Panels) != 1 {
-		t.Fatalf("dashboard persistence did not return its one saved panel: %#v", ownerDashboards.Dashboards)
+		len(ownerDashboards.Dashboards[0].Panels) != 2 {
+		t.Fatalf("dashboard persistence did not return both saved panels: %#v", ownerDashboards.Dashboards)
+	}
+	orderedPanels := ownerDashboards.Dashboards[0].Panels
+	if orderedPanels[0].ID != secondPanel.Panel.ID || orderedPanels[0].Position != 0 ||
+		orderedPanels[1].ID != createdPanel.Panel.ID || orderedPanels[1].Position != 1 {
+		t.Fatalf("dashboard panel reorder was not persisted: %#v", orderedPanels)
 	}
 
 	ticketResponse := requestJSON(t, ctx, http.MethodPost, baseURL+"/v1/live/ticket", map[string]any{})
