@@ -21,11 +21,11 @@ sql="
 CREATE SETTINGS PROFILE IF NOT EXISTS grafana_reader_profile
     SETTINGS readonly = 1 CHANGEABLE_IN_READONLY MIN 1 MAX 1,
              max_execution_time = 60 CHANGEABLE_IN_READONLY;
+CREATE ROLE IF NOT EXISTS grafana_reader_role
+    SETTINGS PROFILE grafana_reader_profile;
 CREATE USER IF NOT EXISTS grafana_reader
     IDENTIFIED WITH sha256_password BY '$GRAFANA_CLICKHOUSE_PASSWORD'
     DEFAULT ROLE grafana_reader_role;
-CREATE ROLE IF NOT EXISTS grafana_reader_role
-    SETTINGS PROFILE grafana_reader_profile;
 ALTER USER grafana_reader
     IDENTIFIED WITH sha256_password BY '$GRAFANA_CLICKHOUSE_PASSWORD'
     DEFAULT ROLE grafana_reader_role;
