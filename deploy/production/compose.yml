@@ -103,6 +103,8 @@ services:
     build:
       context: ../..
       dockerfile: deploy/agent-artifacts/Dockerfile
+      args:
+        MONITOR_AGENT_VERSION: "${MONITOR_ME_RELEASE:?Set MONITOR_ME_RELEASE}"
     environment:
       MONITOR_AGENT_VERSION: "${MONITOR_ME_RELEASE}"
     restart: "no"
