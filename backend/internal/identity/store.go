@@ -105,6 +105,42 @@ type Project struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
+type Dashboard struct {
+	ID          string           `json:"id"`
+	Name        string           `json:"name"`
+	Description string           `json:"description"`
+	ProjectID   *string          `json:"project_id,omitempty"`
+	IsDefault   bool             `json:"is_default"`
+	CreatedAt   time.Time        `json:"created_at"`
+	UpdatedAt   time.Time        `json:"updated_at"`
+	Panels      []DashboardPanel `json:"panels"`
+}
+
+type DashboardPanel struct {
+	ID             string    `json:"id"`
+	DashboardID    string    `json:"dashboard_id"`
+	Title          string    `json:"title"`
+	Visualization  string    `json:"visualization"`
+	ServerID       string    `json:"server_id"`
+	ProjectID      *string   `json:"project_id,omitempty"`
+	MetricName     string    `json:"metric_name"`
+	TimeRange      string    `json:"time_range"`
+	Position       int       `json:"position"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
+}
+
+type DashboardPanelInput struct {
+	Title          string
+	Visualization  string
+	ServerID       string
+	ProjectID      string
+	MetricName     string
+	TimeRange      string
+	Position       int
+}
+
+
 // ServerProjectMapping assigns one workload selector on a server to a project.
 type ServerProjectMapping struct {
 	ID                string    `json:"id"`
@@ -818,6 +854,235 @@ func (s *Store) DeleteProject(ctx context.Context, principal Principal, projectI
 	affected, err := result.RowsAffected()
 	if err != nil {
 		return fmt.Errorf("inspect project deletion: %w", err)
+	}
+	if affected == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// ListDashboards returns organization-owned dashboards and their configured panels.
+func (s *Store) ListDashboards(ctx context.Context, principal Principal) ([]Dashboard, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT d.id::text, d.name, d.description, d.project_id::text, d.is_default,
+		       d.created_at, d.updated_at,
+		       panel.id::text, panel.title, panel.visualization, panel.server_id::text,
+		       panel.project_id::text, panel.metric_name, panel.time_range, panel.position,
+		       panel.created_at, panel.updated_at
+		FROM dashboards d
+		LEFT JOIN dashboard_panels panel
+		  ON panel.dashboard_id = d.id
+		 AND panel.organization_id = d.organization_id
+		WHERE d.organization_id = $1
+		ORDER BY d.is_default DESC, lower(d.name), d.id, panel.position, panel.id
+	`, principal.OrganizationID)
+	if err != nil {
+		return nil, fmt.Errorf("list organization dashboards: %w", err)
+	}
+	defer rows.Close()
+
+	dashboards := make([]Dashboard, 0)
+	indexByID := make(map[string]int)
+	for rows.Next() {
+		var dashboard Dashboard
+		var dashboardProjectID sql.NullString
+		var panelID, panelTitle, visualization, serverID, panelProjectID, metricName, timeRange sql.NullString
+		var position sql.NullInt64
+		var panelCreatedAt, panelUpdatedAt sql.NullTime
+		if err := rows.Scan(
+			&dashboard.ID, &dashboard.Name, &dashboard.Description, &dashboardProjectID, &dashboard.IsDefault,
+			&dashboard.CreatedAt, &dashboard.UpdatedAt,
+			&panelID, &panelTitle, &visualization, &serverID, &panelProjectID,
+			&metricName, &timeRange, &position, &panelCreatedAt, &panelUpdatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("scan organization dashboard: %w", err)
+		}
+		if dashboardProjectID.Valid {
+			dashboard.ProjectID = &dashboardProjectID.String
+		}
+		if index, exists := indexByID[dashboard.ID]; exists {
+			dashboard = dashboards[index]
+		} else {
+			dashboard.Panels = make([]DashboardPanel, 0)
+			indexByID[dashboard.ID] = len(dashboards)
+			dashboards = append(dashboards, dashboard)
+		}
+		if panelID.Valid {
+			panel := DashboardPanel{
+				ID: panelID.String, DashboardID: dashboard.ID, Title: panelTitle.String,
+				Visualization: visualization.String, ServerID: serverID.String,
+				MetricName: metricName.String, TimeRange: timeRange.String,
+				Position: int(position.Int64), CreatedAt: panelCreatedAt.Time, UpdatedAt: panelUpdatedAt.Time,
+			}
+			if panelProjectID.Valid {
+				panel.ProjectID = &panelProjectID.String
+			}
+			dashboards[indexByID[dashboard.ID]].Panels = append(dashboards[indexByID[dashboard.ID]].Panels, panel)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate organization dashboards: %w", err)
+	}
+	return dashboards, nil
+}
+
+// CreateDashboard persists a dashboard in the caller's organization.
+func (s *Store) CreateDashboard(ctx context.Context, principal Principal, name, description, projectID string, isDefault bool) (Dashboard, error) {
+	if !canAdminister(principal.Role) {
+		return Dashboard{}, ErrForbidden
+	}
+	name = strings.TrimSpace(name)
+	description = strings.TrimSpace(description)
+	if len(name) < 2 || len(name) > 120 || len(description) > 500 {
+		return Dashboard{}, ErrInvalidInput
+	}
+	if projectID != "" && !validUUID(projectID) {
+		return Dashboard{}, ErrInvalidInput
+	}
+
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return Dashboard{}, fmt.Errorf("begin dashboard creation: %w", err)
+	}
+	defer tx.Rollback()
+	if projectID != "" {
+		var exists bool
+		if err := tx.QueryRowContext(ctx,
+			"SELECT EXISTS (SELECT 1 FROM projects WHERE id = $1 AND organization_id = $2)",
+			projectID, principal.OrganizationID).Scan(&exists); err != nil {
+			return Dashboard{}, fmt.Errorf("validate dashboard project: %w", err)
+		}
+		if !exists {
+			return Dashboard{}, ErrNotFound
+		}
+	}
+	if isDefault {
+		if _, err := tx.ExecContext(ctx,
+			"UPDATE dashboards SET is_default = false, updated_at = now() WHERE organization_id = $1 AND is_default = true",
+			principal.OrganizationID); err != nil {
+			return Dashboard{}, fmt.Errorf("clear previous default dashboard: %w", err)
+		}
+	}
+	var dashboard Dashboard
+	var project sql.NullString
+	err = tx.QueryRowContext(ctx, `
+		INSERT INTO dashboards (organization_id, name, description, project_id, is_default, created_by, updated_by)
+		VALUES ($1, $2, $3, NULLIF($4, '')::uuid, $5, $6, $6)
+		RETURNING id::text, name, description, project_id::text, is_default, created_at, updated_at
+	`, principal.OrganizationID, name, description, projectID, isDefault, principal.UserID).Scan(
+		&dashboard.ID, &dashboard.Name, &dashboard.Description, &project,
+		&dashboard.IsDefault, &dashboard.CreatedAt, &dashboard.UpdatedAt,
+	)
+	if err != nil {
+		return Dashboard{}, fmt.Errorf("create organization dashboard: %w", err)
+	}
+	if project.Valid {
+		dashboard.ProjectID = &project.String
+	}
+	dashboard.Panels = make([]DashboardPanel, 0)
+	if err := tx.Commit(); err != nil {
+		return Dashboard{}, fmt.Errorf("commit organization dashboard: %w", err)
+	}
+	return dashboard, nil
+}
+
+// DeleteDashboard removes only a dashboard owned by the caller's organization.
+func (s *Store) DeleteDashboard(ctx context.Context, principal Principal, dashboardID string) error {
+	if !canAdminister(principal.Role) {
+		return ErrForbidden
+	}
+	if !validUUID(dashboardID) {
+		return ErrNotFound
+	}
+	result, err := s.db.ExecContext(ctx,
+		"DELETE FROM dashboards WHERE id = $1 AND organization_id = $2",
+		dashboardID, principal.OrganizationID)
+	if err != nil {
+		return fmt.Errorf("delete organization dashboard: %w", err)
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("inspect dashboard deletion: %w", err)
+	}
+	if affected == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// CreateDashboardPanel validates every referenced entity in the dashboard's organization.
+func (s *Store) CreateDashboardPanel(ctx context.Context, principal Principal, dashboardID string, input DashboardPanelInput) (DashboardPanel, error) {
+	if !canAdminister(principal.Role) {
+		return DashboardPanel{}, ErrForbidden
+	}
+	input.Title = strings.TrimSpace(input.Title)
+	if !validUUID(dashboardID) || !validUUID(input.ServerID) ||
+		(input.ProjectID != "" && !validUUID(input.ProjectID)) ||
+		len(input.Title) < 2 || len(input.Title) > 120 ||
+		!alertMetricPattern.MatchString(input.MetricName) ||
+		(input.Visualization != "timeseries" && input.Visualization != "stat") ||
+		(input.TimeRange != "1h" && input.TimeRange != "6h" && input.TimeRange != "24h" &&
+			input.TimeRange != "7d" && input.TimeRange != "30d") ||
+		input.Position < 0 || input.Position > 1000 {
+		return DashboardPanel{}, ErrInvalidInput
+	}
+	var panel DashboardPanel
+	var project sql.NullString
+	err := s.db.QueryRowContext(ctx, `
+		INSERT INTO dashboard_panels (
+			organization_id, dashboard_id, title, visualization, server_id,
+			project_id, metric_name, time_range, position, created_by, updated_by
+		)
+		SELECT d.organization_id, d.id, $4, $5, server.id,
+		       COALESCE(NULLIF($6, '')::uuid, d.project_id), $7, $8, $9, $10, $10
+		FROM dashboards d
+		JOIN servers server
+		  ON server.id = $3
+		 AND server.organization_id = d.organization_id
+		WHERE d.id = $1
+		  AND d.organization_id = $2
+		  AND ($6 = '' OR EXISTS (
+		      SELECT 1 FROM projects project
+		      WHERE project.id = $6::uuid AND project.organization_id = d.organization_id
+		  ))
+		  AND (d.project_id IS NULL OR COALESCE(NULLIF($6, '')::uuid, d.project_id) = d.project_id)
+		RETURNING id::text, dashboard_id::text, title, visualization, server_id::text,
+		          project_id::text, metric_name, time_range, position, created_at, updated_at
+	`, dashboardID, principal.OrganizationID, input.ServerID, input.Title, input.Visualization,
+		input.ProjectID, input.MetricName, input.TimeRange, input.Position, principal.UserID).Scan(
+		&panel.ID, &panel.DashboardID, &panel.Title, &panel.Visualization,
+		&panel.ServerID, &project, &panel.MetricName, &panel.TimeRange,
+		&panel.Position, &panel.CreatedAt, &panel.UpdatedAt,
+	)
+	if errors.Is(err, sql.ErrNoRows) {
+		return DashboardPanel{}, ErrNotFound
+	}
+	if err != nil {
+		return DashboardPanel{}, fmt.Errorf("create dashboard panel: %w", err)
+	}
+	if project.Valid {
+		panel.ProjectID = &project.String
+	}
+	return panel, nil
+}
+
+// DeleteDashboardPanel removes a panel only when it belongs to the caller's organization.
+func (s *Store) DeleteDashboardPanel(ctx context.Context, principal Principal, panelID string) error {
+	if !canAdminister(principal.Role) {
+		return ErrForbidden
+	}
+	if !validUUID(panelID) {
+		return ErrNotFound
+	}
+	result, err := s.db.ExecContext(ctx,
+		"DELETE FROM dashboard_panels WHERE id = $1 AND organization_id = $2",
+		panelID, principal.OrganizationID)
+	if err != nil {
+		return fmt.Errorf("delete dashboard panel: %w", err)
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("inspect dashboard panel deletion: %w", err)
 	}
 	if affected == 0 {
 		return ErrNotFound
