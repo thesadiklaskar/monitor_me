@@ -4,6 +4,8 @@ A self-hosted infrastructure monitoring product for a VPS, VM, cloud VM, VPC-hos
 
 Monitor Me is an original monitoring product. It does not embed Grafana, Prometheus, Zabbix or Netdata.
 
+> **Release status:** this is the development `main` branch, not a certified public release. The latest frontend changes and `install.sh` have not yet passed a fresh green CI run, browser review or a clean Ubuntu/Debian VPS installation. Treat the platform matrix and feature limits below as the current truth; do not assume zero-lag, unlimited scale or full Grafana parity.
+
 ## Product principles
 
 - One installation, one operator boundary and one local data store.
