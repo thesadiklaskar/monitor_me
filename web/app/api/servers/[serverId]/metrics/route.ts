@@ -16,7 +16,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
     return errorResponse(400, "invalid_server_id", "The server identifier is invalid.");
   }
 
-  const allowed = ["metric", "from", "to", "step", "limit"];
+  const allowed = ["metric", "from", "to", "step", "limit", "label_key", "label_value"];
   const query = new URLSearchParams();
   for (const key of allowed) {
     const value = request.nextUrl.searchParams.get(key);
