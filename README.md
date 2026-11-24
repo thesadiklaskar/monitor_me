@@ -4,7 +4,7 @@ A self-hosted infrastructure monitoring product for a VPS, VM, cloud VM, VPC-hos
 
 Monitor Me is an original monitoring product with an included Grafana OSS companion UI. Grafana is provisioned against Monitor Me's PostgreSQL telemetry using a dedicated read-only database role. Prometheus, Zabbix and Netdata are not required.
 
-> **Release status:** this is the development `main` branch, not a certified public release. The latest frontend changes and `install.sh` have not yet passed a fresh green CI run, browser review or a clean Ubuntu/Debian VPS installation. Treat the platform matrix and feature limits below as the current truth; do not assume zero-lag, unlimited scale or full Grafana parity.
+> **Release status:** this is the development `main` branch, not a certified public release. On November 24, 2026, the local API, database, migration runner, agent-artifact builder and native web dashboard started successfully in one Windows Docker Desktop environment. The new Grafana/PostgreSQL/ClickHouse integration has not yet passed that local acceptance run. Clean-host production install, multiple Linux distributions, ARM hardware, backup/restore and load limits remain unverified. GitHub Actions is not used as the acceptance gate.
 
 ## Product principles
 
@@ -22,13 +22,13 @@ Monitor Me is an original monitoring product with an included Grafana OSS compan
 |---|---|---|
 | Machine inventory | Enrolment tokens, machine status, agent heartbeat and credential rotation | The owner must keep the dashboard protected by the configured network allowlist |
 | Host metrics | CPU, memory, swap, disk, network, uptime, process count and selected process/socket metadata | Metric availability differs by OS; no eBPF or HTTP request tracing |
-| Metric dashboards | Native saved dashboards plus an included Grafana OSS UI at `/grafana/`; Grafana has SQL query building, variables, annotations, rich visualizations, Explore and Grafana alerting against Monitor Me telemetry | The native Monitor Me dashboard remains intentionally simpler; Grafana queries use a read-only PostgreSQL account and are bounded by the underlying telemetry retention |
+| Metric dashboards | Native saved dashboards plus a full Grafana OSS companion at `/grafana/`; provisioned PostgreSQL datasource for metrics and ClickHouse datasource for logs; Grafana provides SQL/query builder, Explore, variables, annotations, transformations, rich visualizations and alerting | Grafana is upstream Grafana OSS, not a Monitor Me reimplementation. Its datasources use dedicated read-only DB roles; the integrated provisioning and dashboards still require local acceptance after pull |
 | Live metrics | Authenticated agent stream, bounded WebSocket updates and historical catch-up | Live freshness depends on agent sampling, storage and network; no zero-latency guarantee |
-| Logs | Linux journald ingestion through bounded local spool and ClickHouse search; time/severity/source filters and paged results | The UI's 10-second auto-refresh is HTTP polling, not push-based live tail. General file/syslog tail and rotation support are not delivered. Windows Event Log source code needs runtime acceptance |
+| Logs | Linux journald ingestion through bounded local spool and ClickHouse search; native UI filters and paging; Grafana ClickHouse datasource with Logs query builder, Explore and a provisioned Host Logs panel | The native UI's 10-second auto-refresh is HTTP polling, not push-based live tail. General file/syslog tail and rotation support are not delivered. Windows Event Log source code needs runtime acceptance |
 | Alerts | Metric threshold rules, firing/recovered events and in-app notifications | External email/chat notification providers are not implemented |
 | Deployment | Linux production Compose stack, health checks, migration runner, backup/restore for PostgreSQL and rollback of application images | ClickHouse backup/restore, automated upgrades and clean-host acceptance remain release work |
 
-Do not describe this as a complete Grafana replacement until the remaining query/panel/log features and release gates are tested.
+Grafana itself supplies the full upstream OSS dashboard/query/Explore experience; the native Monitor Me dashboard remains a smaller, purpose-built operator UI. The Grafana provisioning, permissions and query paths must pass the local checks below before production rollout.
 
 ## Install the control plane
 
@@ -44,7 +44,7 @@ sudo ./install.sh
 
 The development repository is currently `WorkRCS/monitor_me`; the public target is `thesadiklaskar/monitor_me`. Do not use the public clone URL until the final code and release have actually been transferred there.
 
-The root `install.sh` is a guided Ubuntu/Debian Linux x86-64 bootstrap. It installs Docker/Compose, Nginx, Certbot and UFW when no host firewall is active (or uses an already-active firewalld); generates database/cache/Grafana secrets; requests a Let's Encrypt certificate; enables automatic certificate renewal (including Nginx reload and gRPC API restart); applies an administrator CIDR boundary; builds the stack; runs migrations; provisions a read-only Grafana database user; and checks API/web/Grafana readiness. The development `main` branch stores `install.sh` as an executable file (`100755`), so the intended command is `sudo ./install.sh`. Preserve this executable mode when transferring the final source to `thesadiklaskar/monitor_me`.
+The root `install.sh` is a guided Ubuntu/Debian Linux x86-64 bootstrap. It installs Docker/Compose, Nginx, Certbot and UFW when no host firewall is active (or uses an already-active firewalld); generates database/cache/Grafana secrets; requests a Let's Encrypt certificate; enables automatic certificate renewal (including Nginx reload and gRPC API restart); applies an administrator CIDR boundary; builds the stack; runs migrations; provisions dedicated read-only Grafana users in PostgreSQL and ClickHouse; and checks API/web/Grafana readiness. The development `main` branch stores `install.sh` as an executable file (`100755`), so the intended command is `sudo ./install.sh`. Preserve this executable mode when transferring the final source to `thesadiklaskar/monitor_me`.
 
 The installer asks for:
 1. A DNS hostname whose A record routes to the control plane or its public HTTPS load balancer.
@@ -52,7 +52,7 @@ The installer asks for:
 3. An email address for certificate expiry notices.
 4. Confirmation before enabling UFW if the host firewall is inactive.
 
-Before starting, the VPS/provider firewall must allow TCP 80, 443 and 8443, plus SSH from the administrator network. The script cannot edit cloud security groups/VPC ACLs without the provider's IAM credentials. The management UI has no application login; do not expose it publicly. Nginx and the host firewall restrict it to `ADMIN_CIDR`.
+Before starting, the VPS/provider firewall must allow TCP 80, 443 and 8443, plus SSH from the administrator network. The script cannot edit cloud security groups/VPC ACLs without the provider's IAM credentials. The Monitor Me management UI has no application login; do not expose it publicly. Nginx and the host firewall restrict it to `ADMIN_CIDR`. Grafana is served at `https://YOUR_HOST/grafana/`, requires its own admin login and is also restricted by the same Nginx CIDR allowlist. Its generated admin password is stored in the private `.env.production` file.
 
 ### Add monitored machines
 
@@ -64,14 +64,14 @@ A monitored host needs outbound HTTPS for the installer/artifact and outbound TL
 
 | Role | Platform | Status |
 |---|---|---|
-| Control plane | Ubuntu/Debian Linux x86-64 | Primary intended target; clean-host/release certification remains pending |
-| Agent | Linux amd64 | Primary agent target; clean-host runtime acceptance required |
-| Agent | Linux arm64/aarch64 | Build/installer target; real hardware runtime acceptance required |
+| Control plane | Ubuntu/Debian Linux amd64 | Automated installer target; clean-host/release certification remains pending |
+| Agent | systemd Linux amd64 | Native agent and installer target; clean-host runtime acceptance required |
+| Agent | systemd Linux arm64/aarch64 | Native agent and installer target; real ARM hardware runtime acceptance required |
 | Agent | Windows x64 | Service and metrics/Event Log code exists; Windows runtime acceptance required |
 | Control plane | Native Windows Server | Unsupported |
 | Agent/control plane | macOS, Windows ARM64, BSD | Not currently supported as released targets |
 
-VPS, VM, cloud VM, VPC and bare metal are hosting types, not operating systems. Compatibility depends on the guest OS, CPU architecture, service manager, storage, DNS, TLS and network rules.
+VPS, VM, cloud VM, VPC and bare metal are hosting types, not operating systems. An agent can run on systemd-based Linux distributions with amd64 or arm64 CPUs when procfs is mounted and readable. Journald collection additionally requires `journalctl` and readable systemd journal access. Alpine/OpenRC and non-systemd Linux are not accepted agent targets yet. The control-plane installer is narrower: Ubuntu/Debian amd64 only; ARM64 control-plane deployment is not accepted because the current stack pins an x86-64-only ClickHouse Docker server image. Provider security groups/VPC ACLs must be configured separately.
 
 ## Real-data demo and README screenshots
 
@@ -115,6 +115,8 @@ Toolchain versions are pinned by the project manifests:
 - Node.js 26.13.x.
 - Docker Engine with Docker Compose v2.
 
+Grafana OSS 13.3.1 is included. Its ClickHouse datasource plugin is pinned to 4.23.5; Grafana installs that plugin synchronously before starting, so first startup needs outbound access to the Grafana plugin catalog.
+
 Windows developers can use Docker Desktop with Linux containers for local development; that does not make Windows a certified production control-plane host.
 
 PowerShell:
@@ -131,7 +133,17 @@ git pull --ff-only origin main
 ./scripts/start-local.sh
 ```
 
-The startup scripts validate source freshness/working tree, Compose configuration, build before replacing services and check readiness. Never run `docker compose down -v` as a routine troubleshooting step; it deletes persistent data.
+The startup scripts validate source freshness/working tree, Compose configuration, build before replacing services and check API, web and Grafana readiness. Local Grafana opens from the sidebar at `http://localhost:3000/grafana/` (direct loopback port `3001` also redirects there). Local credentials are `admin` / `localgrafanaadminpasswordchange`; change them before exposing any non-local environment.
+
+Run the read-only Linux preflight on a candidate host before installing:
+
+```bash
+sudo ./scripts/linux-preflight.sh --control-plane
+# On each monitored Linux host:
+sudo ./scripts/linux-preflight.sh --agent
+```
+
+The preflight does not install packages or change services; a pass is not a production acceptance certificate. Never run `docker compose down -v` as a routine troubleshooting step; it deletes persistent data.
 
 ## Architecture
 
@@ -149,10 +161,13 @@ Self-hosted Linux control plane (Docker Compose)
   ├─ PostgreSQL: durable metrics and operator state
   ├─ Redis: ephemeral latest-value fan-out
   └─ ClickHouse: structured log events
-          |
-          v
-Next.js dashboard
+          |                       |
+          v                       v
+Next.js dashboard             Grafana OSS companion
   Servers | Logs | Dashboards | Alerts
+                              ├─ PostgreSQL reader: metrics
+                              └─ ClickHouse reader: host logs
+                              SQL / query builder / Explore / alerting
 ```
 
 The backend is the source of truth for telemetry; Redis messages are notifications only. The agent removes a queued batch only after durable backend acknowledgement.
@@ -160,7 +175,7 @@ The backend is the source of truth for telemetry; Redis messages are notificatio
 ## Configuration, data and security
 
 - Production settings and secrets live in `.env.production` (mode 0600); never commit it.
-- Dashboard/API/WebSocket/Grafana access is network-restricted by Nginx to `ADMIN_CIDR`; Grafana additionally uses its own administrator login. Its PostgreSQL datasource uses `grafana_reader`, a dedicated SELECT-only role; agents use their own short-lived credentials.
+- Dashboard/API/WebSocket/Grafana access is network-restricted by Nginx to `ADMIN_CIDR`; Grafana additionally uses its own administrator login. PostgreSQL metrics use `grafana_reader` (SELECT-only), while ClickHouse logs use a separate `grafana_reader` user/role limited to `monitor_me.logs` with `readonly=1`; agents use their own short-lived credentials.
 - PostgreSQL, Redis and ClickHouse are private to the Compose network. Do not publish ports 5432, 6379, 8080, 8123 or 9000.
 - PostgreSQL backups are provided by `deploy/production/backup.sh` and `restore.sh`. ClickHouse backup/restore must be designed and tested before a production retention commitment.
 - The current schema still contains legacy organization/user/session compatibility plumbing used internally for installation-local ownership and live tickets. It is not a customer account system and is not exposed in the UI; removing it fully requires a separate data-preserving schema refactor.
