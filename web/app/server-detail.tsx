@@ -539,7 +539,7 @@ export function ServerDetail({
         <span className={effectiveLiveState === "live" ? "monitor-live-indicator is-live" : effectiveLiveState === "disabled" ? "monitor-live-indicator is-muted" : "monitor-live-indicator is-waiting"} />
         <strong>{effectiveLiveState === "live" ? "LIVE TELEMETRY" : effectiveLiveState === "disabled" ? "HISTORY ONLY" : effectiveLiveState === "connecting" ? "CONNECTING TO LIVE STREAM" : "RECONNECTING"}</strong>
         <span>{effectiveLiveMessage}</span>
-        <span className="monitor-updated-label">Agent collection interval · 5s</span>
+        <span className="monitor-updated-label">Live stream · committed telemetry</span>
       </div>
 
       {historyError && <div className="notice notice-error" role="alert">{historyError}</div>}
