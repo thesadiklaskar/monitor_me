@@ -17,7 +17,6 @@ import (
 const (
 	testOrganizationID = "11111111-1111-4111-8111-111111111111"
 	testServerID       = "22222222-2222-4222-8222-222222222222"
-	testProjectID      = "33333333-3333-4333-8333-333333333333"
 )
 
 func testQuery() Query {
@@ -106,12 +105,11 @@ func TestQueryAlwaysScopesOrganizationAndServerAndBindsFilters(t *testing.T) {
 			t.Errorf("read ClickHouse query body: %v", readErr)
 		}
 		receivedQuery = string(body)
-		_, _ = fmt.Fprintln(writer, `{"event_id":"`+strings.Repeat("a", 64)+`","event_time_unix_nanos":1795524000000000000,"source":"sshd.service","severity":"warning","body":"authentication failed","attributes":{"systemd_unit":"sshd.service"},"project_id":"`+testProjectID+`"}`)
+		_, _ = fmt.Fprintln(writer, `{"event_id":"`+strings.Repeat("a", 64)+`","event_time_unix_nanos":1795524000000000000,"source":"sshd.service","severity":"warning","body":"authentication failed","attributes":{"systemd_unit":"sshd.service"}}`)
 	}))
 	defer server.Close()
 
 	query := testQuery()
-	query.ProjectID = testProjectID
 	query.Search = "authentication"
 	query.Severity = "warning"
 	query.Source = "sshd.service"
@@ -119,13 +117,12 @@ func TestQueryAlwaysScopesOrganizationAndServerAndBindsFilters(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Query() error = %v", err)
 	}
-	if len(results) != 1 || results[0].ProjectID != testProjectID {
+	if len(results) != 1 {
 		t.Fatalf("Query() results = %#v", results)
 	}
 	for _, required := range []string{
 		"organization_id = {org_id:UUID}",
 		"server_id = {server_id:UUID}",
-		"project_id = {project_id:UUID}",
 		"positionCaseInsensitiveUTF8(body, {search:String})",
 		"severity = {severity:String}",
 		"source = {source:String}",
@@ -137,7 +134,6 @@ func TestQueryAlwaysScopesOrganizationAndServerAndBindsFilters(t *testing.T) {
 	for key, want := range map[string]string{
 		"param_org_id": testOrganizationID,
 		"param_server_id": testServerID,
-		"param_project_id": testProjectID,
 		"param_search": "authentication",
 		"param_severity": "warning",
 		"param_source": "sshd.service",
@@ -159,7 +155,7 @@ func TestQueryUsesKeysetCursorAndBindsItsParameters(t *testing.T) {
 			t.Errorf("read ClickHouse query body: %v", err)
 		}
 		receivedQuery = string(body)
-		_, _ = fmt.Fprintln(writer, `{"event_id":"`+strings.Repeat("a", 64)+`","event_time_unix_nanos":1795524000000000000,"event_time_unix_micros":1795524000000000,"source":"sshd.service","severity":"warning","body":"authentication failed","attributes":{},"project_id":""}`)
+		_, _ = fmt.Fprintln(writer, `{"event_id":"`+strings.Repeat("a", 64)+`","event_time_unix_nanos":1795524000000000000,"event_time_unix_micros":1795524000000000,"source":"sshd.service","severity":"warning","body":"authentication failed","attributes":{}}`)
 	}))
 	defer server.Close()
 
