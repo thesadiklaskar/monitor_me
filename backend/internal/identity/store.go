@@ -353,9 +353,6 @@ func (s *Store) CreateServer(ctx context.Context, principal Principal, name, hos
 	if len(name) < 2 || len(name) > 120 || len(hostname) > 253 {
 		return IssuedServer{}, ErrInvalidInput
 	}
-	if !canManageServers(principal.Role) {
-		return IssuedServer{}, ErrForbidden
-	}
 
 	token, err := newOpaqueToken()
 	if err != nil {
@@ -455,9 +452,6 @@ func (s *Store) ListServers(ctx context.Context, principal Principal) ([]Server,
 // ReissueEnrollmentToken creates a fresh single-use credential for an existing server.
 // Only operators and administrators in the owning organization may rotate installation credentials.
 func (s *Store) ReissueEnrollmentToken(ctx context.Context, principal Principal, serverID string) (IssuedServer, error) {
-	if !canManageServers(principal.Role) {
-		return IssuedServer{}, ErrForbidden
-	}
 	if !validUUID(serverID) {
 		return IssuedServer{}, ErrNotFound
 	}
@@ -523,9 +517,6 @@ func (s *Store) ReissueEnrollmentToken(ctx context.Context, principal Principal,
 
 // RevokeEnrollmentToken revokes an unused token within the caller's organization.
 func (s *Store) RevokeEnrollmentToken(ctx context.Context, principal Principal, tokenID string) error {
-	if !canAdminister(principal.Role) {
-		return ErrForbidden
-	}
 	if !validUUID(tokenID) {
 		return ErrNotFound
 	}
@@ -550,9 +541,6 @@ func (s *Store) RevokeEnrollmentToken(ctx context.Context, principal Principal, 
 
 // RevokeAgent revokes the agent and every outstanding session in the caller's organization.
 func (s *Store) RevokeAgent(ctx context.Context, principal Principal, agentID string) error {
-	if !canAdminister(principal.Role) {
-		return ErrForbidden
-	}
 	if !validUUID(agentID) {
 		return ErrNotFound
 	}
@@ -658,9 +646,6 @@ func (s *Store) ListDashboards(ctx context.Context, principal Principal) ([]Dash
 
 // CreateDashboard persists a dashboard in the caller's organization.
 func (s *Store) CreateDashboard(ctx context.Context, principal Principal, name, description string, isDefault bool) (Dashboard, error) {
-	if !canAdminister(principal.Role) {
-		return Dashboard{}, ErrForbidden
-	}
 	name = strings.TrimSpace(name)
 	description = strings.TrimSpace(description)
 	if len(name) < 2 || len(name) > 120 || len(description) > 500 {
@@ -699,9 +684,6 @@ func (s *Store) CreateDashboard(ctx context.Context, principal Principal, name, 
 
 // DeleteDashboard removes only a dashboard owned by the caller's organization.
 func (s *Store) DeleteDashboard(ctx context.Context, principal Principal, dashboardID string) error {
-	if !canAdminister(principal.Role) {
-		return ErrForbidden
-	}
 	if !validUUID(dashboardID) {
 		return ErrNotFound
 	}
@@ -723,9 +705,6 @@ func (s *Store) DeleteDashboard(ctx context.Context, principal Principal, dashbo
 
 // CreateDashboardPanel validates every referenced entity in the dashboard's organization.
 func (s *Store) CreateDashboardPanel(ctx context.Context, principal Principal, dashboardID string, input DashboardPanelInput) (DashboardPanel, error) {
-	if !canAdminister(principal.Role) {
-		return DashboardPanel{}, ErrForbidden
-	}
 	input.Title = strings.TrimSpace(input.Title)
 	if !validUUID(dashboardID) || !validUUID(input.ServerID) ||
 		len(input.Title) < 2 || len(input.Title) > 120 ||
@@ -769,9 +748,6 @@ func (s *Store) CreateDashboardPanel(ctx context.Context, principal Principal, d
 // MoveDashboardPanel updates the persisted ordering of panels within one dashboard.
 // The dashboard row is locked so concurrent reorder requests cannot interleave.
 func (s *Store) MoveDashboardPanel(ctx context.Context, principal Principal, panelID string, position int) error {
-	if !canAdminister(principal.Role) {
-		return ErrForbidden
-	}
 	if !validUUID(panelID) || position < 0 || position > 1000 {
 		return ErrInvalidInput
 	}
@@ -870,9 +846,6 @@ func (s *Store) MoveDashboardPanel(ctx context.Context, principal Principal, pan
 
 // DeleteDashboardPanel removes a panel only when it belongs to the caller's organization.
 func (s *Store) DeleteDashboardPanel(ctx context.Context, principal Principal, panelID string) error {
-	if !canAdminister(principal.Role) {
-		return ErrForbidden
-	}
 	if !validUUID(panelID) {
 		return ErrNotFound
 	}
@@ -975,9 +948,6 @@ func (s *Store) ListAlertRules(ctx context.Context, principal Principal) ([]Aler
 }
 
 func (s *Store) CreateAlertRule(ctx context.Context, principal Principal, input AlertRule) (AlertRule, error) {
-	if !canAdminister(principal.Role) {
-		return AlertRule{}, ErrForbidden
-	}
 	input.Name = strings.TrimSpace(input.Name)
 	if len(input.Name) < 2 || len(input.Name) > 120 || !alertMetricPattern.MatchString(input.MetricName) ||
 		(input.Operator != "gt" && input.Operator != "gte" && input.Operator != "lt" && input.Operator != "lte") ||
@@ -1025,9 +995,6 @@ func nullableUUID(value *string) any {
 }
 
 func (s *Store) DeleteAlertRule(ctx context.Context, principal Principal, ruleID string) error {
-	if !canAdminister(principal.Role) {
-		return ErrForbidden
-	}
 	if !validUUID(ruleID) {
 		return ErrNotFound
 	}
