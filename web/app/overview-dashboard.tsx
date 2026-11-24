@@ -233,6 +233,14 @@ export default function OverviewDashboard({ servers }: { servers: Server[] }) {
     [servers],
   );
   const otherCount = servers.length - connectedCount;
+  const orderedServers = useMemo(
+    () => [...servers].sort((left, right) => {
+      const leftOnline = left.status.toLowerCase() === "online" ? 1 : 0;
+      const rightOnline = right.status.toLowerCase() === "online" ? 1 : 0;
+      return rightOnline - leftOnline || left.name.localeCompare(right.name);
+    }),
+    [servers],
+  );
 
   const loadServerDashboard = useCallback(async () => {
     if (!selectedServerId) return;
@@ -369,7 +377,7 @@ export default function OverviewDashboard({ servers }: { servers: Server[] }) {
                 ))}
               </div>
             )}
-            <div className="overview-metric-footer"><span>{data?.logs.length ?? 0} events loaded</span><span>Auto-refresh · 15s</span></div>
+            <div className="overview-metric-footer"><span>{logs.length} events shown</span><span>Auto-refresh · 15s</span></div>
           </article>
         </section>
       </section>
@@ -398,7 +406,7 @@ export default function OverviewDashboard({ servers }: { servers: Server[] }) {
         </div>
       ) : (
         <section className="overview-server-grid" aria-label="Server health cards">
-          {servers.map((server) => (
+          {orderedServers.map((server) => (
             <button
               className="overview-server-card"
               key={server.id}
