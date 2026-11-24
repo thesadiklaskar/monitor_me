@@ -2,6 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { apiRequest } from "@/lib/client-api";
+import { formatByteRate } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -22,7 +23,7 @@ const METRICS = [
 
 function formatNumber(value: number, unit: string) {
   if (unit === "bytes") return (value / 1024 ** 3).toFixed(2) + " GiB";
-  if (unit === "bytes/s") return (value / 1024 ** 2).toFixed(2) + " MiB/s";
+  if (unit === "bytes/s") return formatByteRate(value);
   if (unit === "%") return value.toFixed(1) + "%";
   return Math.round(value).toLocaleString() + " " + unit;
 }
