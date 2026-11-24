@@ -54,9 +54,9 @@ No item may be marked Verified based only on a code stub, mock UI, or documentat
 
 
 | F-037 | Single-install no-login operator mode | P0 | No signup/login/organization UI; implicit install workspace; local loopback access; remote no-login mode is blocked unless HTTPS and administrator network restrictions are verified | In Progress |
-| F-038 | Automatic control-plane and node bootstrap | P0 | One control-plane command generates secrets/TLS, starts Compose, applies migrations/health checks and firewall policy; per-node PowerShell/POSIX command detects target OS/architecture, installs checksum-verified native artifact and system service without Docker/source checkout; publisher signing and runtime acceptance are still pending | In Progress |
-| F-039 | High-volume raw log ingestion and exploration | P0 | Linux journald/files and Windows Event Logs/files; ClickHouse durable batch ingestion, indexed time-bounded search, live tail, retention, redaction, back-pressure and crash/replay/load tests; currently not implemented | Planned |
-| F-040 | Professional monitoring-console shell | P0 | Responsive operator console, collapsible icon sidebar, consistent icon system, global node/time selectors, accessible controls, clear status/data states and removal of placeholder UI | In Progress |
+| F-038 | Automatic control-plane and node bootstrap | P0 | Local one-command Compose starter and implicit-install bootstrap endpoint are implemented; production deployment helper enforces Nginx ADMIN_CIDR before app upgrade, and node launchers install checksum-verified Linux/Windows artifacts; full production host provisioning, publisher signing and runtime acceptance remain | In Progress |
+| F-039 | High-volume raw log ingestion and exploration | P0 | Initial Linux journald → bounded agent spool → TLS gRPC → ClickHouse ingestion, structured search, event detail and 200-row keyset pagination are implemented; Windows Event Log, Linux/Windows file-tail, native push tail, backups, crash/replay and sustained-load tests remain | In Progress |
+| F-040 | Professional monitoring-console shell | P0 | Single-install no-login shell, collapsible Lucide sidebar, saved dashboards with basic metric panels and initial Log Explorer are implemented; global node/time selectors, panel edit/reorder, template variables, advanced visualizations, saved queries and full UI acceptance remain | In Progress |
 
 ## Phase-Level Verification
 

@@ -1,6 +1,6 @@
 # Monitor Me — Owner Acceptance Checklist
 
-This checklist verifies the current single-install, no-login local experience and native node bootstrap. It does not claim production readiness or raw-log ingestion.
+This checklist verifies the current single-install, no-login local experience and the implemented first Linux journald → ClickHouse / Log Explorer slice. It does not claim production readiness, Windows/file log coverage or sustained-volume capacity.
 
 ## 1. Prepare the local stack
 
@@ -14,7 +14,7 @@ This checklist verifies the current single-install, no-login local experience an
    On Linux, use `./scripts/start-local.sh`.
 
 3. The helper creates `.env` and a localhost-only development TLS certificate if absent, builds the Compose services and native agent artifacts, starts the services and probes the dashboard.
-4. Confirm PostgreSQL, Redis, API, agent-artifacts and web are healthy/completed as appropriate. Open `http://localhost:3000`.
+4. Confirm PostgreSQL, Redis, ClickHouse, API, agent-artifacts and web are healthy/completed as appropriate. Open `http://localhost:3000`.
 5. Confirm the dashboard opens without signup, login or organization creation. Local no-login access must remain bound to loopback; do not expose this profile to LAN/public networks.
 
 Do not delete existing database volumes or run `docker compose down -v` during ordinary upgrades or acceptance.
@@ -78,22 +78,35 @@ Remote operations are disabled unless the API's REMOTE_ALLOWED_SYSTEMD_UNITS env
 
 Only after creating a disposable test service on the test VM:
 1. Add that exact test unit to the allowlist and restart the local API.
-2. Sign in as the organization owner/admin and open Operations.
+2. Open Operations in the local single-install workspace (no browser login is required).
 3. Queue a restart and confirm the browser confirmation is shown.
 4. Verify the operation moves through queued/dispatched to its reported result and an audit entry identifies the actor/action/time.
-5. Try as a read-only role and confirm the action is unavailable/denied.
+5. Verify the backend's allowlist rejects any service unit not explicitly approved; do not treat the no-login UI as a reason to widen this allowlist.
 6. Verify an unavailable agent causes a clear failure/expiry and that arbitrary commands cannot be submitted.
 
 Never use system-critical units such as ssh, networking, database, container runtime or the Monitor Me API as the test target. The UI is not a substitute for backend authorization.
 
 ## 7. Failure and recovery
 
-- Restart the API and verify the web session reuses the secure HttpOnly cookie.
+- Restart the API and reload the browser; the implicit installation workspace should reinitialize without a login or browser session cookie.
 - Stop/restart Redis and PostgreSQL independently using the recovery procedures in the repository's Compose CI/runbook; verify readiness fails/recoveries behave as documented.
 - Restart the Linux agent and confirm its persisted session/WAL recover.
 - Confirm alert/operation history survives API restart.
 
-## 8. Local health checks and reset
+## 8. Initial Linux Log Explorer acceptance
+
+1. Enroll a Linux systemd machine with `journalctl`; verify its capabilities include `logs.journald`.
+2. Generate a synthetic journal message on that host and open **Logs** in the dashboard. Choose a time range containing the message.
+3. Verify timestamp, source/systemd unit, severity, message body and event JSON details.
+4. Apply a source, severity and text filter and confirm the results update.
+5. When more than 200 events match, use **Load older events**. Confirm the returned page contains older events, does not duplicate IDs, and never expands one page beyond 200 visible events.
+6. Turn on the polling live-tail mode, generate another synthetic event, verify it appears after a poll, then pause/resume the polling.
+7. Stop ClickHouse on a disposable environment while journald continues to produce events; verify the agent queue grows only to its configured quota and resumes delivery after ClickHouse returns.
+8. Record the actual event count, time range and query latency. This is functional acceptance, not evidence of 10,000 events/second or a 100-million-event search benchmark.
+
+The current log reader supports Linux journald only. Windows Event Log, file-tail/rotation, full-text indexes, native push streaming, context-around-event, saved queries, ClickHouse backup/restore and sustained-load acceptance remain outstanding.
+
+## 9. Local health checks and reset
 
 From the repository root, verify the local services:
 
@@ -103,7 +116,7 @@ From the repository root, verify the local services:
 
 For troubleshooting:
 
-    docker compose logs --tail=150 postgres redis migrate api web
+    docker compose logs --tail=150 postgres redis clickhouse migrate api web
 
 Stop the stack and keep test data:
 
@@ -120,6 +133,6 @@ Remote Operations stays read-only/disabled for command execution by default beca
 
 No command in this local checklist applies the production firewall helper or touches your computer's host firewall.
 
-## 9. Record results
+## 10. Record results
 
 Record date, commit, host/OS, browser, agent version and result for each section. File a defect with the exact dashboard page, server ID (not its enrollment token), timestamp, expected behavior and observed behavior. Never include passwords, access tokens, private keys or enrollment tokens.

@@ -49,7 +49,7 @@ Discovery is capability-based. Windows does not claim Linux cgroup/Systemd/TCP m
 
 ## Observability data architecture
 
-The current implementation has a host-metrics pipeline with a persistent agent spool, TLS gRPC ingestion, PostgreSQL history and Redis live notifications. It does **not** yet implement raw host/application log ingestion, indexed full-text search, log streaming or trace ingestion. Those must be built as explicit product capabilities.
+The current implementation has a host-metrics pipeline with a persistent agent spool, TLS gRPC ingestion, PostgreSQL history and Redis live notifications. An initial Linux journald → bounded log spool → TLS gRPC → ClickHouse path and a keyset-paginated Log Explorer have been implemented. Windows Event Log, file-tail sources, indexed full-text search, native push log streaming and trace ingestion remain incomplete and require explicit acceptance.
 
 Recommended target data planes:
 
@@ -72,7 +72,7 @@ Do not send one insert per log event. Batch on agents and/or server-side ingesti
 - Do not create an unbounded column per arbitrary log attribute. Promote common searchable fields and keep the remaining fields in a bounded map/raw JSON payload. Limit label/attribute cardinality.
 - Add traces/OpenTelemetry ingestion only after logs and metrics pipelines have a durable shared identity/correlation model.
 
-ClickHouse is a proposed log store, not yet an installed or benchmarked component. Its production schema, indexes, retention, backup and resource budget must be validated with realistic log distributions before any throughput claim.
+ClickHouse is installed in the Compose profiles and an initial MergeTree schema is used by the Linux journald path. The current 30-day TTL and 90-day PostgreSQL idempotency ledger are implemented, but production backup/restore, index tuning, Windows/file source coverage and resource budgeting must be validated with realistic log distributions before any throughput claim.
 
 ## Professional monitoring-console UI
 
@@ -80,7 +80,7 @@ ClickHouse is a proposed log store, not yet an installed or benchmarked componen
 - Consistent icon system, compact typography, clear information hierarchy, precise units, timestamps and timezone.
 - Global node selector, time-range picker, refresh/live state, health indicators and search.
 - Purpose-built overview, node details, metrics, processes, network, services, alerts, operations, log explorer and settings pages. Remove placeholder menu items and irrelevant phase/status copy.
-- Log Explorer: time picker, severity filter, source/node filters, full-text query, structured attribute filters, live tail, pause/resume, JSON detail, context around an event, pagination/virtualized rendering and saved queries.
+- Log Explorer: time picker, severity filter, source/node filters, full-text query, structured attribute filters, polling live tail with pause/resume, JSON detail, context around an event, keyset pagination/virtualized rendering and saved queries. Initial severity/source/text filters, event JSON detail and bounded 200-row keyset pages are implemented; context search and saved queries remain.
 - Useful no-data/unsupported/permission-denied/stale/error states; never show fabricated zeroes or pretend unavailable capabilities are active.
 - Dense tables and virtualized lists for large data. Never render millions of log rows into the browser at once; query and page results server-side.
 - Keyboard navigation, visible focus, responsive layouts, no decorative controls that do not work.
