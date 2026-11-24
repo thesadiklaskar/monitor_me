@@ -21,7 +21,17 @@ Copy the repository to a stable host path, then run:
     cp deploy/production/.env.production.example .env.production
     chmod 600 .env.production
 
-Replace every placeholder with unique secrets. URL-encode reserved characters in DATABASE_URL. Set PUBLIC_HOSTNAME, AGENT_GRPC_PUBLIC_ADDRESS, and the public API origin consistently. The API runs as a non-root user: do not mount Certbot's root-only private key directly. Instead, create a dedicated host group with the configured unused numeric CERT_GROUP_ID (default 15001), add the ID to .env.production, and let the certificate hook copy the files with group-only read permissions:
+Replace every placeholder with unique secrets. Set ADMIN_CIDR to the real operator/VPN source range (never leave the documentation example), set PUBLIC_HOSTNAME and AGENT_GRPC_PUBLIC_ADDRESS consistently, and URL-encode reserved characters in DATABASE_URL.
+
+After issuing the HTTPS certificate and creating the API-readable certificate copy, install the final Nginx vhost **before** running the deployment script:
+
+    sudo install -d -m 0755 /etc/nginx/snippets
+    sudo cp deploy/production/nginx.conf.example /etc/nginx/conf.d/monitor-me.conf
+    # Replace monitor.example.com and verify certificate paths in the file.
+    sudo nginx -t
+    sudo systemctl reload nginx
+
+The Nginx vhost includes `/etc/nginx/snippets/monitor-me-admin-allowlist.conf`. The deploy script creates this file automatically: with no-login enabled it restricts the dashboard/API/WebSocket to `ADMIN_CIDR`; with authentication enabled it leaves access control to the application. The dedicated installer, CA and artifact paths remain public for node enrollment. The API runs as a non-root user: do not mount Certbot's root-only private key directly. Instead, create a dedicated host group with the configured unused numeric CERT_GROUP_ID (default 15001), add the ID to .env.production, and let the certificate hook copy the files with group-only read permissions:
 
     sudo groupadd --system --gid 15001 monitor-me-cert
     sudo install -d -o root -g monitor-me-cert -m 0750 /var/lib/monitor-me/certs
@@ -32,11 +42,11 @@ Check that GID 15001 is unused before creating it; if it is already allocated, s
 
 ## Deploy
 
-    ./deploy/production/deploy.sh
+    sudo ./deploy/production/deploy.sh
 
-The script validates Compose interpolation, builds version-tagged images plus Linux/Windows native agent artifacts, starts PostgreSQL/Redis, waits for readiness, applies SQL migrations, starts API/web, and probes API readiness plus the web config endpoint. When `MONITOR_ME_AUTH_DISABLED=true`, it requires root and an explicit `ADMIN_CIDR`, writes the Nginx administrator allowlist, validates/reloads Nginx, verifies that installer/CA/artifact paths remain public while dashboard and live WebSocket paths include the allowlist, and only then applies host firewall rules. It still does not provision DNS, obtain certificates, install Nginx/Docker, or update cloud security groups.
+The script validates Compose interpolation, builds version-tagged images plus Linux/Windows native agent artifacts, starts PostgreSQL/Redis, waits for readiness, applies SQL migrations, starts API/web and probes API readiness plus the web config endpoint. When `MONITOR_ME_AUTH_DISABLED=true`, it requires root and an explicit `ADMIN_CIDR`, writes the Nginx administrator allowlist, validates/reloads Nginx, verifies that installer/CA/artifact paths remain public while dashboard and live-WebSocket paths include the allowlist, and only then applies host firewall rules. With auth disabled set to false, it creates the required but empty Nginx include and lets application authentication protect the dashboard. It still does not provision DNS, obtain certificates, install Nginx/Docker, or update cloud security groups.
 
-After the initial certificate is issued and the API-readable key copy is created, replace the temporary bootstrap vhost with nginx.conf.example as /etc/nginx/conf.d/monitor-me.conf, then run nginx -t and reload Nginx. Certbot's deploy hook refreshes the API-readable group-restricted copy on subsequent renewals. Verify HTTPS, /v1/live/ws WebSocket upgrade and gRPC TLS from an independent network. Enrolled agents must trust the certificate CA used by the public gRPC endpoint.
+Certbot's deploy hook refreshes the API-readable group-restricted certificate copy on subsequent renewals. Verify HTTPS, the public installer/CA/artifact routes, dashboard access from an allowed and a denied source, /v1/live/ws WebSocket upgrade, and gRPC TLS from an independent network. Enrolled agents must trust the certificate chain used by the public gRPC endpoint.
 
 ## Firewall helper
 
