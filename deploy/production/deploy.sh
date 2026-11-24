@@ -21,11 +21,49 @@ if [[ "$auth_disabled" == "true" ]]; then
     exit 2
   fi
   if [[ "$EUID" -ne 0 ]]; then
-    echo "Production no-login firewall verification requires root. Re-run the deploy script with sudo." >&2
+    echo "Production no-login mode requires root to install the Nginx access allowlist and host firewall rules." >&2
     exit 2
   fi
-  echo "Applying and verifying admin-only HTTPS access before enabling no-login dashboard APIs..."
-  "$ROOT/deploy/production/firewall.sh" --role control-plane --admin-cidr "$admin_cidr" --apply --verify-no-public-https
+  python3 -c 'import ipaddress,sys; n=ipaddress.ip_network(sys.argv[1], strict=False); sys.exit(1 if n.prefixlen == 0 else 0)' "$admin_cidr" || {
+    echo "ADMIN_CIDR must be a specific IPv4/IPv6 source range, not a default route." >&2
+    exit 2
+  }
+
+  # Generate the Nginx L7 access boundary. The dashboard and live WebSocket
+  # are admin-only, while the separate installer/CA/artifact routes stay public
+  # so remote hosts can bootstrap without joining the operator VPN.
+  access_file="/etc/nginx/snippets/monitor-me-admin-allowlist.conf"
+  access_directory="$(dirname "$access_file")"
+  access_tmp="$(mktemp)"
+  access_backup=""
+  mkdir -p "$access_directory"
+  printf 'allow %s;\ndeny all;\n' "$admin_cidr" > "$access_tmp"
+  chmod 0644 "$access_tmp"
+  if [[ -f "$access_file" ]]; then
+    access_backup="$(mktemp)"
+    cp -p "$access_file" "$access_backup"
+  fi
+  install -m 0644 "$access_tmp" "$access_file"
+  rm -f "$access_tmp"
+
+  if ! nginx -t; then
+    echo "Nginx validation failed; restoring the previous administrator access file." >&2
+    if [[ -n "$access_backup" ]]; then
+      install -m 0644 "$access_backup" "$access_file"
+    else
+      rm -f "$access_file"
+    fi
+    rm -f "$access_backup"
+    exit 2
+  fi
+  rm -f "$access_backup"
+  systemctl reload nginx
+
+  firewall_args=(--role control-plane --admin-cidr "$admin_cidr" --verify-admin-ui-allowlist)
+  # Verify the reverse-proxy boundary before opening public HTTPS for the
+  # installer/artifact paths.
+  "$ROOT/deploy/production/firewall.sh" "${firewall_args[@]}"
+  "$ROOT/deploy/production/firewall.sh" "${firewall_args[@]}" --apply
 fi
 
 compose build api web agent-artifacts
