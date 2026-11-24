@@ -54,7 +54,7 @@ export function sameOriginMutation(request: NextRequest): boolean {
 export async function callBackend(
   path: string,
   options: {
-    method?: "GET" | "POST" | "DELETE";
+    method?: "GET" | "POST" | "PATCH" | "DELETE";
     body?: unknown;
   } = {},
 ): Promise<BackendResult> {
