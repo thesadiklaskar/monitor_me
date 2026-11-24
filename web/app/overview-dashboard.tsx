@@ -255,7 +255,7 @@ export default function OverviewDashboard({ servers }: { servers: Server[] }) {
         .catch((loadError: unknown): Loaded<LogEvent[]> => ({ error: loadError instanceof Error ? loadError.message : "Host logs could not be loaded.", value: [] })),
       Promise.all(metricPanels.map(async (definition) => {
         try {
-          return [definition.key, await fetchMetric(selectedServer.id, definition, from, to)] as const;
+          return [definition.key, await fetchMetric(selectedServerId, definition, from, to)] as const;
         } catch (loadError) {
           return [definition.key, { points: [], error: loadError instanceof Error ? loadError.message : "Metric history could not be loaded." }] as const;
         }
