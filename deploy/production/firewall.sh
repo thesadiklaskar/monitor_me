@@ -140,7 +140,7 @@ add_firewalld_port() {
 }
 if [[ "$MANAGER" == "ufw" ]]; then
   for cidr in "${ADMIN_CIDRS[@]}"; do add_ufw_source "$cidr" "$SSH_PORT"; done
-  add_ufw_port 443
+  for cidr in "${ADMIN_CIDRS[@]}"; do add_ufw_source "$cidr" 443; done
   if ((${#GRPC_CIDRS[@]} > 0)); then
     for cidr in "${GRPC_CIDRS[@]}"; do add_ufw_source "$cidr" "$GRPC_PORT"; done
   else
@@ -149,7 +149,7 @@ if [[ "$MANAGER" == "ufw" ]]; then
   if [[ "$ALLOW_HTTP" == true ]]; then add_ufw_port 80; fi
 else
   for cidr in "${ADMIN_CIDRS[@]}"; do add_firewalld_source "$cidr" "$SSH_PORT"; done
-  add_firewalld_port 443
+  for cidr in "${ADMIN_CIDRS[@]}"; do add_firewalld_source "$cidr" 443; done
   if ((${#GRPC_CIDRS[@]} > 0)); then
     for cidr in "${GRPC_CIDRS[@]}"; do add_firewalld_source "$cidr" "$GRPC_PORT"; done
   else
