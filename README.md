@@ -96,7 +96,7 @@ logger -p user.warning -t monitor-me-demo "Monitor Me demo: cache latency above 
 Generate bounded real CPU, memory and disk activity for two minutes:
 
 ```bash
-./scripts/demo-load.sh --duration 120
+bash ./scripts/demo-load.sh --duration 120
 ```
 
 The script asks for confirmation, runs `stress-ng` with bounded defaults and exits after the requested duration. Open **Servers** and inspect the machine, then open its metric charts. In **Logs**, search for `monitor-me-demo`. In **Dashboards**, create a dashboard and add CPU, memory, disk and network panels. In **Alerts**, create a temporary CPU threshold rule if you want to demonstrate a firing/recovery cycle; remove the rule after the demo.
