@@ -129,15 +129,6 @@ function formatValue(value: number, unit: string): string {
   return `${value.toFixed(2)} ${unit}`;
 }
 
-function formatUptime(value: number): string {
-  if (!Number.isFinite(value) || value < 0) return "Unavailable";
-  const seconds = Math.floor(value);
-  const days = Math.floor(seconds / 86_400);
-  const hours = Math.floor((seconds % 86_400) / 3_600);
-  const minutes = Math.floor((seconds % 3_600) / 60);
-  return days > 0 ? `${days}d ${hours}h` : hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
-}
-
 function ServerMetricChart({
   points,
   range,
@@ -468,8 +459,6 @@ export function ServerDetail({
   const cpuLatest = latestMetric("host.cpu.utilization");
   const memoryUsed = latestMetric("host.memory.used");
   const memoryTotal = latestMetric("host.memory.total");
-  const memoryAvailable = latestMetric("host.memory.available");
-  const uptimeLatest = latestMetric("host.uptime.seconds");
   const diskVolumes = latestSamples.filter((sample) => sample.metric_name === "host.disk.used.percent");
   const networkReceive = latestSamples.filter((sample) => sample.metric_name === "host.network.receive.bytes_per_second");
   const networkTransmit = latestSamples.filter((sample) => sample.metric_name === "host.network.transmit.bytes_per_second");
