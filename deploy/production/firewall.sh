@@ -8,13 +8,14 @@ GRPC_PORT=8443
 ALLOW_HTTP=false
 APPLY=false
 ROLLBACK=false
+VERIFY_ADMIN_UI_ALLOWLIST=false
 STATE_DIR="${MONITOR_ME_FIREWALL_STATE_DIR:-/var/lib/monitor-me/firewall}"
 ADMIN_CIDRS=()
 GRPC_CIDRS=()
 usage() {
   cat <<'USAGE'
 Usage:
-  firewall.sh --role control-plane --admin-cidr CIDR [--admin-cidr CIDR] [--grpc-cidr CIDR] [--manager auto|ufw|firewalld] [--zone ZONE] [--ssh-port PORT] [--grpc-port PORT] [--http-01] [--apply]
+  firewall.sh --role control-plane --admin-cidr CIDR [--admin-cidr CIDR] [--grpc-cidr CIDR] [--manager auto|ufw|firewalld] [--zone ZONE] [--ssh-port PORT] [--grpc-port PORT] [--http-01] [--apply] [--verify-admin-ui-allowlist]
   firewall.sh --role agent-only
   firewall.sh --rollback
 Dry-run is the default. This helper adds allow rules only; it never changes default policies or removes existing rules.
@@ -33,6 +34,7 @@ while (($#)); do
     --http-01) ALLOW_HTTP=true; shift ;;
     --apply) APPLY=true; shift ;;
     --rollback) ROLLBACK=true; shift ;;
+    --verify-admin-ui-allowlist|--verify-no-public-https) VERIFY_ADMIN_UI_ALLOWLIST=true; shift ;;
     -h|--help) usage; exit 0 ;;
     *) echo "Unknown argument: $1" >&2; usage; exit 2 ;;
   esac
@@ -76,7 +78,10 @@ if [[ "$ROLE" == "agent-only" ]]; then
 fi
 (${#ADMIN_CIDRS[@]} > 0) || { echo "Control-plane mode requires --admin-cidr; SSH must never be opened to the world." >&2; exit 2; }
 for cidr in "${ADMIN_CIDRS[@]}" "${GRPC_CIDRS[@]}"; do
-  python3 -c 'import ipaddress,sys; ipaddress.ip_network(sys.argv[1], strict=False)' "$cidr" || { echo "Invalid administrator CIDR: $cidr" >&2; exit 2; }
+  python3 -c 'import ipaddress,sys; network=ipaddress.ip_network(sys.argv[1], strict=False); sys.exit(1 if network.prefixlen == 0 else 0)' "$cidr" || {
+    echo "Invalid or unrestricted CIDR (default routes are not allowed): $cidr" >&2
+    exit 2
+  }
 done
 if [[ "$MANAGER" == "auto" ]]; then
   ufw_active=false; firewalld_active=false
@@ -158,6 +163,36 @@ else
   if [[ "$ALLOW_HTTP" == true ]]; then add_firewalld_port 80; fi
   if [[ "$APPLY" == true ]]; then firewall-cmd --reload; fi
 fi
+if [[ "$VERIFY_ADMIN_UI_ALLOWLIST" == true ]]; then
+  command -v nginx >/dev/null 2>&1 || { echo "Nginx is required to verify the no-login operator access boundary." >&2; exit 3; }
+  access_file="${MONITOR_ME_NGINX_ACCESS_FILE:-/etc/nginx/snippets/monitor-me-admin-allowlist.conf}"
+  [[ -s "$access_file" ]] || { echo "Missing Nginx administrator allowlist: $access_file" >&2; exit 3; }
+  grep -Eq '^allow [^;]+;$' "$access_file" || { echo "The Nginx access file contains no administrator allow rule." >&2; exit 3; }
+  grep -Fxq 'deny all;' "$access_file" || { echo "The Nginx access file must end with deny all;." >&2; exit 3; }
+  while IFS= read -r line; do
+    cidr="${line#allow }"
+    cidr="${cidr%;}"
+    python3 -c 'import ipaddress,sys; network=ipaddress.ip_network(sys.argv[1], strict=False); sys.exit(1 if network.prefixlen == 0 else 0)' "$cidr" || {
+      echo "The Nginx administrator allowlist contains an invalid or unrestricted CIDR: $cidr" >&2
+      exit 3
+    }
+  done < <(grep -E '^allow ' "$access_file")
+  nginx_config="$(nginx -T 2>&1)" || { echo "nginx -T failed; cannot verify operator access." >&2; printf '%s\n' "$nginx_config" >&2; exit 3; }
+  include_count="$(printf '%s\n' "$nginx_config" | grep -F -c "include $access_file;" || true)"
+  [[ "$include_count" -ge 2 ]] || { echo "Nginx must include the administrator allowlist in both the dashboard and live-WebSocket locations." >&2; exit 3; }
+  for location in \
+    "location = /install/agent-linux.sh" \
+    "location = /install/agent-windows.ps1" \
+    "location ^~ /api/agent-artifacts/" \
+    "location = /api/agent-ca"; do
+    printf '%s\n' "$nginx_config" | grep -Fq "$location" || {
+      echo "Nginx is missing the public node-bootstrap route: $location" >&2
+      exit 3
+    }
+  done
+  echo "Verified: no-login dashboard and live WebSocket use the Nginx administrator allowlist; only node bootstrap, CA and artifact routes are public on HTTPS."
+fi
+
 if [[ "$APPLY" == true ]]; then
   echo "Rules added. Verify SSH from a second session and test IPv4/IPv6 externally."
   echo "Existing broad rules/default policies were not changed. Inspect them before claiming least-privilege."

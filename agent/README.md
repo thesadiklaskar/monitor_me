@@ -1,10 +1,10 @@
 # Native Monitoring Agent
 
-The native Go agent runs directly on a monitored host. Linux collection is verified; an initial Windows host collector is now available for local acceptance. Docker is not required on the monitored machine.
+The native Go agent runs directly on each monitored host. Linux host collection has prior verification; the initial Windows collector and Windows Service Control Manager entry point are implemented but still require runtime acceptance. Target bootstrap installers download the matching artifact; Docker is not required on the monitored machine.
 
 ## Current implementation
 
-- Foreground process with JSON structured logs, environment validation, and signal-aware shutdown.
+- Foreground mode for development and native systemd/Windows Service lifecycle support for managed installation, with JSON structured logs, environment validation, and graceful stop handling.
 - Configurable 100ms–1m collection interval (500ms default).
 - Linux procfs aggregate/per-core CPU, memory, swap, disk throughput/IOPS, network throughput/packets/errors, uptime, process count, and up to 128 readable processes by RSS.
 - Initial Windows collector using native operating-system counters through gopsutil: aggregate/per-core CPU, memory and swap, mounted-volume capacity and usage, disk throughput/IOPS, network throughput/packets/errors, uptime, host identity/version, process count, and up to 128 readable processes by RSS.
@@ -14,9 +14,9 @@ The native Go agent runs directly on a monitored host. Linux collection is verif
 - Bounded append-only JSONL spool, fsync on append, private 0700 directory/0600 WAL file, quota enforcement, recovery of a truncated final record, and atomic acknowledgement compaction.
 - Optional TLS gRPC enrollment, persisted session credentials, heartbeat, reconnect/backoff, and local batch delivery. A batch is removed from the WAL only after the backend reports a durable commit.
 - Agent-health telemetry includes process CPU utilization, collector errors per interval, persistent WAL byte size and unacknowledged batch depth. Last successful send is omitted until a matching durable ACK has been received.
-- A hardened Linux systemd unit is provided at `agent/deploy/systemd/monitor-me-agent.service`; the monitored machine needs systemd but does not need Docker.
+- A hardened Linux systemd unit is provided at `agent/deploy/systemd/monitor-me-agent.service`; the downloadable Linux installer creates the service. The Windows build includes a Service Control Manager entry point and a restart-enabled PowerShell installer. Monitored machines do not need Docker.
 
-macOS and other unsupported operating systems currently report only agent health/spool capabilities. Windows does not currently expose Linux TCP-state/listening-port inventory, cgroup/Systemd workload attribution, or per-process CPU through this collector. Windows service installation and signed installers are not included in this first local-test slice.
+macOS and other unsupported operating systems currently report only agent health/spool capabilities. Windows does not currently expose Linux TCP-state/listening-port inventory, cgroup/Systemd workload attribution, or per-process CPU through this collector. Windows Service lifecycle code and target-side Windows Service installer are now present. They still require runtime acceptance on supported Windows releases and publisher code-signing; Windows TCP/listening-port inventory and workload attribution are unsupported.
 
 ## Build and test
 
@@ -54,6 +54,7 @@ go test -run '^$' -bench 'Benchmark(ProcCollectorCollect|CounterRate|SpoolAppend
 | `MONITOR_SPOOL_DIR` | `./.monitor-me/spool` | Local durable queue directory |
 | `MONITOR_SPOOL_MAX_BYTES` | `67108864` | Maximum local spool size (64MiB) |
 | `MONITOR_LOG_LEVEL` | `info` | `debug`, `info`, `warn`, or `error` |
+| `MONITOR_LOG_FILE` | stdout | Optional bounded rotating JSON log output for managed services |
 | `MONITOR_GRPC_ADDRESS` | unset | TLS gRPC endpoint, e.g. `localhost:8443` |
 | `MONITOR_TLS_CA_FILE` | unset | Explicit CA certificate used to verify the backend |
 | `MONITOR_ENROLLMENT_TOKEN` | unset | One-use token for first enrollment or session renewal |
@@ -117,22 +118,17 @@ Edit `/etc/monitor-me/agent.env` with the organization's gRPC address and truste
 Follow logs with `journalctl -u monitor-me-agent -f`. Use `systemctl restart monitor-me-agent` to restart and `systemctl disable --now monitor-me-agent` to disable and stop the service.
 
 
-## Windows local acceptance
+## Windows service installation
 
-1. Start the control plane with the local startup helper documented in the repository README, or use an existing local Compose stack.
-2. Choose **Add Server**, select Windows, create the host record and copy its one-time enrollment token.
-3. From the repository root on the monitored Windows host, run:
-
-   ```powershell
-   .\\scripts\\setup-windows-agent.ps1
-   ```
-
-4. The helper builds the Windows x64 agent with Docker if the binary is absent, then starts it. Paste the one-time token when the hidden prompt appears. For a remote host, pass the reachable gRPC address and trusted CA explicitly:
+1. Open the dashboard, choose **Add Machine**, and create a one-time enrollment token.
+2. On the monitored Windows x64 host, open PowerShell as Administrator and run the copied command:
 
    ```powershell
-   .\\scripts\\setup-windows-agent.ps1 -GrpcAddress monitor.example.com:8443 -CaFile C:\\certs\\monitor-me-ca.crt
+   & ([scriptblock]::Create((Invoke-RestMethod -Uri 'https://monitor.example/install/agent-windows.ps1'))) -ServerUrl 'https://monitor.example' -GrpcAddress 'monitor.example:8443'
    ```
 
-5. The agent stores its session/WAL under `%LOCALAPPDATA%\\MonitorMe`. Open the server in the dashboard and inspect CPU, memory, disk capacity/I/O, network throughput, uptime, process inventory and System information.
+3. Paste the token at the hidden prompt. The installer downloads the Windows binary and public control-plane CA, verifies SHA-256, installs a restart-enabled Windows Service, stores the private session under ProgramData and removes the one-time token after enrollment.
+4. Confirm the service with `Get-Service MonitorMeAgent`. Diagnostic output is stored in the bounded rotating log `%ProgramData%\MonitorMe\agent.log`.
 
-Keep the PowerShell window open during local acceptance. Press Ctrl+C to stop the foreground agent. On later runs, the persisted session is reused and no new enrollment token is needed. The initial Windows helper does not yet install a Windows service or configure automatic startup.
+No Docker, Go toolchain or repository checkout is required on the monitored Windows host. Use `-ForceEnrollment` only after creating a replacement token and when you deliberately want to discard the current session. Windows x64 support is the current release target; code-signing/publisher verification and runtime acceptance remain release gates.
+

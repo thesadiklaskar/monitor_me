@@ -27,6 +27,7 @@ RUN addgroup -S -g 10001 web && \
 
 COPY --from=build --chown=web:web /app/.next/standalone ./
 COPY --from=build --chown=web:web /app/.next/static ./.next/static
+COPY --from=build --chown=web:web /app/public ./public
 
 USER 10001:10001
 

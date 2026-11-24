@@ -4,7 +4,7 @@
 
 The product is being built around its own native host agent, telemetry ingestion pipeline, metric model, project attribution, alert engine, and operator dashboard. It is intended for infrastructure engineers, platform teams, and organizations that need clear visibility into servers, workloads, and applications.
 
-> **Project setup:** **Completed** — repository structure, local development stack, database migrations, and the Phase 1–3 CI baseline are established and verified. **Product status:** Phases 1, 2 and 3 are complete. The final Phase 1–3 audit on `main` passed all four CI jobs in [GitHub Actions run #45045054465](https://github.com/WorkRCS/monitor_me/actions/runs/45045054465). The verified Linux-first implementation includes native host collection, a durable bounded agent WAL, TLS gRPC delivery, idempotent PostgreSQL history, bounded historical queries, retention, organization-scoped WebSocket delivery, and explicit cgroup/Systemd/container workload attribution. An initial Windows host collector and local build/run helpers have since been added; Windows runtime acceptance, service installation and signed installers remain in progress. Phase 4 — Dashboard and Operational Features started on 2026-11-23. The first implementation slice adds first-owner/login/logout, an organization-scoped server inventory, Add Server, one-time enrollment-token handling, and secure server-side session cookies. These changes pass all four jobs in [Phase 4 CI run #45188259431](https://github.com/WorkRCS/monitor_me/actions/runs/45188259431); the full monitoring dashboard remains in progress. Phase 5 production work, including firewall setup, is still planned. The setup baseline is complete; the operator-facing MVP is not yet released.
+> **Project setup:** **Completed** — repository structure, local development stack, database migrations, and the Phase 1–3 CI baseline are established and verified. **Product status:** Phases 1, 2 and 3 are complete. The final Phase 1–3 audit on `main` passed all four CI jobs in [GitHub Actions run #45045054465](https://github.com/WorkRCS/monitor_me/actions/runs/45045054465). The verified Linux-first foundation includes native host collection, a durable bounded agent WAL, TLS gRPC delivery, idempotent PostgreSQL history, bounded historical queries, retention, live delivery, and Linux cgroup/Systemd workload attribution. The current single-install product direction is no-login by default: the local Compose profile is loopback-only, and the provided production environment sample enables no-login behind a generated Nginx administrator allowlist. Add Machine no longer asks for a target OS. Compose builds Linux amd64/arm64 and Windows x64 agent binaries; source-independent launchers verify SHA-256 and install Linux systemd / Windows Service lifecycle code. Windows runtime acceptance and publisher-code signing remain pending. The operator shell includes Lucide React icons and a collapsible sidebar. Raw log ingestion/search and the complete one-command production control-plane bootstrap are not yet implemented. The earlier authentication/server-inventory slice passed its original CI run #45188259431; recent changes do not yet have a fresh green CI run because GitHub Actions quota is exhausted. The operator-facing MVP is not yet released.
 
 ---
 
@@ -29,17 +29,16 @@ The product is being built around its own native host agent, telemetry ingestion
 
 Monitor Me aims to provide a guided, low-friction monitoring experience without requiring operators to assemble a monitoring stack manually.
 
-The target workflow is:
+The target workflow is a single-install, no-login monitoring console:
 
-1. An operator signs in and selects **Add Server**.
-2. The dashboard creates a scoped, short-lived enrollment credential and an installation instruction for the target operating system.
-3. The native Go agent is installed on a Bare Metal server, VPS, VM, or supported cloud host.
-4. The agent securely enrolls and starts reporting supported host metrics.
-5. The operator sees the server's overall health and resource usage.
-6. The operator can switch between **All Projects** and individual project views, where workload attribution is supported.
-7. The operator can investigate historical data, receive alerts, and perform explicitly authorized actions.
+1. An operator runs one control-plane installation command. Docker Compose, storage, TLS, migrations, health checks and safe network defaults are configured automatically.
+2. The dashboard opens directly. No signup, login or organization creation is required in the default single-install experience.
+3. The operator selects **Add machine** and receives a short-lived, single-use enrollment token.
+4. A platform-native launcher is run on the target host. It detects the target's OS, architecture, service manager and available virtualization/cloud metadata locally, then installs and starts the matching native agent.
+5. The agent enrolls and reports supported metrics and host identity. Each server remains a separately enrolled machine.
+6. The operator investigates fleet health, metrics, alerts and—once delivered—the searchable raw log pipeline.
 
-The long-term objective is an enterprise-oriented product with a straightforward user experience and a measured path from a small deployment to large monitored fleets.
+The complete product contract, architecture boundaries and acceptance targets are documented in [PRODUCT_VISION_PLUG_AND_PLAY.md](docs/PRODUCT_VISION_PLUG_AND_PLAY.md). The no-login production network boundary and ClickHouse log-store proposal are recorded in [ADR 0004](docs/adr/0004-single-install-no-login-network-boundary.md) and [ADR 0005](docs/adr/0005-clickhouse-high-volume-logs.md).
 
 ## Current Project Status
 
@@ -51,15 +50,15 @@ The long-term objective is an enterprise-oriented product with a straightforward
 | High-level architecture | **Completed** | Component boundaries, data flow, storage responsibilities, and security boundaries documented |
 | Feature acceptance matrix | **Completed** | Planned features mapped to implementation tests and CI evidence |
 | Backend implementation | **Phases 2–3 verified** | Authentication, organization-scoped APIs, TLS gRPC enrollment, durable telemetry ingestion, history, retention, and live transport pass CI |
-| Frontend implementation | **Phase 4 in progress — first slice CI verified** | Owner/login, HttpOnly-cookie session handling, organization-scoped server inventory, Add Server and one-time token controls pass frontend build and Compose integration in CI run #45188259431 |
+| Frontend implementation | **Phase 4 in progress** | Monitoring detail refresh, no-login local shell, OS-agnostic Add Machine enrollment, two shell launcher options and collapsible icon-led sidebar are implemented; full console redesign, operator acceptance and production network access gate remain |
 | Local platform stack | **Runtime verified** | PostgreSQL, Redis, migration runner, API, and web services start through Docker Compose |
 | Database and cache integration | **Runtime verified** | PostgreSQL remains durable; Redis and PostgreSQL dependency outage/readiness recovery are tested |
 | Agent protocol and ingestion | **Phase 3 verified** | TLS enrollment, persisted session, heartbeat, reconnect/backoff, streaming batches, post-commit ACK, and idempotent PostgreSQL persistence pass end-to-end CI |
-| Native host agent | **Linux verified; Windows initial implementation in progress** | Linux host/process/TCP/cgroup collection is verified. An initial Windows collector reports CPU, memory/swap, mounted-volume capacity/I/O, network throughput, uptime, host identity and readable process RSS; Windows build/run helpers are present, with runtime acceptance and service lifecycle still pending |
+| Native host agent | **Linux verified; Windows implementation pending runtime acceptance** | Compose builds Linux amd64/arm64 and Windows x64 bundles; source-independent installers verify SHA-256 and install Linux systemd / Windows Service lifecycle code. Host metadata reports OS/architecture and available VM hints. Runtime acceptance, publisher signing, macOS and broader Windows metric parity remain pending |
 | Telemetry history and live transport | **Phase 3 verified** | Bounded PostgreSQL range query, 30-day raw retention, 90-day idempotency retention, one-use session-bound WebSocket tickets, cross-tenant isolation, and bounded subscriber queues pass CI |
 | Project/workload attribution | **Phase 3 verified (Linux mapping path)** | cgroup/Systemd/container selectors, exact server/project mappings, and explicit host-total/unclassified/shared attribution pass database integration tests; full Docker Engine discovery remains later work |
-| Monitoring dashboard | **In Progress** | Phase 4 began 2026-11-23; authentication and server onboarding are CI-verified; server-detail metric views, project switching, charts and operations remain |
-| Production firewall setup | Planned | Phase 5 will add role-aware Linux host firewall profiles for the control plane and monitored agents |
+| Monitoring dashboard | **In Progress** | Operator shell polish, responsive collapse, vector icons, no-login local mode and host detail telemetry are implemented; professional fleet overview, log explorer, global selectors and complete UI acceptance remain |
+| Production firewall setup | **In Progress** | UFW/firewalld helper opens HTTPS for public node bootstrap while Nginx restricts dashboard/API/WebSocket paths to ADMIN_CIDR; deployment validates this allowlist before enabling remote no-login. Real-host IPv4/IPv6 and cloud security-group checks remain |
 | Production release | Not started | Planned for Phase 5 |
 
 **Status vocabulary:** Completed means implemented and verified for the documented environment. Specified means requirements are documented but implementation is not complete. Planned means work has not started. A design document or mock screen does not count as a working feature.
@@ -69,7 +68,7 @@ The long-term objective is an enterprise-oriented product with a straightforward
 The current Linux-first implementation provides a real telemetry path rather than a collector mock:
 
 - **Native Linux agent:** aggregate and per-core CPU, memory available/used/cache/swap, disk byte and operation rates, network byte/packet/error rates, host/agent uptime, process count, top-128 readable process RSS, TCP state counts, and listening-port metadata. It also emits process CPU utilization, collector errors per interval, durable WAL bytes and pending batch depth, and the last successful batch-ACK timestamp.
-- **Initial Windows collector:** aggregate/per-core CPU, memory/swap, mounted-volume capacity and usage, disk throughput/IOPS, network throughput/packet/error rates, uptime, OS/kernel metadata, process count and top-128 readable process RSS. Windows service installation, TCP/listening-port metrics, per-process CPU and workload attribution remain unsupported in this first slice.
+- **Initial Windows collector:** aggregate/per-core CPU, memory/swap, mounted-volume capacity and usage, disk throughput/IOPS, network throughput/packet/error rates, uptime, OS/kernel metadata, process count and top-128 readable process RSS. Windows Service installation code is present but runtime acceptance is pending; TCP/listening-port metrics, per-process CPU and workload attribution remain unsupported in this first slice.
 - **Correct rate semantics:** counter deltas use actual monotonic elapsed time. Initial samples have no fabricated rate; resets and invalid intervals produce missing values rather than negative rates.
 - **Workload metadata:** process RSS samples include cgroup path and workload selector. Systemd units and container cgroup IDs are identified when present. Unmapped and shared resource labels remain explicit.
 - **Agent durability:** append-only JSONL local WAL, fsync per batch, 0600 file/0700 directory, configurable disk quota, restart recovery for a truncated trailing record, and atomic compaction after accepted acknowledgements.
@@ -151,14 +150,29 @@ The monitoring product itself is custom-built. The project will not embed or dep
 
 ### Native agent setup (run on each monitored host)
 
-The Compose stack is the control plane (web, API, PostgreSQL and Redis). A native Monitor Me agent must run on each machine whose host metrics you want to collect; running Compose alone does not grant it reliable access to the Windows/Linux host.
+The Compose stack is the control plane. Every monitored machine runs its own native agent; the installer detects the target OS and architecture there—not in the browser and not from the control-plane container.
 
-- **Windows host:** Add Server in the dashboard, select Windows, then from a Monitor Me source checkout on that Windows host run `.\scripts\setup-windows-agent.ps1` (PowerShell). The helper builds the native Windows binary with Docker if absent, then starts the agent and securely prompts for the one-time token.
-- **Linux host:** Add Server, select Linux, copy the control-plane CA to the monitored host, then run `sudo ./scripts/setup-linux-agent.sh --grpc-address <host:8443> --ca-file <trusted-ca-file>` from a source checkout. It builds the native Linux binary, installs the systemd service, enrolls, and removes the one-time token from the service environment after session persistence.
+After choosing **Add Machine**, copy the command for the terminal available on the target host:
 
-Use a reachable gRPC endpoint and a CA trusted by the target machine. `localhost:8443` is only correct when the agent and control plane are on the same host. The initial Windows helper currently runs in the foreground; native Windows service installation, signed installers and unattended upgrades remain planned.
+**Windows · PowerShell (Run as Administrator)**
 
-Host OS and virtualization labels come from the native agent, not the browser. Virtualization detection is best-effort: hypervisor metadata is reported where available, and provider-specific VPS hints can be missing. A missing signal is shown as unknown rather than guessed. Containers, VMs and the host OS are distinct concepts; a Docker Compose control plane does not itself identify the external host's environment.
+```powershell
+& ([scriptblock]::Create((Invoke-RestMethod -Uri 'https://monitor.example/install/agent-windows.ps1'))) -ServerUrl 'https://monitor.example' -GrpcAddress 'monitor.example:8443'
+```
+
+The installer detects Windows x64, downloads the matching artifact, verifies its SHA-256, installs a restart-enabled Windows Service and securely prompts for the one-time token. The session is stored under ProgramData and the token is removed after enrollment.
+
+**Linux · Shell (systemd, run as root)**
+
+```sh
+curl -fsSL 'https://monitor.example/install/agent-linux.sh' | sudo bash -s -- --server-url 'https://monitor.example' --grpc-address 'monitor.example:8443'
+```
+
+The installer detects Linux amd64/arm64, downloads and checksum-verifies the native agent, installs/enables the systemd service, securely prompts for the one-time token and removes it after session persistence.
+
+These launchers do not need Docker, Go, Node.js or a repository checkout on the monitored host. They require the target to reach the control-plane HTTPS installer and the advertised TLS gRPC endpoint. `localhost:8443` only works when the agent and control plane share a host. The binaries are checksum-verified but are not yet publisher-code-signed; signing and OS publisher verification are release gates.
+
+Host OS, architecture and available VM/hypervisor metadata come from the native agent. Provider detection is best-effort; where a provider or virtualization signal is unavailable, Monitor Me must report unknown rather than guess.
 
 
 See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for prerequisites and current limitations.
@@ -272,20 +286,24 @@ The initial collection target is configurable in the 100ms–500ms range where h
 
 ## Security Principles
 
-- TLS-protected and authenticated agent communication.
-- Short-lived, scoped, revocable enrollment credentials.
-- Server-side authorization for APIs and live subscriptions.
-- Organization, server, and project isolation.
+The default local Compose profile is no-login and is published only on loopback. The production Compose profile defaults to authenticated mode when the variable is omitted. The provided `.env.production.example` opts into no-login and deploy fails closed unless ADMIN_CIDR is configured and Nginx applies the allowlist to dashboard/API/WebSocket paths. Public installer/CA/artifact routes remain reachable over HTTPS. See ADR 0004.
+
+- TLS-protected agent communication with short-lived, single-use, revocable enrollment credentials.
+- Default single-install operation removes the signup/login workflow; the workspace identity is created internally.
+- Local no-login access is loopback-bound. Production no-login relies on HTTPS plus an Nginx administrator CIDR/VPN allowlist for the dashboard/API/WebSocket; only dedicated node bootstrap, CA and artifact paths are public.
+- Keep operator dashboard access separate from agent gRPC enrollment. A node token never authenticates a browser session.
+- Keep PostgreSQL, Redis, ClickHouse (when implemented), API HTTP and internal web ports private.
+- Internal installation/server isolation remains mandatory even when the operator UI is single-tenant.
 - Least-privilege host collection and Docker access.
 - Explicit allowlists and audit records for remote actions.
 - No unrestricted remote shell feature.
-- Signed and verified installer artifacts before execution.
+- Installer artifacts are SHA-256 verified before installation. Publisher code-signing and signature enforcement are still release requirements; checksum integrity alone is not publisher identity.
 - Secrets are never committed to the repository or written to logs.
 - Production deployment uses a least-privilege host firewall: expose only intended HTTPS/gRPC entry points, restrict SSH to administrators, and keep database/cache ports private.
 
 ## Production Firewall Requirements
 
-The production firewall policy is defined for two roles: a control-plane VPS/VM and agent-only monitored Linux hosts. Agent-only hosts require no inbound Monitor Me ports; they send outbound TLS gRPC to the control plane. The control plane normally exposes TCP 443 and TCP 8443, optional TCP 80 for ACME HTTP-01, and SSH only from a trusted administrator CIDR. PostgreSQL 5432, Redis 6379, API 8080, and web 3000 must remain private. See [Production Firewall Requirements](docs/PRODUCTION_FIREWALL.md) for UFW/firewalld examples, Docker firewall caveats, and local/LAN deployment rules. Firewall automation is a Phase 5 deliverable, not a currently implemented installer feature.
+The production firewall policy is defined for two roles: a control-plane VPS/VM and agent-only monitored Linux hosts. Agent-only hosts require no inbound Monitor Me ports; they send outbound TLS gRPC to the control plane. The no-login control-plane profile exposes TCP 443 to Nginx for public installer/CA/artifact routes; Nginx restricts the dashboard/API/WebSocket to the administrator CIDR/VPN. TCP 8443 is the TLS agent endpoint (public or source-restricted), optional TCP 80 is for ACME HTTP-01, and SSH is limited to a trusted administrator CIDR. PostgreSQL 5432, Redis 6379, API 8080, and web 3000 must remain private. See [Production Firewall Requirements](docs/PRODUCTION_FIREWALL.md) for UFW/firewalld examples, Docker firewall caveats, and local/LAN deployment rules. An additive UFW/firewalld helper and a production no-login Nginx access gate are implemented; host/provider verification and fully automatic firewall provisioning remain Phase 5 acceptance work.
 
 ## Five-Phase Delivery Roadmap
 
@@ -295,19 +313,22 @@ The production firewall policy is defined for two roles: a control-plane VPS/VM 
 | 2 | Platform Foundation and Secure Connectivity | **Completed** | Go/Next.js foundation, PostgreSQL/Redis, migrations, owner authentication, organization authorization, TLS gRPC enrollment, heartbeat, reconnect, and revocation pass CI |
 | 3 | Monitoring Agent and Telemetry Data Engine | **Completed** | Linux host collection, durable spool, TLS gRPC ingestion, PostgreSQL history/retention, authorized live delivery, workload attribution, and CI benchmarks all verified |
 | 4 | Dashboard and Operational Features | **In Progress** | Server/project dashboards, custom charts, application visibility, alerts, notifications, one-click installation workflow, and secure remote actions |
-| 5 | Cross-Platform Production and Scale | In Progress | Linux production tooling is prepared; an initial Windows host collector and local build/run helpers are implemented. Windows runtime acceptance, Windows service/signing, macOS collection, fleet tests, and production host verification remain |
+| 5 | Cross-Platform Production and Scale | In Progress | Linux amd64/arm64 and Windows x64 checksummed agent bundles, target-side service installers, Nginx no-login access gate, and UFW/firewalld helper are implemented in code. Windows runtime acceptance, publisher signing, macOS, raw logs, fleet tests and real-host verification remain |
 
 A phase is marked Completed only after implementation, acceptance tests, relevant security/failure checks, documentation, and Git commit requirements pass.
 
 ## MVP Readiness
 
-Phases 1–3 are complete and their phase gates pass CI. This does **not** mean the first usable product MVP is released. The first authenticated dashboard slice now includes login/first-owner setup, server inventory, Add Server, and one-time enrollment credentials. Historical/live metric panels, project switching, charts, alerts, and remote operations remain Phase 4 work. The API, Linux agent, durable ingestion, history, and live transport are verified foundations for the next server-detail/history/live views.
+Phases 1–3 are complete and their phase gates pass CI. This does **not** mean the first usable product MVP is released. The current single-install direction removes login/signup and organization creation from the default operator workflow. Host metrics, server inventory, historical/live charts, projects, alerts and operations exist in varying implementation states; raw logs, publisher-signed installers and the complete one-command production control-plane bootstrap remain outstanding. The API, Linux agent, durable ingestion, history, and live transport are verified foundations for the next server-detail/history/live views.
 
 ## Documentation Map
 
 | Document | Purpose |
 | --- | --- |
-| [Product Requirements](docs/PRODUCT_REQUIREMENTS.md) | Product vision, MVP scope, functional requirements, and non-functional requirements |
+| [Product Requirements](docs/PRODUCT_REQUIREMENTS.md) | Product requirements and current functional acceptance baseline |
+| [Plug-and-Play Product Contract](docs/PRODUCT_VISION_PLUG_AND_PLAY.md) | Single-install no-login workflow, target-side discovery, firewall boundary, log scale and delivery sequence |
+| [ADR 0004](docs/adr/0004-single-install-no-login-network-boundary.md) | No-login single-install model and required network security boundary |
+| [ADR 0005](docs/adr/0005-clickhouse-high-volume-logs.md) | Proposed durable ClickHouse raw-log data plane |
 | [Metric Catalog](docs/METRIC_CATALOG.md) | Metric names, units, sources, calculations, and platform limitations |
 | [Feature Acceptance Matrix](docs/FEATURE_ACCEPTANCE_MATRIX.md) | Feature-by-feature verification criteria and evidence status |
 | [Architecture Overview](docs/ARCHITECTURE_OVERVIEW.md) | Components, data flow, storage, Docker boundaries, and security boundaries |
@@ -348,9 +369,11 @@ After the implementation is complete, the final Excalidraw system design will be
 
 The final diagram must describe the system that was actually built, not an aspirational architecture.
 
+**Raw logs are not implemented yet.** The current telemetry path stores host metrics in PostgreSQL and uses Redis for ephemeral live updates. ClickHouse is the proposed high-volume raw-log store; do not present log search, live tail or million-event reliability as shipped until ADR 0005 is implemented and load-tested.
+
 ---
 
-**Current resume point:** Phases 1–3 are complete on `main`; Phase 4 and Phase 5 have not started. The final audit passed all four CI jobs in [GitHub Actions run #45043161542](https://github.com/WorkRCS/monitor_me/actions/runs/45045054465). No Phase 4 or Phase 5 implementation was started during this audit. Read [docs/PROJECT_STATE.md](docs/PROJECT_STATE.md) for the exact next action.
+**Current resume point:** Phases 1–3 are complete. Phase 4 and Phase 5 are in progress. The original Phase 1–3 baseline passed in [GitHub Actions run #45045054465](https://github.com/WorkRCS/monitor_me/actions/runs/45045054465); newer CI execution is currently blocked by the repository's Actions free-minute quota. No fresh CI pass is claimed for the latest UI/bootstrap/firewall changes. Read [docs/PROJECT_STATE.md](docs/PROJECT_STATE.md) for the exact next action.
 
 ## Local no-login mode
 

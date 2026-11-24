@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { Activity, Bell, Copy, Folder, PanelLeftClose, PanelLeftOpen, Plus, RefreshCw, Server as ServerIcon } from "lucide-react";
 import { apiRequest } from "@/lib/client-api";
 import { ServerDetail } from "./server-detail";
 import ProjectWorkspace from "./project-workspace";
@@ -35,12 +36,9 @@ type Enrollment = {
   protocol: string;
 };
 
-type AgentPlatform = "windows" | "linux";
-
 type IssuedServer = {
   server: Server;
   enrollment: Enrollment;
-  target_platform?: AgentPlatform;
 };
 
 type AuthResponse = { user: User; expires_at: string };
@@ -109,10 +107,8 @@ function slugFromName(value: string): string {
   return value.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 64);
 }
 
-function detectBrowserPlatform(): AgentPlatform {
-  if (typeof navigator !== "undefined" && /Windows/i.test(navigator.userAgent)) return "windows";
-  return "linux";
-}
+
+
 
 function AuthScreen({
   onAuthenticated,
@@ -251,7 +247,7 @@ function EnrollmentDialog({
   canRevoke: boolean;
 }) {
   const [copied, setCopied] = useState(false);
-  const [commandCopied, setCommandCopied] = useState(false);
+  const [commandCopied, setCommandCopied] = useState<"windows" | "linux" | null>(null);
   const [revoking, setRevoking] = useState(false);
   const [error, setError] = useState("");
   const expires = formatDate(issued.enrollment.expires_at);
@@ -265,14 +261,17 @@ function EnrollmentDialog({
     }
   }
 
-  async function copySetupCommand() {
+  async function copySetupCommand(platform: "windows" | "linux") {
+    const baseUrl = window.location.origin;
     const endpoint = grpcAddress || "localhost:8443";
-    const command = issued.target_platform === "windows"
-      ? `.\\scripts\\setup-windows-agent.ps1 -GrpcAddress ${endpoint}`
-      : `sudo ./scripts/setup-linux-agent.sh --grpc-address ${endpoint}`;
+    const quotePowerShell = (value: string) => "'" + value.replace(/'/g, "''") + "'";
+    const quoteShell = (value: string) => "'" + value.replace(/'/g, "'\\''") + "'";
+    const command = platform === "windows"
+      ? "& ([scriptblock]::Create((Invoke-RestMethod -Uri " + quotePowerShell(baseUrl + "/install/agent-windows.ps1") + "))) -ServerUrl " + quotePowerShell(baseUrl) + " -GrpcAddress " + quotePowerShell(endpoint)
+      : "curl -fsSL " + quoteShell(baseUrl + "/install/agent-linux.sh") + " | sudo bash -s -- --server-url " + quoteShell(baseUrl) + " --grpc-address " + quoteShell(endpoint);
     try {
       await navigator.clipboard.writeText(command);
-      setCommandCopied(true);
+      setCommandCopied(platform);
     } catch {
       setError("Clipboard access was blocked. Select and copy the setup command manually.");
     }
@@ -311,54 +310,39 @@ function EnrollmentDialog({
           <textarea readOnly value={issued.enrollment.token} rows={3} onFocus={(event) => event.currentTarget.select()} />
         </label>
         <button className="button button-secondary button-wide" type="button" onClick={copyToken}>
-          {copied ? "Copied to clipboard" : "Copy one-time token"}
+          <Copy size={15} /> {copied ? "Copied to clipboard" : "Copy one-time token"}
         </button>
 
         <div className="install-instructions">
           <div className="install-heading-row">
             <div>
-              <h3>{issued.target_platform === "windows" ? "Windows agent setup" : "Linux agent setup"}</h3>
-              <p className="install-platform-note">The agent reports its actual OS, architecture and virtualization details after connecting.</p>
+              <h3>Install a native agent</h3>
+              <p className="install-platform-note">No OS setting is required. Run the command in the terminal native to the target machine; the agent identifies the host platform.</p>
             </div>
-            <span className="install-platform-badge">{issued.target_platform === "windows" ? "WINDOWS" : "LINUX"}</span>
+            <span className="install-platform-badge">AUTO DISCOVERY</span>
           </div>
-          {grpcAddress ? (
-            <p>Agent endpoint: <code>{grpcAddress}</code></p>
-          ) : (
-            <p className="text-warning">This local setup defaults to <code>localhost:8443</code>. For a remote VPS/VM, configure a publicly reachable TLS gRPC address and provide its trusted CA certificate on the target host.</p>
-          )}
-          {issued.target_platform === "windows" ? (
-            <>
-              <div className="install-command-wrap">
-                <div className="install-command-row">
-                  <code className="install-command">.\scripts\setup-windows-agent.ps1 -GrpcAddress {grpcAddress || "localhost:8443"}</code>
-                  <button className="button button-table" type="button" onClick={() => void copySetupCommand()}>{commandCopied ? "Copied" : "Copy command"}</button>
-                </div>
+          <p>Agent endpoint: <code>{grpcAddress || "localhost:8443"}</code></p>
+          <div className="install-platform-block">
+            <strong>Windows · PowerShell (Administrator)</strong>
+            <div className="install-command-wrap">
+              <div className="install-command-row">
+                <code className="install-command">PowerShell bootstrap · detects Windows x64, verifies SHA-256, installs and starts the Windows Service</code>
+                <button className="button button-table" type="button" onClick={() => void copySetupCommand("windows")}>{commandCopied === "windows" ? "Copied" : "Copy one command"}</button>
               </div>
-              <ol>
-                <li>Run this from the Monitor Me repository folder in an elevated or normal PowerShell window.</li>
-                <li>The helper builds the Windows agent with Docker when needed, then starts it.</li>
-                <li>Paste the one-time token when prompted; input is hidden and the token is not saved.</li>
-                <li>For a remote host, also pass <code>-CaFile C:\\path\\to\\control-plane-ca.crt</code>; the default certificate path is for the local Compose host.</li>
-              </ol>
-            </>
-          ) : (
-            <>
-              <div className="install-command-wrap">
-                <div className="install-command-row">
-                  <code className="install-command">sudo ./scripts/setup-linux-agent.sh --grpc-address {grpcAddress || "localhost:8443"}</code>
-                  <button className="button button-table" type="button" onClick={() => void copySetupCommand()}>{commandCopied ? "Copied" : "Copy command"}</button>
-                </div>
+            </div>
+            <p>Run in an elevated PowerShell session on the Windows target. It detects the host, downloads the matching native agent, verifies SHA-256, installs a restart-enabled Windows Service and securely prompts for the one-time token.</p>
+          </div>
+          <div className="install-platform-block">
+            <strong>Linux · Shell</strong>
+            <div className="install-command-wrap">
+              <div className="install-command-row">
+                <code className="install-command">Shell bootstrap · detects Linux architecture, verifies SHA-256, installs and starts systemd</code>
+                <button className="button button-table" type="button" onClick={() => void copySetupCommand("linux")}>{commandCopied === "linux" ? "Copied" : "Copy one command"}</button>
               </div>
-              <ol>
-                <li>Run this from a Linux checkout of the Monitor Me repository on a systemd host.</li>
-                <li>The helper builds the native Linux agent with Docker, installs the systemd service and starts it.</li>
-                <li>Paste the one-time token when prompted; the installer removes it from the service environment after enrollment.</li>
-                <li>For a remote host, append <code>--ca-file /path/to/control-plane-ca.crt</code> using a trusted copy of the control-plane certificate.</li>
-              </ol>
-            </>
-          )}
-          <p className="install-note">These helpers require the repository source and the control-plane CA certificate on the target host. A remote machine must be able to reach the advertised gRPC endpoint; <code>localhost</code> only works when the agent and control plane share that host.</p>
+            </div>
+            <p>Run in a root shell on a systemd Linux target. It detects the host architecture, downloads the matching native agent, verifies SHA-256, installs and enables the systemd service, then removes the one-time token after session persistence.</p>
+          </div>
+          <p className="install-note">Use the command for the shell available on the target machine; the installer itself detects that machine's OS and architecture. It downloads binaries and the public CA over the control-plane endpoint. Remote hosts must reach the advertised gRPC address; <code>localhost</code> only works when the agent and control plane share a host. The downloaded binaries are checksum-verified, but are not yet code-signed; OS publisher-signature verification remains a release gate.</p>
         </div>
 
         {error && <div className="notice notice-error" role="alert">{error}</div>}
@@ -384,13 +368,8 @@ function AddServerDialog({
 }) {
   const [name, setName] = useState("");
   const [hostname, setHostname] = useState("");
-  const [targetPlatform, setTargetPlatform] = useState<AgentPlatform>("linux");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-
-  useEffect(() => {
-    setTargetPlatform(detectBrowserPlatform());
-  }, []);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -401,7 +380,7 @@ function AddServerDialog({
         method: "POST",
         body: JSON.stringify({ name, hostname }),
       });
-      onCreated({ ...issued, target_platform: targetPlatform });
+      onCreated(issued);
     } catch (submitError) {
       setError(displayError(submitError));
     } finally {
@@ -414,40 +393,26 @@ function AddServerDialog({
       <section className="modal-card" role="dialog" aria-modal="true" aria-labelledby="add-server-title">
         <div className="modal-heading">
           <div>
-            <div className="eyebrow">New host registration</div>
-            <h2 id="add-server-title">Add a server</h2>
+            <div className="eyebrow">New node enrollment</div>
+            <h2 id="add-server-title">Add a machine</h2>
           </div>
           <button className="icon-button" type="button" onClick={onClose} aria-label="Close">×</button>
         </div>
-        <p className="modal-copy">Create a single-use credential. Choose the target host OS for the matching one-command installer; the agent will report the real OS and virtualization metadata once it connects.</p>
+        <p className="modal-copy">Create a one-time enrollment token. No operating system needs to be selected here; host discovery happens on the target machine.</p>
         <form onSubmit={submit} className="form-stack">
           <label className="field">
-            <span>Server display name</span>
-            <input autoFocus required minLength={2} maxLength={120} value={name} onChange={(event) => setName(event.target.value)} placeholder="Production API" />
+            <span>Node label</span>
+            <input autoFocus required minLength={2} maxLength={120} value={name} onChange={(event) => setName(event.target.value)} placeholder="production-api-01" />
+            <small>A display label only. The agent reports the actual hostname and operating system.</small>
           </label>
           <label className="field">
-            <span>Hostname (optional)</span>
-            <input maxLength={253} value={hostname} onChange={(event) => setHostname(event.target.value)} placeholder="api-01.example.com" />
+            <span>Expected hostname (optional)</span>
+            <input maxLength={253} value={hostname} onChange={(event) => setHostname(event.target.value)} placeholder="Leave empty to discover automatically" />
           </label>
-          <fieldset className="platform-fieldset">
-            <legend>Target operating system</legend>
-            <div className="platform-choice-grid">
-              <button type="button" className={targetPlatform === "windows" ? "platform-choice platform-choice-active" : "platform-choice"} aria-pressed={targetPlatform === "windows"} onClick={() => setTargetPlatform("windows")}>
-                <span className="platform-choice-icon">⊞</span>
-                <span><strong>Windows</strong><small>PowerShell installer</small></span>
-              </button>
-              <button type="button" className={targetPlatform === "linux" ? "platform-choice platform-choice-active" : "platform-choice"} aria-pressed={targetPlatform === "linux"} onClick={() => setTargetPlatform("linux")}>
-                <span className="platform-choice-icon">⌘</span>
-                <span><strong>Linux</strong><small>systemd installer</small></span>
-              </button>
-            </div>
-            <p className="platform-detection-note">Suggested from this browser: {detectBrowserPlatform() === "windows" ? "Windows" : "Linux"}. Change this for a remote host. VM/VPS classification is based on agent-reported host metadata, not the browser.</p>
-          </fieldset>
-
           {error && <div className="notice notice-error" role="alert">{error}</div>}
           <div className="modal-actions">
             <button className="button button-secondary" type="button" onClick={onClose}>Cancel</button>
-            <button className="button button-primary" type="submit" disabled={busy}>{busy ? "Creating…" : "Create server and token"}</button>
+            <button className="button button-primary" type="submit" disabled={busy}>{busy ? "Creating…" : "Create node token"}</button>
           </div>
         </form>
       </section>
@@ -515,6 +480,19 @@ export default function DashboardClient() {
   const [showAlerts, setShowAlerts] = useState(false);
   const [showOperations, setShowOperations] = useState(false);
   const [logoutBusy, setLogoutBusy] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  useEffect(() => {
+    try { setSidebarCollapsed(window.localStorage.getItem("monitor-me-sidebar-collapsed") === "true"); } catch { /* browser storage may be unavailable */ }
+  }, []);
+
+  function toggleSidebar() {
+    setSidebarCollapsed((current) => {
+      const next = !current;
+      try { window.localStorage.setItem("monitor-me-sidebar-collapsed", String(next)); } catch { /* preserve the in-memory preference */ }
+      return next;
+    });
+  }
 
   const loadServers = useCallback(async () => {
     setInventoryBusy(true);
@@ -651,33 +629,28 @@ export default function DashboardClient() {
   }
 
   return (
-    <div className="app-shell">
-      <aside className="sidebar">
+    <div className={sidebarCollapsed ? "app-shell app-shell-sidebar-collapsed" : "app-shell"}>
+      <aside className={sidebarCollapsed ? "sidebar sidebar-collapsed" : "sidebar"}>
         <div className="sidebar-brand">
           <div className="brand-mark">M</div>
-          <div><p className="brand-name">MONITOR ME</p><p className="brand-subtitle">Control plane</p></div>
+          <div className="sidebar-brand-copy"><p className="brand-name">MONITOR ME</p><p className="brand-subtitle">Observability</p></div>
+          <button className="sidebar-toggle" type="button" onClick={toggleSidebar} aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"} title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}>{sidebarCollapsed ? <PanelLeftOpen size={18} strokeWidth={1.8} /> : <PanelLeftClose size={18} strokeWidth={1.8} />}</button>
         </div>
-        <div className="workspace-switcher">
-          <span className="workspace-icon">{(user.organization_name || user.organization || "W").charAt(0).toUpperCase()}</span>
-          <div><strong>{user.organization_name || user.organization || "Workspace"}</strong><span>Current workspace</span></div>
-          <span className="chevron">⌄</span>
+        <div className="workspace-switcher" title="Single installation">
+          <span className="workspace-icon"><Activity size={15} strokeWidth={1.8} /></span>
+          <div className="workspace-switcher-copy"><strong>Infrastructure</strong><span>Single installation</span></div>
         </div>
         <nav className="side-nav" aria-label="Main navigation">
-          <span className="nav-section-label">Workspace</span>
-          <button className={!showProjects && !showAlerts && !showOperations ? "nav-item nav-item-active" : "nav-item"} type="button" onClick={() => { setShowProjects(false); setShowAlerts(false); setShowOperations(false); setSelectedServer(null); }}><span>▦</span>Servers</button>
-          <button className={showProjects ? "nav-item nav-item-active" : "nav-item"} type="button" onClick={() => { setShowAlerts(false); setShowOperations(false); setSelectedServer(null); setShowProjects(true); }}><span>◫</span>Projects</button>
+          <span className="nav-section-label">Monitor</span>
+          <button title="Servers" aria-label="Servers" className={!showProjects && !showAlerts && !showOperations ? "nav-item nav-item-active" : "nav-item"} type="button" onClick={() => { setShowProjects(false); setShowAlerts(false); setShowOperations(false); setSelectedServer(null); }}><span className="nav-item-icon"><ServerIcon size={18} strokeWidth={1.8} /></span><span className="nav-item-label">Servers</span></button>
+          <button title="Projects" aria-label="Projects" className={showProjects ? "nav-item nav-item-active" : "nav-item"} type="button" onClick={() => { setShowAlerts(false); setShowOperations(false); setSelectedServer(null); setShowProjects(true); }}><span className="nav-item-icon"><Folder size={18} strokeWidth={1.8} /></span><span className="nav-item-label">Projects</span></button>
           <span className="nav-section-label nav-section-spaced">Manage</span>
-          <button className={showAlerts ? "nav-item nav-item-active" : "nav-item"} type="button" onClick={() => { setShowProjects(false); setShowOperations(false); setSelectedServer(null); setShowAlerts(true); }}><span>◉</span>Alerts</button>
-          <button className={showOperations ? "nav-item nav-item-active" : "nav-item"} type="button" onClick={() => { setShowProjects(false); setShowAlerts(false); setSelectedServer(null); setShowOperations(true); }}><span>↻</span>Operations</button>
-          <span className="nav-item nav-item-disabled" aria-disabled="true"><span>⚙</span>Settings <small>Later</small></span>
+          <button title="Alerts" aria-label="Alerts" className={showAlerts ? "nav-item nav-item-active" : "nav-item"} type="button" onClick={() => { setShowProjects(false); setShowOperations(false); setSelectedServer(null); setShowAlerts(true); }}><span className="nav-item-icon"><Bell size={18} strokeWidth={1.8} /></span><span className="nav-item-label">Alerts</span></button>
+          <button title="Operations" aria-label="Operations" className={showOperations ? "nav-item nav-item-active" : "nav-item"} type="button" onClick={() => { setShowProjects(false); setShowAlerts(false); setSelectedServer(null); setShowOperations(true); }}><span className="nav-item-icon"><Activity size={18} strokeWidth={1.8} /></span><span className="nav-item-label">Operations</span></button>
         </nav>
         <div className="sidebar-bottom">
-          <div className="sidebar-status"><span className="status-dot status-dot-online" /> {authDisabled ? "Local access · No login" : "API session active"}</div>
-          <div className="user-card">
-            <div className="avatar">{(user.display_name || user.email).charAt(0).toUpperCase()}</div>
-            <div className="user-meta"><strong>{user.display_name}</strong><span>{user.role}</span></div>
-            {!authDisabled && <button className="icon-button logout-button" type="button" onClick={logout} disabled={logoutBusy} aria-label="Sign out">↗</button>}
-          </div>
+          <div className="sidebar-status" title={authDisabled ? "Local no-login access" : "Authenticated session"}><span className="status-dot status-dot-online" /><span className="sidebar-status-label">{authDisabled ? "No-login · Local" : "Session active"}</span></div>
+          {!authDisabled && <button className="icon-button logout-button" type="button" onClick={logout} disabled={logoutBusy} aria-label="Sign out">↗</button>}
         </div>
       </aside>
 
@@ -710,8 +683,8 @@ export default function DashboardClient() {
                 {projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
               </select>
             </label>
-            <button className="button button-secondary" type="button" onClick={() => void loadServers()} disabled={inventoryBusy}>{inventoryBusy ? "Refreshing…" : "Refresh"}</button>
-            {canCreate && <button className="button button-primary" type="button" onClick={() => setShowAdd(true)}>+ Add server</button>}
+            <button className="button button-secondary" type="button" onClick={() => void loadServers()} disabled={inventoryBusy}><RefreshCw size={15} /> {inventoryBusy ? "Refreshing…" : "Refresh"}</button>
+            {canCreate && <button className="button button-primary" type="button" onClick={() => setShowAdd(true)}><Plus size={16} /> Add machine</button>}
           </div>
         </header>
 
@@ -719,8 +692,8 @@ export default function DashboardClient() {
         {inventoryError && <div className="notice notice-error" role="alert">{inventoryError}</div>}
 
         <section className="welcome-strip">
-          <div><div className="eyebrow">Infrastructure at a glance</div><p>Manage enrolled hosts and secure agent credentials for {user.organization_name || user.organization || "your workspace"}.</p></div>
-          <div className="phase-label"><span className="status-dot status-dot-online" /> Phase 4 · Dashboard rollout</div>
+          <div><div className="eyebrow">Fleet overview</div><p>Monitor the health and performance of every enrolled machine from one place.</p></div>
+          <div className="phase-label"><span className="status-dot status-dot-online" /> {onlineCount} online · {pendingCount} pending</div>
         </section>
 
         <section className="summary-grid" aria-label="Server totals">
@@ -745,7 +718,7 @@ export default function DashboardClient() {
           ) : servers.length === 0 ? (
             <div className="empty-state">
               <div className="empty-icon">+</div><h3>No servers enrolled yet</h3>
-              <p>Register your first Linux host. Monitor Me will create a short-lived, single-use credential for the agent.</p>
+              <p>Add a machine to receive a short-lived, single-use enrollment token. Its native agent reports the host operating system and available environment metadata automatically.</p>
               {canCreate && <button className="button button-primary" type="button" onClick={() => setShowAdd(true)}>Add your first server</button>}
             </div>
           ) : (

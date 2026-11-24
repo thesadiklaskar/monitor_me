@@ -12,7 +12,65 @@ command -v curl >/dev/null || { echo "curl is required." >&2; exit 2; }
 compose() { docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" "$@"; }
 
 compose config --quiet
-compose build api web
+
+auth_disabled="$(sed -n 's/^MONITOR_ME_AUTH_DISABLED=//p' "$ENV_FILE" | tail -n 1 | tr -d '"' | tr -d '\r' | tr '[:upper:]' '[:lower:]' | xargs)"
+access_file="/etc/nginx/snippets/monitor-me-admin-allowlist.conf"
+access_directory="$(dirname "$access_file")"
+access_tmp="$(mktemp)"
+access_backup=""
+mkdir -p "$access_directory"
+
+if [[ "$auth_disabled" == "true" ]]; then
+  admin_cidr="$(sed -n 's/^ADMIN_CIDR=//p' "$ENV_FILE" | tail -n 1 | tr -d '"' | tr -d '\r')"
+  if [[ -z "$admin_cidr" ]]; then
+    echo "Refusing production no-login mode: set ADMIN_CIDR to the trusted administrator/VPN source range." >&2
+    exit 2
+  fi
+  if [[ "$EUID" -ne 0 ]]; then
+    echo "Production no-login mode requires root to install the Nginx access allowlist and host firewall rules." >&2
+    exit 2
+  fi
+  python3 -c 'import ipaddress,sys; n=ipaddress.ip_network(sys.argv[1], strict=False); sys.exit(1 if n.prefixlen == 0 else 0)' "$admin_cidr" || {
+    echo "ADMIN_CIDR must be a specific IPv4/IPv6 source range, not a default route." >&2
+    exit 2
+  }
+  printf 'allow %s;\ndeny all;\n' "$admin_cidr" > "$access_tmp"
+else
+  # In authenticated mode, the application enforces browser/API credentials.
+  # Keep the Nginx include present but do not add IP filtering.
+  printf '# Application authentication is enabled; Nginx does not add an IP allowlist.\n' > "$access_tmp"
+fi
+
+chmod 0644 "$access_tmp"
+if [[ -f "$access_file" ]]; then
+  access_backup="$(mktemp)"
+  cp -p "$access_file" "$access_backup"
+fi
+install -m 0644 "$access_tmp" "$access_file"
+rm -f "$access_tmp"
+
+if ! nginx -t; then
+  echo "Nginx validation failed; restoring the previous administrator access file." >&2
+  if [[ -n "$access_backup" ]]; then
+    install -m 0644 "$access_backup" "$access_file"
+  else
+    rm -f "$access_file"
+  fi
+  rm -f "$access_backup"
+  exit 2
+fi
+rm -f "$access_backup"
+systemctl reload nginx
+
+if [[ "$auth_disabled" == "true" ]]; then
+  firewall_args=(--role control-plane --admin-cidr "$admin_cidr" --verify-admin-ui-allowlist)
+  # Verify the reverse-proxy boundary before opening public HTTPS for the
+  # installer/artifact paths.
+  "$ROOT/deploy/production/firewall.sh" "${firewall_args[@]}"
+  "$ROOT/deploy/production/firewall.sh" "${firewall_args[@]}" --apply
+fi
+
+compose build api web agent-artifacts
 compose up -d postgres redis
 ready=0
 for attempt in $(seq 1 60); do

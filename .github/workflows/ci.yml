@@ -108,13 +108,38 @@ jobs:
       - name: Build native agent
         working-directory: agent
         run: go build -trimpath -o /tmp/monitor-me-agent ./cmd/monitor-agent
-      - name: Cross-compile Windows x64 agent
+      - name: Cross-compile Windows x64 agent and service entry point
         working-directory: agent
         env:
           GOOS: windows
           GOARCH: amd64
           CGO_ENABLED: "0"
-        run: go build -trimpath -o /tmp/monitor-me-agent.exe ./cmd/monitor-agent
+        run: |
+          go build -trimpath -o /tmp/monitor-me-agent.exe ./cmd/monitor-agent
+          go test -c -o /tmp/monitor-me-agent.test.exe ./cmd/monitor-agent
+      - name: Cross-compile Linux ARM64 agent
+        working-directory: agent
+        env:
+          GOOS: linux
+          GOARCH: arm64
+          CGO_ENABLED: "0"
+        run: go build -trimpath -o /tmp/monitor-me-agent-linux-arm64 ./cmd/monitor-agent
+      - name: Build and verify the downloadable native-agent bundle
+        run: |
+          docker build -f deploy/agent-artifacts/Dockerfile -t monitor-me-agent-artifacts:ci .
+          mkdir -p /tmp/monitor-me-agent-artifacts
+          docker run --rm \
+            -e MONITOR_AGENT_VERSION=ci \
+            -e MONITOR_AGENT_ARTIFACT_DIR=/out \
+            --mount type=bind,source=/tmp/monitor-me-agent-artifacts,target=/out \
+            monitor-me-agent-artifacts:ci
+          jq -e '.schema_version == 1 and .version == "ci" and (.artifacts | length == 3)' /tmp/monitor-me-agent-artifacts/manifest.json
+          for artifact in linux-amd64/monitor-agent linux-arm64/monitor-agent windows-amd64/monitor-agent.exe; do
+            test -s "/tmp/monitor-me-agent-artifacts/$artifact"
+            expected="$(jq -r --arg file "$artifact" '.artifacts[] | select(.file == $file) | .sha256' /tmp/monitor-me-agent-artifacts/manifest.json)"
+            actual="$(sha256sum "/tmp/monitor-me-agent-artifacts/$artifact" | awk '{print $1}')"
+            test "$expected" = "$actual"
+          done
       - name: Validate Linux systemd service
         run: |
           sudo install -m 0755 /tmp/monitor-me-agent /usr/local/bin/monitor-agent

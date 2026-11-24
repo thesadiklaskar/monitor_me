@@ -4,6 +4,7 @@ map $http_upgrade $monitor_me_connection_upgrade {
     default upgrade;
     ''      close;
 }
+limit_req_zone $binary_remote_addr zone=monitor_me_agent_bootstrap:10m rate=30r/s;
 server {
     listen 80;
     listen [::]:80;
@@ -26,7 +27,47 @@ server {
     server_tokens off;
     client_max_body_size 2m;
 
+    # Public, rate-limited bootstrap routes: installers, CA and signed-by-checksum
+    # native binaries. These contain no operator data or persistent enrollment secrets.
+    location = /install/agent-linux.sh {
+        limit_req zone=monitor_me_agent_bootstrap burst=100 nodelay;
+        proxy_pass http://127.0.0.1:13000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto https;
+        add_header Cache-Control "no-store";
+    }
+    location = /install/agent-windows.ps1 {
+        limit_req zone=monitor_me_agent_bootstrap burst=100 nodelay;
+        proxy_pass http://127.0.0.1:13000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto https;
+        add_header Cache-Control "no-store";
+    }
+    location = /api/agent-artifacts/manifest {
+        limit_req zone=monitor_me_agent_bootstrap burst=100 nodelay;
+        proxy_pass http://127.0.0.1:13000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto https;
+        add_header Cache-Control "no-store";
+    }
+    location ^~ /api/agent-artifacts/ {
+        limit_req zone=monitor_me_agent_bootstrap burst=100 nodelay;
+        proxy_pass http://127.0.0.1:13000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto https;
+    }
+    location = /api/agent-ca {
+        limit_req zone=monitor_me_agent_bootstrap burst=100 nodelay;
+        proxy_pass http://127.0.0.1:13000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto https;
+        add_header Cache-Control "no-store";
+    }
+
+    # The app UI, normal API routes and live stream have owner-level access
+    # in the no-login profile. Only administrators/VPN users may reach them.
     location = /v1/live/ws {
+        include /etc/nginx/snippets/monitor-me-admin-allowlist.conf;
         proxy_pass http://127.0.0.1:18080;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
@@ -38,6 +79,7 @@ server {
         proxy_buffering off;
     }
     location / {
+        include /etc/nginx/snippets/monitor-me-admin-allowlist.conf;
         proxy_pass http://127.0.0.1:13000;
         proxy_http_version 1.1;
         proxy_set_header Host $host;

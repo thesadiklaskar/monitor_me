@@ -15,21 +15,39 @@ This file is the authoritative resume point for Monitor Me. Read it before makin
 | Completed phases | Phase 1 — Product Specification and Technical Blueprint; Phase 2 — Platform Foundation and Secure Connectivity; Phase 3 — Monitoring Agent and Telemetry Data Engine |
 | Current phase | Phase 4 dashboard acceptance and Phase 5 Linux-MVP / Windows local-agent validation |
 | Current phase status | In Progress — implementation is present; end-to-end acceptance is pending |
-| MVP status | Dashboard workflows are implemented; owner-led local acceptance and production-host verification remain before release |
-| Implementation status | Phase 4 now includes a full-shell visual refresh, responsive navigation, OS-aware Add Server guidance and copyable native-agent setup commands, in addition to the existing inventory, metric history/live charts, projects, alerts and remote operations. Local Compose startup helpers and source-based Windows/Linux agent installers are committed. Both collectors report OS/platform/architecture and available virtualization metadata; Linux also reports best-effort cloud-provider hints. Phase 5 deployment/firewall tooling is prepared but production VPS cutover/restore verification is not done. Windows service installation/signing, macOS collection and end-to-end owner acceptance remain pending. |
+| MVP status | Core metrics/dashboard foundation and first plug-and-play installers are implemented; Windows/Linux runtime acceptance, raw logs, full console polish and production-host verification remain |
+| Implementation status | The operator product direction is single-install, no-login and plug-and-play. Add Machine no longer asks for target OS; it offers PowerShell/POSIX launchers, a collapsible Lucide icon sidebar and a simplified single-install shell. Linux/Windows agents report OS/platform/architecture and available virtualization hints. The local Compose startup helper auto-generates a development certificate and the Compose artifact-builder now generates protobuf code and builds Linux amd64/arm64 plus Windows x64 binaries. Target-side installers download checksum-verified binaries without Docker/source checkout; Linux installs systemd and Windows installs a restart-enabled Windows Service. These installers and service lifecycles have not yet passed owner runtime acceptance or publisher code-signing. Production no-login is opt-in in the provided env sample and the deploy script generates an Nginx admin allowlist for dashboard/API/WebSocket while leaving installer/CA/artifact paths public; the host firewall helper and real-host IPv4/IPv6/cloud checks still need validation. Raw log ingestion/search is not implemented; ClickHouse is only proposed in ADR 0005. |
 | Last source commit covered by latest successful CI run | 9685e115113123d5f9f8e8a1b222804752f5a283 (Go, frontend and native-agent jobs passed in run #45203706343; Compose integration failed at the web proxy login probe; later commits are not covered) |
 | Latest CI run | [#45208235137 — quota blocked](https://github.com/WorkRCS/monitor_me/actions/runs/45208235137); jobs failed before runner assignment/steps because the repository owner reports GitHub Actions free minutes are exhausted |
-| Latest implementation commit | [57889c0884e7cba595ea0e6c389ff12e385f258d](https://github.com/WorkRCS/monitor_me/commit/57889c0884e7cba595ea0e6c389ff12e385f258d) — Linux/Windows environment metadata assertions and one-command onboarding/UI changes |
-| Next action | Owner pulls `main`, rebuilds/restarts the local Compose stack, then stops the old Windows foreground agent and restarts the updated native collector with the Windows installer’s `-Rebuild` option to validate the environment card. Keep all existing volumes; do not run production/firewall scripts for local acceptance. |
+| Latest implementation commit | [2f4e60109a7f1e6cc895b800f10d712ec9ee39b8](https://github.com/WorkRCS/monitor_me/commit/2f4e60109a7f1e6cc895b800f10d712ec9ee39b8) — normalize production no-login gate; preceding commits add Lucide action icons, target-side native service installers, fresh-clone protobuf generation and Nginx/firewall protections |
+| Next action | On the owner's Windows PC, pull `main`, run `.\scripts\start-local.ps1` in PowerShell, confirm `agent-artifacts` completed and the no-login dashboard opens, then Add Machine and validate the Windows x64 Service installer using a fresh one-time token. Inspect `Get-Service MonitorMeAgent` and `%ProgramData%\\MonitorMe\\agent.log`. Do not expose local anonymous mode beyond loopback. GitHub Actions currently cannot assign runners due quota, so no fresh CI pass is claimed. |
 
 
+
+
+## Single-install plug-and-play product direction — 2026-11-24
+
+**Status:** Target contract recorded; partial UI/security changes committed; major installer/log pipeline/runtime verification remain open.
+
+- [x] Added docs/PRODUCT_VISION_PLUG_AND_PLAY.md with the target operator experience, target-side discovery contract, no-login network boundary, high-volume log data plane, UI and benchmark gates.
+- [x] Added ADR 0004 for the internal single-install workspace/no-login model. Local no-login remains loopback-only; production no-login must wait for an enforced HTTPS admin CIDR/VPN boundary. Browser/node enrollment token roles remain separate.
+- [x] Added ADR 0005 proposing ClickHouse MergeTree for raw logs with durable batching, idempotent acknowledgements, bounded queues, retention, structured schema, search and replay/load gates. ClickHouse is not deployed, and raw logs are not yet collected or searchable.
+- [x] Reworked Add Machine: removed browser-based target-OS selection and shows both native shell launchers after token creation. Added clearer node label and auto-hostname copy. The current launchers still require a source checkout and Docker; this does not yet meet the no-Docker/downloadable-agent target.
+- [x] Added a collapsible icon-led sidebar with browser-local preference, vector React icons, and removed workspace-owner/profile clutter from the operator shell. Other pages still need the full professional console redesign and accurate advanced navigation.
+- [x] Changed the no-login boundary to Nginx path-level access control so remote agents can still download the public installer, CA and binaries on HTTPS. The firewall helper opens 443 to Nginx, restricts SSH to ADMIN_CIDR, and verifies that Nginx applies the allowlist to both dashboard and live WebSocket locations. Existing broad rules and cloud security groups are not automatically removed/updated; real-host verification is pending.
+- [x] Updated README, roadmap and acceptance matrix to reflect the product owner's new direction and distinguish current implementation from target requirements.
+- [x] Default the single-install operator UX to an implicit workspace and no-login dashboard; keep internal user/organization IDs only for database isolation. Local access stays loopback-bound; production no-login is enabled through the provided environment sample only behind the Nginx allowlist gate.
+- [ ] Deliver a source-independent signed Linux/Windows installer, target-side OS/architecture detection, Linux systemd and Windows Service lifecycle, one-use token enrollment, upgrades, rollback and uninstall. macOS remains unimplemented.
+- [ ] Deliver a single control-plane bootstrap that generates secrets/TLS, provisions supported firewall policy, launches Compose and auto-enrolls the local host. Provider firewalls require scoped provider IAM and must not be guessed.
+- [ ] Implement raw log collection and ClickHouse ingestion/search/live-tail/retention/backup. The current product has metrics only.
+- [ ] Verify the updated UI, installer and firewall code with local tests, external IPv4/IPv6 checks, cross-platform service acceptance and load/failure benchmarks. GitHub Actions free-minute quota currently prevents fresh runner verification; no new CI pass is claimed.
 
 ## Plug-and-play onboarding and host metadata — 2026-11-24
 
 **Status:** Implementation committed to `main`; local runtime acceptance and CI execution remain pending.
 
 - [x] Added `scripts/start-local.ps1` and `scripts/start-local.sh`: create local `.env` from the example when absent, generate a localhost-only development TLS certificate through a temporary Docker container, run `docker compose up --build -d`, and probe the dashboard. Existing database volumes are preserved.
-- [x] Added Add Server target-OS guidance (Windows/Linux), browser-OS suggestion, OS-specific setup instructions and a one-click copy action for the installer command. Browser OS is only a suggestion for remote hosts; the native agent is authoritative for the target OS.
+- [x] Removed browser-based target-OS selection from Add Machine. The enrollment dialog now provides both shell launchers (PowerShell/POSIX) and per-command copy actions; the launcher scripts are still interim source-checkout/Docker helpers, not the final automatic release installer.
 - [x] Added `scripts/setup-windows-agent.ps1` with Docker-based Windows x64 build, secure one-time token prompt, optional remote gRPC/CA arguments and explicit `-Rebuild`. The current Windows agent remains foreground-only; Windows service installation and signed distribution are not delivered.
 - [x] Added `scripts/setup-linux-agent.sh` and a Docker-based Linux build helper. The installer requires systemd and Docker for the source build, installs the service, securely prompts for a one-use token, and removes it from the service environment after session persistence.
 - [x] Linux and Windows collectors now emit OS/platform/kernel/architecture and available virtualization metadata. Linux adds best-effort DMI-based provider hints; environment classification distinguishes container, cloud VM hint, virtual machine and physical/unknown. Provider detection is not guaranteed across all VPS vendors.
@@ -47,7 +65,7 @@ This file is the authoritative resume point for Monitor Me. Read it before makin
 - [x] Kept the existing history API, committed-telemetry WebSocket, project scope, and latest-snapshot/process APIs; no chart dependency or third-party monitoring platform was added.
 - [x] Clarified that TCP state and listening-port inventory are not reported by the initial Windows collector.
 - [ ] Pull the new main commit, rebuild the web container, and verify the refreshed UI against the enrolled Windows host. GitHub Actions quota is currently blocking fresh runner-based CI, so no new CI pass is claimed.
-- **Next action:** Run `git pull origin main` followed by `docker compose up --build -d web`, then open the Windows PC detail page and check current KPI values and the history chart. Keep the agent window running.
+- Historical Windows foreground-agent testing used a per-user LOCALAPPDATA state file. Before testing the new ProgramData Windows Service installer, stop the old foreground process and create a new Add Machine token for the separate service identity.
 
 ## Next Work Session — 2026-11-24
 
@@ -220,20 +238,15 @@ These measurements are a single CI-runner snapshot, not production capacity guar
 - [x] Token reissue revokes all previous unused enrollment credentials in the same PostgreSQL transaction; an integration test covers the replaced-token rejection path.
 - [x] Frontend lint/typecheck/production build and full-stack verification passed in [GitHub Actions run #45188259431](https://github.com/WorkRCS/monitor_me/actions/runs/45188259431).
 
-### Exact resume instructions
+### Exact resume instructions — superseded 2026-11-24
 
-Continue directly on `main`. Do not create a new branch.
+Continue directly on `main`. The older login-first Phase 4 sequence below is historical and is superseded by the single-install no-login product direction recorded in `docs/PRODUCT_VISION_PLUG_AND_PLAY.md` and ADR 0004.
 
-**Next implementation slice:** finish the Phase 4 server-detail experience using the verified historical-series and live-ticket APIs.
-
-1. Add a typed API client for login, current-user, logout and server inventory endpoints.
-2. Implement login and session handling without exposing bearer tokens in logs or URLs.
-3. Build the server inventory list with loading, empty, error and disconnected states.
-4. Add the Add Server flow and show the one-time enrollment token exactly once with copy/install guidance.
-5. Add component/API tests and keep all UI strings, comments and documentation in English.
-6. Update README, feature acceptance matrix and this state file after the slice passes CI.
-
-Do not start charts, alerts, project switching or remote actions until the authenticated server inventory and Add Server flow are accepted and tested.
+Current priority order:
+1. Pull `main` on the owner's Windows PC and run `scripts/start-local.ps1`; confirm the fresh Compose build runs the `agent-artifacts` job successfully and opens the dashboard without login.
+2. Validate Add Machine, one-time token enrollment, the standalone Windows Service installer, restart recovery and bounded agent diagnostic logs. Then validate Linux systemd on a supported disposable Linux host.
+3. Run frontend lint/typecheck/build, agent race tests, Windows cross-build, agent-artifact image build and Compose integration as soon as GitHub Actions quota is available; do not mark these commits verified before then.
+4. Build ClickHouse-backed raw log collection/search and the real professional monitoring console, then run sustained/failure-recovery benchmarks before any high-volume or Grafana-replacement claim.
 
 ## Repository Rules
 
@@ -256,7 +269,7 @@ Phase 1 and Phase 2 implementation/verification history is recorded above. The f
 
 - Added a Windows-specific collector using gopsutil for CPU, memory/swap, mounted-volume capacity, disk/network counters, uptime, host identity and readable process RSS.
 - Added explicit Windows capabilities; Linux-only TCP/listening-port, cgroup/Systemd/container attribution and systemd remote actions are not advertised or run on Windows.
-- Added Windows-specific collector tests, Docker-based x64 cross-build and PowerShell foreground-run helpers. The build helper now invokes a checked-in shell script rather than passing a multiline command through PowerShell native argument parsing.
+- Added Windows-specific collector tests, Docker x64 cross-build helpers, a Windows Service Control Manager entry point, bounded rotating service logs, and a standalone PowerShell installer that downloads/checksums the native binary. Runtime acceptance and publisher-code signing remain pending.
 - Added a Windows-specific atomic spool-file replacement using MoveFileEx so acknowledged batches can be compacted after durable delivery.
 - Added a host-health snapshot and System information panel to server detail.
 - Made persisted agent session handling compatible with Windows FileMode behavior; the supported local helper stores session/WAL below the current user's LOCALAPPDATA.

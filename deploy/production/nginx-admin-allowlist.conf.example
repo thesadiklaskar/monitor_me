@@ -1,0 +1,5 @@
+# Replace this example with the trusted administrator/VPN source CIDR(s).
+# This allowlist is included only by the dashboard and live-WebSocket Nginx locations.
+# Dedicated /install, /api/agent-ca and /api/agent-artifacts routes remain public.
+allow 203.0.113.10/32;
+deny all;
