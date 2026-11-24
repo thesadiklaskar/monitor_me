@@ -1,8 +1,10 @@
 #!/bin/sh
 set -eu
 
-VERSION="\${MONITOR_AGENT_VERSION:-0.1.0-dev}"
-OUT="\${MONITOR_AGENT_ARTIFACT_DIR:-/out}"
+VERSION="$MONITOR_AGENT_VERSION"
+[ -n "$VERSION" ] || VERSION="0.1.0-dev"
+OUT="$MONITOR_AGENT_ARTIFACT_DIR"
+[ -n "$OUT" ] || OUT="/out"
 mkdir -p "$OUT"
 
 cd /src/agent
@@ -35,7 +37,7 @@ build_target windows amd64
   while IFS="$(printf '\t')" read -r target_os target_arch filename checksum; do
     if [ "$first" = true ]; then first=false; else printf ',\n'; fi
     printf '    {"os":"%s","arch":"%s","file":"%s-%s/%s","sha256":"%s"}' \
-      "$target_os" "$target_arch" "$filename" "$target_os" "$filename" "$checksum"
+      "$target_os" "$target_arch" "$target_os" "$target_arch" "$filename" "$checksum"
   done < "$OUT/.manifest.tsv"
   printf '\n  ]\n}\n'
 } > "$OUT/manifest.json"
