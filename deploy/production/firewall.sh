@@ -169,12 +169,14 @@ if [[ "$VERIFY_ADMIN_UI_ALLOWLIST" == true ]]; then
   [[ -s "$access_file" ]] || { echo "Missing Nginx administrator allowlist: $access_file" >&2; exit 3; }
   grep -Eq '^allow [^;]+;$' "$access_file" || { echo "The Nginx access file contains no administrator allow rule." >&2; exit 3; }
   grep -Fxq 'deny all;' "$access_file" || { echo "The Nginx access file must end with deny all;." >&2; exit 3; }
-  for cidr in "$(grep -E '^allow ' "$access_file" | sed -E 's/^allow ([^;]+);$/\1/')"; do
+  while IFS= read -r line; do
+    cidr="${line#allow }"
+    cidr="${cidr%;}"
     python3 -c 'import ipaddress,sys; network=ipaddress.ip_network(sys.argv[1], strict=False); sys.exit(1 if network.prefixlen == 0 else 0)' "$cidr" || {
       echo "The Nginx administrator allowlist contains an invalid or unrestricted CIDR: $cidr" >&2
       exit 3
     }
-  done
+  done < <(grep -E '^allow ' "$access_file")
   nginx_config="$(nginx -T 2>&1)" || { echo "nginx -T failed; cannot verify operator access." >&2; printf '%s\n' "$nginx_config" >&2; exit 3; }
   include_count="$(printf '%s\n' "$nginx_config" | grep -F -c "include $access_file;" || true)"
   [[ "$include_count" -ge 2 ]] || { echo "Nginx must include the administrator allowlist in both the dashboard and live-WebSocket locations." >&2; exit 3; }
