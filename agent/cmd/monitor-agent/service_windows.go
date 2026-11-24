@@ -49,7 +49,7 @@ func (service *monitorMeWindowsService) Execute(
 
 	current := svc.Status{
 		State:   svc.Running,
-		Accepts: svc.AcceptStop | svc.AcceptShutdown | svc.AcceptInterrogate,
+		Accepts: svc.AcceptStop | svc.AcceptShutdown,
 	}
 	statuses <- current
 	for {
