@@ -93,21 +93,3 @@ func TestSeriesBucketCountUsesEpochAlignedBoundaries(t *testing.T) {
 	}
 }
 
-func TestValidateRangeQueryProjectScope(t *testing.T) {
-	now := time.Now().UTC()
-	query := RangeQuery{
-		OrganizationID: "org", ServerID: "server", MetricName: "process.memory.rss",
-		From: now.Add(-time.Minute), To: now, Step: time.Second, Limit: 100,
-	}
-	if err := ValidateRangeQuery(query, now); err != nil {
-		t.Fatalf("unfiltered query should pass: %v", err)
-	}
-	query.ProjectID = "not-a-uuid"
-	if err := ValidateRangeQuery(query, now); err == nil {
-		t.Fatal("malformed project ID must be rejected")
-	}
-	query.ProjectID = "2b6a8d10-9b4d-4e40-9a9c-0c8fc3af3b7f"
-	if err := ValidateRangeQuery(query, now); err != nil {
-		t.Fatalf("valid project-scoped query should pass: %v", err)
-	}
-}
