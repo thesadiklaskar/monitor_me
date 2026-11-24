@@ -1,5 +1,6 @@
 param(
-    [string]$GrpcAddress = "localhost:8443"
+    [string]$GrpcAddress = "localhost:8443",
+    [string]$CaFile = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -13,7 +14,11 @@ if (-not (Test-Path $binary)) {
     }
 }
 
-& (Join-Path $PSScriptRoot "run-windows-agent.ps1") -GrpcAddress $GrpcAddress
+$runArguments = @{ GrpcAddress = $GrpcAddress }
+if (-not [string]::IsNullOrWhiteSpace($CaFile)) {
+    $runArguments.CaFile = $CaFile
+}
+& (Join-Path $PSScriptRoot "run-windows-agent.ps1") @runArguments
 if ($LASTEXITCODE -ne 0) {
     throw "Windows agent exited with code $LASTEXITCODE."
 }
