@@ -848,3 +848,53 @@ td { font-size: 13px; }
   .log-explorer-header,.dashboards-workspace-header,.alerts-workspace-header { align-items: flex-start; flex-direction: column; gap: 14px; }
   .log-explorer-header-actions,.dashboards-header-actions { width: 100%; }
 }
+
+
+/* First-run guidance: teach the operator how to enrol a host without a wizard. */
+.sidebar { transition: width 180ms ease, flex-basis 180ms ease; }
+.empty-state-guide { max-width: 940px; margin: 0 auto; padding: 42px 26px 46px; }
+.empty-state-guide > p { max-width: 680px; margin-bottom: 24px; }
+.setup-steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  max-width: 860px;
+  margin: 0 auto 25px;
+  padding: 0;
+  list-style: none;
+  text-align: left;
+}
+.setup-steps li {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  gap: 11px;
+  padding: 15px;
+  border: 1px solid rgba(65, 88, 116, .62);
+  border-radius: 12px;
+  background: rgba(10, 20, 33, .45);
+}
+.setup-steps li > span {
+  display: grid;
+  width: 27px;
+  height: 27px;
+  flex: 0 0 27px;
+  place-items: center;
+  border: 1px solid rgba(142, 205, 196, .3);
+  border-radius: 8px;
+  background: rgba(142, 205, 196, .09);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 800;
+}
+.setup-steps strong { display: block; color: #e7eef7; font-size: 12px; }
+.setup-steps small { display: block; margin-top: 5px; color: #9fb0c4; font-size: 11px; line-height: 1.5; }
+.empty-state-guide > .button { margin-top: 2px; }
+@media(max-width: 880px) {
+  .setup-steps { grid-template-columns: 1fr; max-width: 560px; }
+  .setup-steps li { align-items: center; }
+}
+@media(max-width: 760px) {
+  .empty-state-guide { padding: 30px 16px; }
+  .setup-steps { margin-bottom: 20px; }
+}
