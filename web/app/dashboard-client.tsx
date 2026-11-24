@@ -276,7 +276,7 @@ export default function DashboardClient() {
   useEffect(() => {
     let active = true;
 
-    async function restoreSession() {
+    async function initializeInstallation() {
       try {
         const config = await apiRequest<ConfigResponse>("/api/config");
         if (!active) return;
@@ -294,7 +294,7 @@ export default function DashboardClient() {
       }
     }
 
-    void restoreSession();
+    void initializeInstallation();
     return () => { active = false; };
   }, [loadServers, loadWorkspaceMetadata]);
 
