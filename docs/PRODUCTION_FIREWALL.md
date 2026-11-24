@@ -17,7 +17,7 @@ The default policy is deny unsolicited inbound traffic and allow established/rel
 
 | Host / service | Direction | Port | Policy |
 | --- | --- | --- | --- |
-| Control-plane HTTPS reverse proxy | Inbound | TCP 443 | Default to the administrator CIDR/VPN only. Do not expose a no-login dashboard publicly. A public UI requires a separately designed authenticated access boundary. |
+| Control-plane HTTPS reverse proxy | Inbound | TCP 443 | Public TLS listener for the native installer, public CA and checksum-verified agent artifacts. Nginx restricts the dashboard, its normal API and live WebSocket to the administrator CIDR/VPN. |
 | Agent TLS gRPC endpoint | Inbound to control plane | TCP 8443 by default | Allow agent connections; restrict to a VPN/private subnet when available. The port can be changed with deployment configuration |
 | ACME HTTP-01 challenge | Inbound to control plane | TCP 80 | Optional; open only when the chosen certificate workflow requires it, then redirect HTTP to HTTPS |
 | Administrator SSH | Inbound to control plane and hosts | TCP 22 by default | Allow only from the administrator's fixed IP/CIDR, VPN, or bastion; use the configured SSH port if different |
@@ -41,13 +41,13 @@ Apply both layers when available:
 1. The cloud provider's security group / network firewall.
 2. The Linux host firewall.
 
-Keep the rules consistent. For the no-login single-install profile, allow TCP 443 only from the administrator CIDR/VPN and TCP 8443 from enrolled agent networks (or public agent networks when unavoidable). Expose TCP 80 only for HTTP-01 certificate validation. Permit SSH only from an administrator CIDR, VPN, or bastion. Apply the same policy to the cloud security group. Database, cache, API, and web application ports remain private.
+Keep the rules consistent. For the no-login single-install profile, TCP 443 must reach Nginx so remote monitored hosts can download the public installer, CA and agent artifact. Nginx must source-restrict the dashboard, normal API and live WebSocket to the administrator CIDR/VPN while leaving only the dedicated installer/CA/artifact paths public. TCP 8443 is the TLS gRPC enrollment/data channel; restrict it to known agent source ranges when possible, or expose it publicly when agents roam. Expose TCP 80 only for HTTP-01 certificate validation. Permit SSH only from an administrator CIDR, VPN or bastion. Apply the same port policy to the cloud security group; the Nginx allowlist remains the application-layer admin boundary. Database, cache, API, and web application ports remain private.
 
 ### Conservative automation helper
 
-Run deploy/production/firewall.sh first without --apply to review its dry-run plan. Control-plane mode requires one or more explicit --admin-cidr values; optional --zone must identify the zone attached to the public interface. The helper adds only source-restricted SSH and HTTPS rules, gRPC rules (source-restricted when --grpc-cidr is supplied, otherwise public for roaming agents), and optional HTTP-01 allow rules. It detects active UFW/firewalld, refuses to enable an inactive firewall, and records rules it added for --rollback. Agent-only mode deliberately makes no inbound changes.
+Run deploy/production/firewall.sh first without --apply to review its dry-run plan. Control-plane mode requires one or more explicit --admin-cidr values; optional --zone must identify the zone attached to the public interface. The helper adds source-restricted SSH, public HTTPS (the reverse proxy enforces which paths are public), gRPC rules (source-restricted when --grpc-cidr is supplied, otherwise public for roaming agents), and optional HTTP-01 allow rules. It detects active UFW/firewalld, refuses to enable an inactive firewall, and records rules it added for --rollback. Agent-only mode deliberately makes no inbound changes.
 
-This implementation is additive by design: it does not set default policies or remove broad existing SSH/port rules. Therefore a dry-run/apply does not prove the host is least-privilege. Review existing rules, default policies, IPv6, Docker forwarding and cloud security groups separately; keep a second SSH session/provider console open. A real-host verification and rollback rehearsal is still required.
+This implementation is additive by design: it does not set default policies or remove existing rules. The no-login deploy gate also verifies that Nginx includes the generated admin-only allowlist in both dashboard and live-WebSocket locations, while installer, CA and artifact paths remain public. This check does not audit every other Nginx vhost, IPv6 path, Docker forwarding rule or cloud security group. Review those separately, keep a second SSH session/provider console open and perform external IPv4/IPv6 acceptance before production use.
 
 ### Ubuntu/Debian with UFW
 
@@ -57,7 +57,9 @@ Confirm the administrator CIDR and allow SSH before enabling UFW. Keep the curre
 sudo ufw default deny incoming
 sudo ufw default allow outgoing
 sudo ufw allow from <ADMIN_CIDR> to any port 22 proto tcp
-sudo ufw allow from <ADMIN_CIDR> to any port 443 proto tcp
+# TCP 443 must reach Nginx so remote agents can download installers and binaries.
+# Nginx applies the ADMIN_CIDR allowlist to dashboard/API/WebSocket paths.
+sudo ufw allow 443/tcp
 sudo ufw allow 8443/tcp
 
 # Optional: only when using ACME HTTP-01 validation.
