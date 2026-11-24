@@ -1,0 +1,22 @@
+apiVersion: 1
+
+datasources:
+  - name: Monitor Me PostgreSQL
+    uid: monitor-me-postgres
+    type: postgres
+    access: proxy
+    url: postgres:5432
+    database: ${POSTGRES_DB}
+    user: grafana_reader
+    isDefault: true
+    editable: false
+    version: 1
+    jsonData:
+      sslmode: disable
+      postgresVersion: 1800
+      timescaledb: false
+      maxOpenConns: 20
+      maxIdleConns: 5
+      connMaxLifetime: 14400
+    secureJsonData:
+      password: ${GRAFANA_DB_PASSWORD}
