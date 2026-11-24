@@ -50,7 +50,7 @@ type DashboardLogEvent = {
   attributes: Record<string, string>;
 };
 type LogResponse = { events: DashboardLogEvent[]; count: number; has_more: boolean };
-type PanelSeries = { points?: SeriesPoint[]; logs?: DashboardLogEvent[]; error?: string };
+type PanelSeries = { points?: SeriesPoint[]; logs?: DashboardLogEvent[]; error?: string; windowEnd?: number };
 type MetricDefinition = { value: string; label: string; unit: string; category: string };
 type DashboardAlertEvent = {
   id: string;
@@ -141,6 +141,8 @@ type ChartPoint = {
 };
 type ChartGeometry = {
   points: ChartPoint[];
+  startTime: number;
+  endTime: number;
   line: string;
   area: string;
   ticks: { y: number; value: number }[];
@@ -152,8 +154,7 @@ type ChartGeometry = {
   endLabel: string;
 };
 
-function chartGeometry(points: SeriesPoint[], durationMs: number): ChartGeometry | null {
-  const end = Date.now();
+function chartGeometry(points: SeriesPoint[], durationMs: number, end: number): ChartGeometry | null {
   const start = end - durationMs;
   const values = points.map((point) => ({
     time: new Date(point.bucket).getTime(),
@@ -192,6 +193,8 @@ function chartGeometry(points: SeriesPoint[], durationMs: number): ChartGeometry
   }));
   return {
     points: mapped,
+    startTime: start,
+    endTime: end,
     line,
     area,
     ticks,
@@ -216,7 +219,7 @@ function MetricVisualization({ panel, series, durationMs, annotations = [] }: {
     if (series.error) return <div className="dashboard-chart-error" role="alert">{series.error}</div>;
     const events = series.logs ?? [];
     return events.length === 0 ? (
-      <div className="dashboard-chart-empty">No host log events in this time range. Check the machine's log collection capability and agent status.</div>
+      <div className="dashboard-chart-empty">No host log events in this time range. Check the machine&apos;s log collection capability and agent status.</div>
     ) : (
       <div className="dashboard-log-panel">
         <div className="dashboard-log-panel-meta">{events.length} events · newest first · latest 50 shown</div>
@@ -235,7 +238,9 @@ function MetricVisualization({ panel, series, durationMs, annotations = [] }: {
   }
   const points = series?.points;
   const latest = points?.[points.length - 1];
-  const chart = points ? chartGeometry(points, durationMs) : null;
+  const chart = points && series?.windowEnd !== undefined
+    ? chartGeometry(points, durationMs, series.windowEnd)
+    : null;
   const unit = metric?.unit ?? "";
 
   if (points === undefined) {
@@ -319,10 +324,8 @@ function MetricVisualization({ panel, series, durationMs, annotations = [] }: {
         }) : <path d={chart.line} className="dashboard-chart-line" />}
         {annotations.filter((event) => event.metric_name === panel.metric_name).map((event) => {
           const eventTime = new Date(event.triggered_at).getTime();
-          const now = Date.now();
-          const chartStart = now - durationMs;
-          if (!Number.isFinite(eventTime) || eventTime < chartStart || eventTime > now) return null;
-          const x = 42 + ((eventTime - chartStart) / durationMs) * 920;
+          if (!Number.isFinite(eventTime) || eventTime < chart.startTime || eventTime > chart.endTime) return null;
+          const x = 42 + ((eventTime - chart.startTime) / durationMs) * 920;
           return (
             <g key={event.id}>
               <line x1={x} x2={x} y1="18" y2="190" className={event.status === "firing" ? "dashboard-alert-marker dashboard-alert-marker-firing" : "dashboard-alert-marker"} />
@@ -373,8 +376,7 @@ export default function DashboardsView({ servers }: { servers: Server[] }) {
   const [panelGridWidth, setPanelGridWidth] = useState<GridWidth>(6);
   const [panelLabelKey, setPanelLabelKey] = useState("");
   const [panelLabelValue, setPanelLabelValue] = useState("");
-  const [serverFilter, setServerFilter] = useState("all");
-  const [rangeOverride, setRangeOverride] = useState<"panel" | TimeRange>("panel");
+  const [filterOverrides, setFilterOverrides] = useState<Record<string, { serverFilter: string; rangeOverride: "panel" | TimeRange }>>({});
   const [draggingPanelId, setDraggingPanelId] = useState("");
 
   const selectedDashboard = useMemo(
@@ -385,6 +387,41 @@ export default function DashboardsView({ servers }: { servers: Server[] }) {
     () => selectedDashboard ? [...selectedDashboard.panels].sort((a, b) => a.position - b.position) : [],
     [selectedDashboard],
   );
+
+  const activeFilterOverride = selectedDashboard ? filterOverrides[selectedDashboard.id] : undefined;
+  const serverFilter = activeFilterOverride?.serverFilter ?? selectedDashboard?.default_server_id ?? "all";
+  const rangeOverride = activeFilterOverride?.rangeOverride ?? selectedDashboard?.default_time_range ?? "panel";
+
+  function updateServerFilter(value: string) {
+    if (!selectedDashboard) return;
+    setFilterOverrides((current) => ({
+      ...current,
+      [selectedDashboard.id]: {
+        serverFilter: value,
+        rangeOverride: current[selectedDashboard.id]?.rangeOverride ?? selectedDashboard.default_time_range ?? "panel",
+      },
+    }));
+  }
+
+  function updateRangeOverride(value: "panel" | TimeRange) {
+    if (!selectedDashboard) return;
+    setFilterOverrides((current) => ({
+      ...current,
+      [selectedDashboard.id]: {
+        serverFilter: current[selectedDashboard.id]?.serverFilter ?? selectedDashboard.default_server_id ?? "all",
+        rangeOverride: value,
+      },
+    }));
+  }
+
+  function clearFilterOverride(dashboardId: string) {
+    setFilterOverrides((current) => {
+      if (!(dashboardId in current)) return current;
+      const next = { ...current };
+      delete next[dashboardId];
+      return next;
+    });
+  }
 
   const loadDashboards = useCallback(async () => {
     setLoading(true);
@@ -433,9 +470,9 @@ export default function DashboardsView({ servers }: { servers: Server[] }) {
             "/api/servers/" + encodeURIComponent(serverId) + "/logs?" + query.toString(),
           );
           if (!response || !Array.isArray(response.events)) throw new Error("Host log query returned an invalid response.");
-          return [panel.id, { logs: response.events }] as const;
+          return [panel.id, { logs: response.events, windowEnd: now }] as const;
         } catch (queryError) {
-          return [panel.id, { logs: [], error: queryError instanceof Error ? queryError.message : "Host logs could not be loaded." }] as const;
+          return [panel.id, { logs: [], error: queryError instanceof Error ? queryError.message : "Host logs could not be loaded.", windowEnd: now }] as const;
         }
       }
       const query = new URLSearchParams({
@@ -453,9 +490,9 @@ export default function DashboardsView({ servers }: { servers: Server[] }) {
           "/api/servers/" + encodeURIComponent(serverId) + "/metrics?" + query.toString(),
         );
         if (!response || !Array.isArray(response.points)) throw new Error("Metric history returned an invalid response.");
-        return [panel.id, { points: response.points }] as const;
+        return [panel.id, { points: response.points, windowEnd: now }] as const;
       } catch (queryError) {
-        return [panel.id, { points: [], error: queryError instanceof Error ? queryError.message : "Metric history could not be loaded." }] as const;
+        return [panel.id, { points: [], error: queryError instanceof Error ? queryError.message : "Metric history could not be loaded.", windowEnd: now }] as const;
       }
     }));
     setSeriesByPanel(Object.fromEntries(results));
@@ -465,12 +502,6 @@ export default function DashboardsView({ servers }: { servers: Server[] }) {
     const timer = window.setTimeout(() => { void loadDashboards(); }, 0);
     return () => window.clearTimeout(timer);
   }, [loadDashboards]);
-
-  useEffect(() => {
-    if (!selectedDashboard) return;
-    setServerFilter(selectedDashboard.default_server_id ?? "all");
-    setRangeOverride(selectedDashboard.default_time_range || "panel");
-  }, [selectedDashboard?.id, selectedDashboard?.default_server_id, selectedDashboard?.default_time_range]);
 
   useEffect(() => {
     const initial = window.setTimeout(() => { void loadAlertEvents(); }, 0);
@@ -538,6 +569,7 @@ export default function DashboardsView({ servers }: { servers: Server[] }) {
       }
       setShowDashboardForm(false);
       setEditingDashboardId("");
+      clearFilterOverride(dashboardId);
       await loadDashboards();
       setSelectedId(dashboardId);
     } catch (saveError) {
@@ -698,8 +730,8 @@ export default function DashboardsView({ servers }: { servers: Server[] }) {
               <label className="field"><span>Name</span><input value={dashboardName} onChange={(event) => setDashboardName(event.target.value)} required minLength={2} maxLength={120} placeholder="Production overview" /></label>
               <label className="field dashboard-description-field"><span>Description</span><textarea value={dashboardDescription} onChange={(event) => setDashboardDescription(event.target.value)} maxLength={500} rows={2} placeholder="Purpose and audience for this view" /></label>
               <label className="dashboard-default-check"><input type="checkbox" checked={dashboardDefault} onChange={(event) => setDashboardDefault(event.target.checked)} /> Set as the default dashboard</label>
-              <label className="field"><span>Default machine</span><select value={dashboardDefaultServerId} onChange={(event) => setDashboardDefaultServerId(event.target.value)}><option value="">Use each panel's machine</option>{servers.map((server) => <option key={server.id} value={server.id}>{server.name}</option>)}</select></label>
-              <label className="field"><span>Default time range</span><select value={dashboardDefaultTimeRange} onChange={(event) => setDashboardDefaultTimeRange(event.target.value as "panel" | TimeRange)}><option value="panel">Use each panel's range</option>{Object.entries(rangeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+              <label className="field"><span>Default machine</span><select value={dashboardDefaultServerId} onChange={(event) => setDashboardDefaultServerId(event.target.value)}><option value="">Use each panel&apos;s machine</option>{servers.map((server) => <option key={server.id} value={server.id}>{server.name}</option>)}</select></label>
+              <label className="field"><span>Default time range</span><select value={dashboardDefaultTimeRange} onChange={(event) => setDashboardDefaultTimeRange(event.target.value as "panel" | TimeRange)}><option value="panel">Use each panel&apos;s range</option>{Object.entries(rangeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
               <div className="dashboard-builder-actions">
                 <Button variant="secondary" type="button" onClick={() => setShowDashboardForm(false)}>Cancel</Button>
                 <Button type="submit" disabled={busy}>{busy ? "Saving…" : editingDashboardId ? "Save dashboard" : "Create dashboard"}</Button>
@@ -725,7 +757,7 @@ export default function DashboardsView({ servers }: { servers: Server[] }) {
           <aside className="dashboard-list-card">
             <div className="dashboard-list-heading"><span>Saved dashboards</span><Badge variant="secondary">{dashboards.length}</Badge></div>
             {dashboards.map((dashboard) => (
-              <button key={dashboard.id} type="button" className={selectedId === dashboard.id ? "dashboard-list-item dashboard-list-item-active" : "dashboard-list-item"} onClick={() => setSelectedId(dashboard.id)}>
+              <button key={dashboard.id} type="button" className={selectedId === dashboard.id ? "dashboard-list-item dashboard-list-item-active" : "dashboard-list-item"} onClick={() => { clearFilterOverride(dashboard.id); setSelectedId(dashboard.id); }}>
                 <span><strong>{dashboard.name}</strong><small>{dashboard.panels.length} panels</small></span>
                 {dashboard.is_default && <Badge>Default</Badge>}
               </button>
@@ -744,8 +776,8 @@ export default function DashboardsView({ servers }: { servers: Server[] }) {
               </div>
 
               <div className="dashboard-variable-bar">
-                <label className="field"><span>Machine filter</span><select value={serverFilter} onChange={(event) => setServerFilter(event.target.value)}><option value="all">Use each panel's machine</option>{servers.map((server) => <option key={server.id} value={server.id}>{server.name}</option>)}</select></label>
-                <label className="field"><span>Time window</span><select value={rangeOverride} onChange={(event) => setRangeOverride(event.target.value as "panel" | TimeRange)}><option value="panel">Use each panel's range</option>{Object.entries(rangeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+                <label className="field"><span>Machine filter</span><select value={serverFilter} onChange={(event) => updateServerFilter(event.target.value)}><option value="all">Use each panel&apos;s machine</option>{servers.map((server) => <option key={server.id} value={server.id}>{server.name}</option>)}</select></label>
+                <label className="field"><span>Time window</span><select value={rangeOverride} onChange={(event) => updateRangeOverride(event.target.value as "panel" | TimeRange)}><option value="panel">Use each panel&apos;s range</option>{Object.entries(rangeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
                 <div className="dashboard-variable-summary"><strong>{orderedPanels.length} panels</strong><span>{activeRangeLabel}</span><Button variant="secondary" size="sm" onClick={() => void saveViewDefaults()} disabled={busy}>Save view defaults</Button></div>
               </div>
 
