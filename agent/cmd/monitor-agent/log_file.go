@@ -59,24 +59,44 @@ func (writer *rotatingLogWriter) Write(value []byte) (int, error) {
 }
 
 func (writer *rotatingLogWriter) rotate() error {
-	if err := writer.file.Close(); err != nil {
-		return fmt.Errorf("close agent log for rotation: %w", err)
+	if writer.file != nil {
+		if err := writer.file.Close(); err != nil {
+			return fmt.Errorf("close agent log for rotation: %w", err)
+		}
+		writer.file = nil
 	}
+
+	var rotationErr error
 	for index := agentLogBackups; index >= 1; index-- {
 		source := writer.path
 		if index > 1 {
 			source = fmt.Sprintf("%s.%d", writer.path, index-1)
 		}
 		target := fmt.Sprintf("%s.%d", writer.path, index)
-		if _, err := os.Stat(source); err == nil {
-			if err := os.Rename(source, target); err != nil {
-				return fmt.Errorf("rotate agent log: %w", err)
+		if _, err := os.Stat(source); err != nil {
+			if !os.IsNotExist(err) {
+				rotationErr = fmt.Errorf("inspect previous agent log: %w", err)
+				break
 			}
-		} else if !os.IsNotExist(err) {
-			return fmt.Errorf("inspect previous agent log: %w", err)
+			continue
+		}
+		if err := os.Remove(target); err != nil && !os.IsNotExist(err) {
+			rotationErr = fmt.Errorf("remove old agent log backup: %w", err)
+			break
+		}
+		if err := os.Rename(source, target); err != nil {
+			rotationErr = fmt.Errorf("rotate agent log: %w", err)
+			break
 		}
 	}
-	return writer.open()
+
+	if err := writer.open(); err != nil {
+		if rotationErr != nil {
+			return fmt.Errorf("%v; reopen agent log: %w", rotationErr, err)
+		}
+		return err
+	}
+	return rotationErr
 }
 
 func (writer *rotatingLogWriter) Close() error {
