@@ -19,7 +19,7 @@ if [[ ! -s .data/certs/server.crt || ! -s .data/certs/server.key ]]; then
   echo "Generating a local-only development TLS certificate with Docker..."
   docker run --rm --entrypoint /bin/sh \
     --mount "type=bind,source=$ROOT_DIR/.data/certs,target=/certs" \
-    alpine:3.23 -c "apk add --no-cache openssl >/dev/null && openssl req -x509 -newkey rsa:2048 -nodes -keyout /certs/server.key -out /certs/server.crt -days 365 -subj '/CN=localhost' -addext 'subjectAltName=DNS:localhost,IP:127.0.0.1' && chmod 644 /certs/server.crt /certs/server.key"
+    alpine:3.23 -c "apk add --no-cache openssl >/dev/null && openssl req -x509 -newkey rsa:2048 -nodes -keyout /certs/server.key -out /certs/server.crt -days 365 -subj '/CN=localhost' -addext 'subjectAltName=DNS:localhost,IP:127.0.0.1' && chmod 644 /certs/server.crt && chmod 600 /certs/server.key"
 fi
 
 if docker compose up --build -d; then
