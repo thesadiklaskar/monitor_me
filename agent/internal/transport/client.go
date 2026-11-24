@@ -189,7 +189,7 @@ func (c *Client) SendPending(ctx context.Context, session state.Credentials, sto
 // SendPendingLogs streams durable journal batches and removes each local
 // batch only after the ClickHouse-backed control plane acknowledges it.
 func (c *Client) SendPendingLogs(ctx context.Context, session state.Credentials, store *logspool.Store) (int, error) {
-	batches, err := store.Peek(4)
+	batches, err := store.Peek(32)
 	if err != nil {
 		return 0, err
 	}

@@ -20,6 +20,7 @@ var ErrSpoolFull = errors.New("log spool quota exceeded")
 const (
 	maxEventsPerBatch = 32
 	maxEventBodyBytes = 16 << 10
+	maxEncodedBatchBytes = 768 << 10
 )
 
 type Event struct {
@@ -112,14 +113,45 @@ func (s *Store) Cursor() (string, error) {
 func (s *Store) QueuedCursor() (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	batches, err := s.readLocked(0)
+
+	file, err := os.Open(s.path)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("open log spool to inspect its tail: %w", err)
 	}
-	if len(batches) > 0 {
-		return batches[len(batches)-1].Cursor, nil
+	defer file.Close()
+	info, err := file.Stat()
+	if err != nil {
+		return "", fmt.Errorf("stat log spool tail: %w", err)
 	}
-	return s.readCursorLocked()
+	if info.Size() == 0 {
+		return s.readCursorLocked()
+	}
+
+	readSize := info.Size()
+	if readSize > maxEncodedBatchBytes+2 {
+		readSize = maxEncodedBatchBytes + 2
+	}
+	tail := make([]byte, int(readSize))
+	if _, err := file.ReadAt(tail, info.Size()-readSize); err != nil && !errors.Is(err, io.EOF) {
+		return "", fmt.Errorf("read queued log cursor tail: %w", err)
+	}
+	if info.Size() > readSize {
+		firstNewline := bytes.IndexByte(tail, '\n')
+		if firstNewline < 0 {
+			return "", errors.New("log spool tail exceeds the maximum encoded batch size")
+		}
+		tail = tail[firstNewline+1:]
+	}
+	tail = bytes.TrimSuffix(tail, []byte("\n"))
+	lastNewline := bytes.LastIndexByte(tail, '\n')
+	var batch Batch
+	if err := json.Unmarshal(tail[lastNewline+1:], &batch); err != nil {
+		return "", fmt.Errorf("decode last queued log batch: %w", err)
+	}
+	if err := validateBatch(batch); err != nil {
+		return "", fmt.Errorf("validate last queued log batch: %w", err)
+	}
+	return batch.Cursor, nil
 }
 
 func (s *Store) readCursorLocked() (string, error) {
@@ -140,6 +172,9 @@ func (s *Store) Append(batch Batch) error {
 	encoded, err := json.Marshal(batch)
 	if err != nil {
 		return fmt.Errorf("encode log spool batch: %w", err)
+	}
+	if len(encoded) > maxEncodedBatchBytes {
+		return errors.New("encoded log batch exceeds the maximum supported size")
 	}
 	encoded = append(encoded, '\n')
 

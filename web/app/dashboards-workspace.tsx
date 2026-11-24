@@ -217,6 +217,7 @@ export default function DashboardsWorkspace({
         step: rangeSteps[panel.time_range],
         limit: "120",
       });
+      query.set("metric", panel.metric_name);
       if (panel.project_id) query.set("project_id", panel.project_id);
       try {
         const response = await apiRequest<SeriesResponse>(

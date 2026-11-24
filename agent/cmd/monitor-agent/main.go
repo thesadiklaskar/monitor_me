@@ -4,7 +4,6 @@ import (
 	"context"
 	"log/slog"
 	"os"
-	"path/filepath"
 	"runtime"
 	"time"
 
@@ -86,7 +85,7 @@ func run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 
 	ticker := time.NewTicker(cfg.CollectionInterval)
 	defer ticker.Stop()
-	logTicker := time.NewTicker(10 * time.Second)
+	logTicker := time.NewTicker(2 * time.Second)
 	defer logTicker.Stop()
 	for {
 		select {
@@ -101,26 +100,35 @@ func run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 			if !journal.Available() || cfg.GRPCAddress == "" {
 				continue
 			}
-			cursor, cursorErr := logStore.QueuedCursor()
-			if cursorErr != nil {
-				logger.Error("could not read acknowledged journal cursor", "error", cursorErr)
-				continue
-			}
-			events, nextCursor, collectErr := journal.Collect(ctx, cursor, 32)
-			if collectErr != nil {
-				logger.Warn("journald collection failed", "error", collectErr)
-				continue
-			}
-			if len(events) > 0 {
+			// Read at most 16 bounded pages per tick. A full local WAL stops
+			// collection without advancing the durable journal cursor.
+			for page := 0; page < 16; page++ {
+				cursor, cursorErr := logStore.QueuedCursor()
+				if cursorErr != nil {
+					logger.Error("could not read queued journal cursor", "error", cursorErr)
+					break
+				}
+				events, nextCursor, collectErr := journal.Collect(ctx, cursor, 32)
+				if collectErr != nil {
+					logger.Warn("journald collection failed", "error", collectErr)
+					break
+				}
+				if len(events) == 0 {
+					break
+				}
+				if nextCursor == cursor {
+					logger.Warn("journald page did not advance its cursor; stopping collection")
+					break
+				}
 				batch, batchErr := logspool.NewBatch(events, nextCursor, time.Now().UTC().UnixNano())
 				if batchErr == nil {
 					batchErr = logStore.Append(batch)
 				}
 				if batchErr != nil {
 					logger.Error("could not persist local log batch", "error", batchErr, "event_count", len(events))
-				} else {
-					logger.Debug("journald batch persisted locally", "batch_id", batch.ID, "event_count", len(events))
+					break
 				}
+				logger.Debug("journald batch persisted locally", "batch_id", batch.ID, "event_count", len(events))
 			}
 		case <-ticker.C:
 			samples, collectErr := hostCollector.Collect(ctx)

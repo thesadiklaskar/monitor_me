@@ -75,6 +75,41 @@ func TestQueuedCursorUsesTailOfDurableQueue(t *testing.T) {
 	}
 }
 
+func TestQueuedCursorUsesLastDurableBatch(t *testing.T) {
+	store, err := Open(filepath.Join(t.TempDir(), "spool"), 2<<20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	first, err := NewBatch([]Event{testEvent()}, "cursor-1", time.Now().UnixNano())
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := NewBatch([]Event{testEvent()}, "cursor-2", time.Now().UnixNano())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Append(first); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Append(second); err != nil {
+		t.Fatal(err)
+	}
+	if cursor, err := store.QueuedCursor(); err != nil || cursor != "cursor-2" {
+		t.Fatalf("QueuedCursor() = %q, %v; want cursor-2", cursor, err)
+	}
+	if err := store.Ack(first.ID); err != nil {
+		t.Fatal(err)
+	}
+	if cursor, err := store.QueuedCursor(); err != nil || cursor != "cursor-2" {
+		t.Fatalf("QueuedCursor() after head ACK = %q, %v; want cursor-2", cursor, err)
+	}
+	if err := store.Ack(second.ID); err != nil {
+		t.Fatal(err)
+	}
+	if cursor, err := store.QueuedCursor(); err != nil || cursor != "cursor-2" {
+		t.Fatalf("QueuedCursor() after queue drain = %q, %v; want acknowledged cursor-2", cursor, err)
+	}
+}
 func TestAckMustFollowQueueOrder(t *testing.T) {
 	store, err := Open(filepath.Join(t.TempDir(), "spool"), 2<<20)
 	if err != nil { t.Fatal(err) }

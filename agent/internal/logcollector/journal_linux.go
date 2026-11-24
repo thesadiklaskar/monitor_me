@@ -178,7 +178,7 @@ func normalizeRecord(record journalRecord, observedAt time.Time) (logspool.Event
 		attributes["systemd_unit"] = bounded(record.Unit, 256)
 	}
 	if record.CGroup != "" {
-		attributes["systemd_cgroup"] = bounded(record.CGroup, 512)
+		attributes["systemd_cgroup"] = bounded(record.CGroup, 256)
 	}
 	if record.Comm != "" {
 		attributes["comm"] = bounded(record.Comm, 128)
