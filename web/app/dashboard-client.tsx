@@ -322,6 +322,7 @@ function EnrollmentDialog({
                 <li>Run this from the Monitor Me repository folder in an elevated or normal PowerShell window.</li>
                 <li>The helper builds the Windows agent with Docker when needed, then starts it.</li>
                 <li>Paste the one-time token when prompted; input is hidden and the token is not saved.</li>
+                <li>For a remote host, also pass <code>-CaFile C:\\path\\to\\control-plane-ca.crt</code>; the default certificate path is for the local Compose host.</li>
               </ol>
             </>
           ) : (
@@ -333,6 +334,7 @@ function EnrollmentDialog({
                 <li>Run this from a Linux checkout of the Monitor Me repository on a systemd host.</li>
                 <li>The helper builds the native Linux agent with Docker, installs the systemd service and starts it.</li>
                 <li>Paste the one-time token when prompted; the installer removes it from the service environment after enrollment.</li>
+                <li>For a remote host, append <code>--ca-file /path/to/control-plane-ca.crt</code> using a trusted copy of the control-plane certificate.</li>
               </ol>
             </>
           )}
