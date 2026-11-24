@@ -337,7 +337,7 @@ export default function OverviewDashboard({ servers }: { servers: Server[] }) {
             <span>Memory used</span><strong>{formatMetric(latestByMetric.get("host.memory.used")?.value, "bytes")}</strong><small>Latest host sample</small>
           </article>
           <article className="overview-summary-card">
-            <span>Storage volumes</span><strong>{storageSamples.length.toLocaleString()}</strong><small>Mounted volumes reporting usage</small>
+            <span>Storage volumes</span><strong>{data ? storageSamples.length.toLocaleString() : "Loading"}</strong><small>Mounted volumes reporting usage</small>
           </article>
           <article className="overview-summary-card">
             <span>Processes</span><strong>{formatMetric(latestByMetric.get("host.process.count")?.value, "count")}</strong><small>Latest host inventory</small>
