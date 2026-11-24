@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { Activity, Bell, Copy, FileText, Folder, LayoutDashboard, PanelLeftClose, PanelLeftOpen, Plus, RefreshCw, Server as ServerIcon } from "lucide-react";
+import { Activity, Bell, Copy, FileText, Folder, LayoutDashboard, Plus, RefreshCw, Server as ServerIcon } from "lucide-react";
 import { apiRequest } from "@/lib/client-api";
 import { ServerDetail } from "./server-detail";
 import ProjectWorkspace from "./project-workspace";
@@ -339,20 +339,6 @@ export default function DashboardClient() {
   const [showLogs, setShowLogs] = useState(false);
   const [showAlerts, setShowAlerts] = useState(false);
   const [showOperations, setShowOperations] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-
-  useEffect(() => {
-    try { setSidebarCollapsed(window.localStorage.getItem("monitor-me-sidebar-collapsed") === "true"); } catch { /* browser storage may be unavailable */ }
-  }, []);
-
-  function toggleSidebar() {
-    setSidebarCollapsed((current) => {
-      const next = !current;
-      try { window.localStorage.setItem("monitor-me-sidebar-collapsed", String(next)); } catch { /* preserve the in-memory preference */ }
-      return next;
-    });
-  }
-
   const loadServers = useCallback(async () => {
     setInventoryBusy(true);
     setInventoryError("");
@@ -462,26 +448,25 @@ export default function DashboardClient() {
   }
 
   return (
-    <div className={sidebarCollapsed ? "app-shell app-shell-sidebar-collapsed" : "app-shell"}>
-      <aside className={sidebarCollapsed ? "sidebar sidebar-collapsed" : "sidebar"}>
+    <div className="app-shell">
+      <aside className="sidebar">
         <div className="sidebar-brand">
           <div className="brand-mark">M</div>
           <div className="sidebar-brand-copy"><p className="brand-name">MONITOR ME</p><p className="brand-subtitle">Observability</p></div>
-          <button className="sidebar-toggle" type="button" onClick={toggleSidebar} aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"} title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}>{sidebarCollapsed ? <PanelLeftOpen size={18} strokeWidth={1.8} /> : <PanelLeftClose size={18} strokeWidth={1.8} />}</button>
         </div>
         <div className="workspace-switcher" title="Single installation">
           <span className="workspace-icon"><Activity size={15} strokeWidth={1.8} /></span>
           <div className="workspace-switcher-copy"><strong>Infrastructure</strong><span>Single installation</span></div>
         </div>
         <nav className="side-nav" aria-label="Main navigation">
-          <span className="nav-section-label">Monitor</span>
-          <button title="Servers" aria-label="Servers" className={!showProjects && !showDashboards && !showLogs && !showAlerts && !showOperations ? "nav-item nav-item-active" : "nav-item"} type="button" onClick={() => { setShowProjects(false); setShowDashboards(false); setShowLogs(false); setShowAlerts(false); setShowOperations(false); setSelectedServer(null); }}><span className="nav-item-icon"><ServerIcon size={18} strokeWidth={1.8} /></span><span className="nav-item-label">Servers</span></button>
-          <button title="Logs" aria-label="Logs" className={showLogs ? "nav-item nav-item-active" : "nav-item"} type="button" onClick={() => { setShowProjects(false); setShowDashboards(false); setShowAlerts(false); setShowOperations(false); setSelectedServer(null); setShowLogs(true); }}><span className="nav-item-icon"><FileText size={18} strokeWidth={1.8} /></span><span className="nav-item-label">Logs</span></button>
-          <button title="Projects" aria-label="Projects" className={showProjects ? "nav-item nav-item-active" : "nav-item"} type="button" onClick={() => { setShowDashboards(false); setShowLogs(false); setShowAlerts(false); setShowOperations(false); setSelectedServer(null); setShowProjects(true); }}><span className="nav-item-icon"><Folder size={18} strokeWidth={1.8} /></span><span className="nav-item-label">Projects</span></button>
-          <button title="Dashboards" aria-label="Dashboards" className={showDashboards ? "nav-item nav-item-active" : "nav-item"} type="button" onClick={() => { setShowProjects(false); setShowLogs(false); setShowAlerts(false); setShowOperations(false); setSelectedServer(null); setShowDashboards(true); }}><span className="nav-item-icon"><LayoutDashboard size={18} strokeWidth={1.8} /></span><span className="nav-item-label">Dashboards</span></button>
-          <span className="nav-section-label nav-section-spaced">Manage</span>
-          <button title="Alerts" aria-label="Alerts" className={showAlerts ? "nav-item nav-item-active" : "nav-item"} type="button" onClick={() => { setShowProjects(false); setShowDashboards(false); setShowLogs(false); setShowOperations(false); setSelectedServer(null); setShowAlerts(true); }}><span className="nav-item-icon"><Bell size={18} strokeWidth={1.8} /></span><span className="nav-item-label">Alerts</span></button>
-          <button title="Operations" aria-label="Operations" className={showOperations ? "nav-item nav-item-active" : "nav-item"} type="button" onClick={() => { setShowProjects(false); setShowDashboards(false); setShowLogs(false); setShowAlerts(false); setSelectedServer(null); setShowOperations(true); }}><span className="nav-item-icon"><Activity size={18} strokeWidth={1.8} /></span><span className="nav-item-label">Operations</span></button>
+          <span className="nav-section-label">Monitoring</span>
+          <button title="Server Inventory" aria-label="Server Inventory" className={!showProjects && !showDashboards && !showLogs && !showAlerts && !showOperations ? "nav-item nav-item-active" : "nav-item"} type="button" onClick={() => { setShowProjects(false); setShowDashboards(false); setShowLogs(false); setShowAlerts(false); setShowOperations(false); setSelectedServer(null); }}><span className="nav-item-icon"><ServerIcon size={18} strokeWidth={1.8} /></span><span className="nav-item-label">Server Inventory</span></button>
+          <button title="Log Explorer" aria-label="Log Explorer" className={showLogs ? "nav-item nav-item-active" : "nav-item"} type="button" onClick={() => { setShowProjects(false); setShowDashboards(false); setShowAlerts(false); setShowOperations(false); setSelectedServer(null); setShowLogs(true); }}><span className="nav-item-icon"><FileText size={18} strokeWidth={1.8} /></span><span className="nav-item-label">Log Explorer</span></button>
+          <button title="Project Mapping" aria-label="Project Mapping" className={showProjects ? "nav-item nav-item-active" : "nav-item"} type="button" onClick={() => { setShowDashboards(false); setShowLogs(false); setShowAlerts(false); setShowOperations(false); setSelectedServer(null); setShowProjects(true); }}><span className="nav-item-icon"><Folder size={18} strokeWidth={1.8} /></span><span className="nav-item-label">Project Mapping</span></button>
+          <button title="Saved Dashboards" aria-label="Saved Dashboards" className={showDashboards ? "nav-item nav-item-active" : "nav-item"} type="button" onClick={() => { setShowProjects(false); setShowLogs(false); setShowAlerts(false); setShowOperations(false); setSelectedServer(null); setShowDashboards(true); }}><span className="nav-item-icon"><LayoutDashboard size={18} strokeWidth={1.8} /></span><span className="nav-item-label">Saved Dashboards</span></button>
+          <span className="nav-section-label nav-section-spaced">Management</span>
+          <button title="Alert Rules" aria-label="Alert Rules" className={showAlerts ? "nav-item nav-item-active" : "nav-item"} type="button" onClick={() => { setShowProjects(false); setShowDashboards(false); setShowLogs(false); setShowOperations(false); setSelectedServer(null); setShowAlerts(true); }}><span className="nav-item-icon"><Bell size={18} strokeWidth={1.8} /></span><span className="nav-item-label">Alert Rules</span></button>
+          <button title="Remote Operations" aria-label="Remote Operations" className={showOperations ? "nav-item nav-item-active" : "nav-item"} type="button" onClick={() => { setShowProjects(false); setShowDashboards(false); setShowLogs(false); setShowAlerts(false); setSelectedServer(null); setShowOperations(true); }}><span className="nav-item-icon"><Activity size={18} strokeWidth={1.8} /></span><span className="nav-item-label">Remote Operations</span></button>
         </nav>
         <div className="sidebar-bottom">
           <div className="sidebar-status" title="Self-hosted single installation"><span className="status-dot status-dot-online" /><span className="sidebar-status-label">Self-hosted · Single install</span></div>
