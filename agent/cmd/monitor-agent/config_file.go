@@ -50,7 +50,7 @@ func loadConfigFileArgument() error {
 		if key == "" || strings.ContainsAny(key, " \t") {
 			return fmt.Errorf("invalid agent config key on line %d", lineNumber)
 		}
-		if strings.HasPrefix(value, """) {
+		if strings.HasPrefix(value, "\"") {
 			decoded, decodeErr := strconv.Unquote(value)
 			if decodeErr != nil {
 				return fmt.Errorf("invalid quoted agent config value on line %d", lineNumber)
