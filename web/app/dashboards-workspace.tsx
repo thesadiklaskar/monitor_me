@@ -222,7 +222,10 @@ export default function DashboardsWorkspace({
         const response = await apiRequest<SeriesResponse>(
           "/api/servers/" + encodeURIComponent(panel.server_id) + "/metrics?" + query.toString(),
         );
-        return [panel.id, { points: Array.isArray(response.points) ? response.points : [] }] as const;
+        if (!response || !Array.isArray(response.points)) {
+          throw new Error("Metric history returned an invalid response.");
+        }
+        return [panel.id, { points: response.points }] as const;
       } catch (queryError) {
         return [panel.id, { points: [], error: queryError instanceof Error ? queryError.message : "Metric history could not be loaded." }] as const;
       }
