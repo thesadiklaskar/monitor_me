@@ -3,10 +3,12 @@ set -eu
 
 SERVER_URL=""
 GRPC_ADDRESS=""
+FORCE_ENROLL=0
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --server-url) SERVER_URL="$2"; shift 2 ;;
     --grpc-address) GRPC_ADDRESS="$2"; shift 2 ;;
+    --force-enroll) FORCE_ENROLL=1; shift ;;
     -h|--help)
       echo "Monitor Me native Linux installer"
       echo "Usage: curl -fsSL https://monitor.example/install/agent-linux.sh | sudo bash -s -- --server-url https://monitor.example --grpc-address monitor.example:8443"
@@ -54,6 +56,10 @@ CONFIG_DIR="/etc/monitor-me"
 BINARY="/usr/local/bin/monitor-agent"
 STATE_FILE="$DATA_DIR/agent-state.json"
 CONFIG_FILE="$CONFIG_DIR/agent.env"
+if [ "$FORCE_ENROLL" -eq 1 ]; then
+  systemctl stop monitor-me-agent 2>/dev/null || true
+  rm -f "$STATE_FILE"
+fi
 TEMP_DIR="$(mktemp -d)"
 old_tty=""
 cleanup() {
