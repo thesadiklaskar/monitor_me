@@ -81,11 +81,16 @@ ClickHouse is installed in the Compose profiles and an initial MergeTree schema 
 - A simple, stable sidebar with full menu labels always visible; do not collapse labels into unexplained icons or initials.
 - Consistent icon system, compact typography, clear information hierarchy, precise units, timestamps and timezone.
 - Global node selector, time-range picker, refresh/live state, health indicators and search.
-- Purpose-built overview, node details, metrics, processes, network, services, alerts, operations, log explorer and settings pages. Remove placeholder menu items and irrelevant phase/status copy.
+- Four primary areas only: Servers, Logs, Dashboards and Alerts. Server detail may show metrics, processes, network, services and technical host metadata. Do not expose remote stop/restart/shell operations, project administration, customer settings or workspace management in the monitoring product.
 - Log Explorer: time picker, severity filter, source/node filters, full-text query, structured attribute filters, polling live tail with pause/resume, JSON detail, context around an event, keyset pagination/virtualized rendering and saved queries. Initial severity/source/text filters, event JSON detail and bounded 200-row keyset pages are implemented; context search and saved queries remain.
 - Useful no-data/unsupported/permission-denied/stale/error states; never show fabricated zeroes or pretend unavailable capabilities are active.
 - Dense tables and virtualized lists for large data. Never render millions of log rows into the browser at once; query and page results server-side.
 - Keyboard navigation, visible focus, responsive layouts, no decorative controls that do not work.
+
+
+## Monitoring-only boundary
+
+Monitor Me reads host metrics, logs and health state and presents them in the local dashboard. It is not a remote administration tool: do not expose remote process/service stop, restart, arbitrary command or shell controls in the product UI or public browser API. Agent enrollment and credential rotation remain necessary device-management functions; they are not customer accounts. The existing backend still contains legacy remote-operation handlers and related database code, which must be disabled or removed in a controlled cleanup rather than exposed as user-facing functionality.
 
 ## Reliability, security and scale gates
 
