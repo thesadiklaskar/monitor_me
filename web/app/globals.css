@@ -671,7 +671,7 @@ input:focus-visible,textarea:focus-visible,select:focus-visible,button:focus-vis
 }
 
 
-/* Grafana-inspired log labels and dashboard chart affordances. */
+/* Structured log labels and dashboard chart affordances. */
 .log-labels-cell { min-width: 190px; max-width: 310px; white-space: normal; }
 .log-label-list { display: flex; flex-wrap: wrap; gap: 5px; }
 .log-label {

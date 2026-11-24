@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type DragEvent, type FormEvent } from "react";
-import { Activity, ArrowDown, ArrowUp, BarChart3, Gauge, GripVertical, LayoutDashboard, Plus, RefreshCw, Save, Table2, Trash2, Waves, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { Activity, ArrowDown, ArrowUp, GripVertical, LayoutDashboard, Plus, RefreshCw, Save, Trash2, X } from "lucide-react";
 import { apiRequest } from "@/lib/client-api";
 import { formatByteRate } from "@/lib/format";
 import { Button } from "@/components/ui/button";
@@ -616,7 +616,7 @@ export default function DashboardsView({ servers }: { servers: Server[] }) {
                         className={draggingPanelId === panel.id ? "dashboard-panel-card dashboard-panel-card-v2 dashboard-panel-dragging" : "dashboard-panel-card dashboard-panel-card-v2"}
                         style={{ gridColumn: "span " + (panel.grid_width || 6) }}
                         draggable={!busy}
-                        onDragStart={(event: DragEvent<HTMLElement>) => { setDraggingPanelId(panel.id); event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("text/plain", panel.id); }}
+                        onDragStart={(event) => { setDraggingPanelId(panel.id); event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("text/plain", panel.id); }}
                         onDragOver={(event) => { if (draggingPanelId) event.preventDefault(); }}
                         onDrop={(event) => { event.preventDefault(); const id = event.dataTransfer.getData("text/plain") || draggingPanelId; if (id && id !== panel.id) void movePanelToPosition(id, index); setDraggingPanelId(""); }}
                         onDragEnd={() => setDraggingPanelId("")}

@@ -2,9 +2,9 @@
 
 A self-hosted infrastructure monitoring product for a VPS, VM, cloud VM, VPC-hosted Linux machine, dedicated server or a small fleet. Every installation runs independently on infrastructure controlled by its owner. Monitoring data stays with that installation.
 
-Monitor Me is an original monitoring product. It does not embed Grafana, Prometheus, Zabbix or Netdata.
+Monitor Me is an independently implemented monitoring product with a native web interface, native query builder and native visualization engine.
 
-> **Release status:** this is the development `main` branch, not a certified public release. The latest frontend changes and `install.sh` have not yet passed a fresh green CI run, browser review or a clean Ubuntu/Debian VPS installation. Treat the platform matrix and feature limits below as the current truth; do not assume zero-lag, unlimited scale or full Grafana parity.
+> **Release status:** this is the development `main` branch, not a certified public release. The API, database, migration runner, agent-artifact builder and base web dashboard previously started successfully in one Windows Docker Desktop environment. The native dashboard editor and new visualization set in the current commits still require a fresh local build, browser acceptance and real telemetry review. Clean-host production install, multiple Linux distributions, ARM hardware, backup/restore and load limits remain unverified.
 
 ## Product principles
 
@@ -22,13 +22,13 @@ Monitor Me is an original monitoring product. It does not embed Grafana, Prometh
 |---|---|---|
 | Machine inventory | Enrolment tokens, machine status, agent heartbeat and credential rotation | The owner must keep the dashboard protected by the configured network allowlist |
 | Host metrics | CPU, memory, swap, disk, network, uptime, process count and selected process/socket metadata | Metric availability differs by OS; no eBPF or HTTP request tracing |
-| Metric dashboards | Saved installation-wide dashboards, time-series/stat/table panels, historical averages and min/max ranges, persisted up/down ordering | No drag/resize grid, template variables, annotations, log panels or advanced query editor yet |
+| Metric dashboards | Native query builder for machine, metric and time range; saved panels with time-series, area, bar, stat, gauge, heatmap and table views; per-panel width settings; drag/drop and keyboard reorder; panel editing; installation-wide machine/time filters | Dashboard filters are currently session-level, not saved variable definitions. Annotations, log panels inside dashboards, multi-metric expressions and panel resize by pointer are not implemented yet |
 | Live metrics | Authenticated agent stream, bounded WebSocket updates and historical catch-up | Live freshness depends on agent sampling, storage and network; no zero-latency guarantee |
 | Logs | Linux journald ingestion through bounded local spool and ClickHouse search; time/severity/source filters and paged results | The UI's 10-second auto-refresh is HTTP polling, not push-based live tail. General file/syslog tail and rotation support are not delivered. Windows Event Log source code needs runtime acceptance |
 | Alerts | Metric threshold rules, firing/recovered events and in-app notifications | External email/chat notification providers are not implemented |
 | Deployment | Linux production Compose stack, health checks, migration runner, backup/restore for PostgreSQL and rollback of application images | ClickHouse backup/restore, automated upgrades and clean-host acceptance remain release work |
 
-Do not describe this as a complete Grafana replacement until the remaining query/panel/log features and release gates are tested.
+The native dashboard surface is an in-house implementation. Treat the feature matrix and release gates below as the current truth; do not claim capabilities that have not passed local acceptance.
 
 ## Install the control plane
 
