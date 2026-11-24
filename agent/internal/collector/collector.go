@@ -619,8 +619,8 @@ func detectLinuxCloudProviderHint() string {
 		return "vultr"
 	case strings.Contains(value, "linode") || strings.Contains(value, "akamai"):
 		return "linode"
-	case strings.Contains(value, "microsoft corporation") || strings.Contains(value, "virtual machine"):
-		return "azure_or_hyperv"
+	case strings.Contains(value, "microsoft azure") || strings.Contains(value, "azure"):
+		return "azure"
 	case strings.Contains(value, "oracle"):
 		return "oracle_cloud"
 	case strings.Contains(value, "alibaba"):
