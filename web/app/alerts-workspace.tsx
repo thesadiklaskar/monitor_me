@@ -2,6 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { apiRequest } from "@/lib/client-api";
+import { Button } from "@/components/ui/button";
 
 type Server = { id: string; name: string };
 type Project = { id: string; name: string; slug: string };
@@ -134,7 +135,7 @@ export default function AlertsWorkspace({ servers, projects, role, onBack }: {
               <label className="field"><span>Server scope</span><select value={serverId} onChange={(event) => setServerId(event.target.value)}><option value="">All servers</option>{servers.map((server) => <option key={server.id} value={server.id}>{server.name}</option>)}</select></label>
               <label className="field"><span>Project scope</span><select value={projectId} onChange={(event) => setProjectId(event.target.value)}><option value="">All projects</option>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label>
             </div>
-            <div className="alerts-form-footer"><span>Project rules match samples carrying that project&apos;s attribution.</span><button className="button button-primary" type="submit" disabled={busy}>{busy ? "Saving…" : "Create rule"}</button></div>
+            <div className="alerts-form-footer"><span>Project rules match samples carrying that project&apos;s attribution.</span><Button className="button button-primary" variant="default" type="submit" disabled={busy}>{busy ? "Saving…" : "Create rule"}</Button></div>
           </form>
         </section>
       )}
@@ -147,7 +148,7 @@ export default function AlertsWorkspace({ servers, projects, role, onBack }: {
             const project = projects.find((item) => item.id === rule.project_id);
             return <div className="alert-rule-row" key={rule.id}>
               <div><strong>{rule.name}</strong><small>{metricDef?.label ?? rule.metric_name} {rule.operator} {formatNumber(rule.threshold, metricDef?.unit ?? "")}</small><small>{server?.name ?? "All servers"} · {project?.name ?? "All projects"}</small></div>
-              {canAdminister && <button className="project-inline-delete" type="button" disabled={busy} onClick={() => void deleteRule(rule)}>Delete</button>}
+              {canAdminister && <Button className="project-inline-delete" variant="destructive" size="sm" type="button" disabled={busy} onClick={() => void deleteRule(rule)}>Delete</Button>}
             </div>;
           })}
         </section>
@@ -162,11 +163,11 @@ export default function AlertsWorkspace({ servers, projects, role, onBack }: {
         </section>
       </div>
       <section className="alert-list-card alert-notifications-card">
-        <div className="panel-heading"><div><h2>In-app notifications</h2><p>Delivered separately to each organization member</p></div><button className="button button-secondary" type="button" onClick={() => { void load(); }}>Refresh</button></div>
+        <div className="panel-heading"><div><h2>In-app notifications</h2><p>Delivered separately to each organization member</p></div><Button className="button button-secondary" variant="secondary" type="button" onClick={() => { void load(); }}>Refresh</Button></div>
         {loading ? <div className="project-empty">Loading notifications…</div> : notifications.length === 0 ? <div className="project-empty">No notifications yet.</div> : notifications.map((item) => (
           <div className={item.read_at ? "alert-notification-row" : "alert-notification-row alert-notification-unread"} key={item.id}>
             <div><strong>{item.title}</strong><p>{item.message}</p><small>{formatTime(item.created_at)}</small></div>
-            {!item.read_at && <button className="project-inline-delete" type="button" onClick={() => void markRead(item)}>Mark read</button>}
+            {!item.read_at && <Button className="project-inline-delete" variant="ghost" size="sm" type="button" onClick={() => void markRead(item)}>Mark read</Button>}
           </div>
         ))}
       </section>

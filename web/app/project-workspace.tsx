@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { apiRequest } from "@/lib/client-api";
+import { Button } from "@/components/ui/button";
 
 type Server = { id: string; name: string; hostname?: string };
 type Project = { id: string; name: string; slug: string; created_at: string };
@@ -180,7 +181,7 @@ export default function ProjectWorkspace({
               </label>
             </div>
             <div className="project-form-actions">
-              <button className="button button-primary" type="submit" disabled={busy}>{busy ? "Saving…" : "Create project"}</button>
+              <Button className="button button-primary" variant="default" type="submit" disabled={busy}>{busy ? "Saving…" : "Create project"}</Button>
             </div>
           </form>
         </section>
@@ -222,7 +223,7 @@ export default function ProjectWorkspace({
               </label>
             </div>
             <div className="project-form-actions">
-              <button className="button button-primary" type="submit" disabled={busy}>{busy ? "Saving…" : "Create mapping"}</button>
+              <Button className="button button-primary" variant="default" type="submit" disabled={busy}>{busy ? "Saving…" : "Create mapping"}</Button>
             </div>
           </form>
         </section>
@@ -243,7 +244,7 @@ export default function ProjectWorkspace({
               <article className="project-card" key={project.id}>
                 <div className="project-card-heading">
                   <div><h3>{project.name}</h3><code>{project.slug}</code></div>
-                  {canAdminister && <button className="project-inline-delete" type="button" onClick={() => void deleteProject(project)} disabled={busy}>Delete</button>}
+                  {canAdminister && <Button className="project-inline-delete" variant="destructive" size="sm" type="button" onClick={() => void deleteProject(project)} disabled={busy}>Delete</Button>}
                 </div>
                 <div className="mapping-list">
                   <strong>{projectMappings.length} workload mappings</strong>
@@ -255,7 +256,7 @@ export default function ProjectWorkspace({
                         <strong>{mapping.serverName} · {mapping.workload_type}</strong>
                         <small>{mapping.workload_selector} · {mapping.attribution_method}</small>
                       </div>
-                      {canManageMappings && <button className="project-inline-delete" type="button" onClick={() => void deleteMapping(mapping)} disabled={busy}>Remove</button>}
+                      {canManageMappings && <Button className="project-inline-delete" variant="destructive" size="sm" type="button" onClick={() => void deleteMapping(mapping)} disabled={busy}>Remove</Button>}
                     </div>
                   ))}
                 </div>
