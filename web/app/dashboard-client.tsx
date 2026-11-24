@@ -4,8 +4,8 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { Bell, Copy, FileText, LayoutDashboard, PanelLeftClose, PanelLeftOpen, Plus, RefreshCw, Server as ServerIcon } from "lucide-react";
 import { apiRequest } from "@/lib/client-api";
 import { ServerDetail } from "./server-detail";
-import AlertsWorkspace from "./alerts-workspace";
-import DashboardsWorkspace from "./dashboards-workspace";
+import AlertsView from "./alerts";
+import DashboardsView from "./dashboards";
 import LogExplorer from "./log-explorer";
 
 type Server = {
@@ -437,9 +437,9 @@ export default function DashboardClient() {
         {showLogs ? (
           <LogExplorer servers={servers} />
         ) : showAlerts ? (
-          <AlertsWorkspace servers={servers} role="owner" />
+          <AlertsView servers={servers} role="owner" />
         ) : showDashboards ? (
-          <DashboardsWorkspace servers={servers} role="owner" />
+          <DashboardsView servers={servers} role="owner" />
         ) : selectedServer ? (
           <ServerDetail server={selectedServer} apiPublicURL={publicAPIURL} onBack={() => setSelectedServer(null)} />
         ) : <>
