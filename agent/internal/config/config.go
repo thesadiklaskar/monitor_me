@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -25,7 +24,6 @@ type Config struct {
 	TLSCAFile           string
 	EnrollmentToken     string
 	StateFile           string
-	AllowedSystemdUnits []string
 }
 
 // Load reads and validates environment configuration without echoing secrets.
@@ -44,11 +42,6 @@ func Load() (Config, error) {
 	}
 	cfg.StateFile = env("MONITOR_AGENT_STATE_FILE", filepath.Join(cfg.SpoolDirectory, "agent-state.json"))
 	cfg.LogSpoolDirectory = env("MONITOR_LOG_SPOOL_DIR", filepath.Join(cfg.SpoolDirectory, "logs"))
-	allowedUnits, err := parseAllowedSystemdUnits(os.Getenv("MONITOR_ALLOWED_SYSTEMD_UNITS"))
-	if err != nil {
-		return Config{}, err
-	}
-	cfg.AllowedSystemdUnits = allowedUnits
 
 	if raw := os.Getenv("MONITOR_COLLECTION_INTERVAL"); raw != "" {
 		interval, err := time.ParseDuration(raw)
@@ -101,24 +94,3 @@ func env(key, fallback string) string {
 	return fallback
 }
 
-var allowedSystemdUnitPattern = regexp.MustCompile("^[A-Za-z0-9_.:@-]{1,180}\\.service$")
-
-func parseAllowedSystemdUnits(raw string) ([]string, error) {
-	seen := make(map[string]struct{})
-	units := make([]string, 0)
-	for _, item := range strings.Split(raw, ",") {
-		unit := strings.TrimSpace(item)
-		if unit == "" {
-			continue
-		}
-		if !allowedSystemdUnitPattern.MatchString(unit) {
-			return nil, fmt.Errorf("MONITOR_ALLOWED_SYSTEMD_UNITS must contain comma-separated systemd .service unit names")
-		}
-		if _, exists := seen[unit]; exists {
-			continue
-		}
-		seen[unit] = struct{}{}
-		units = append(units, unit)
-	}
-	return units, nil
-}
