@@ -17,6 +17,7 @@ type RetentionPolicy struct {
 type RetentionResult struct {
 	SamplesDeleted     int64
 	BatchesDeleted     int64
+	LogBatchesDeleted  int64
 	LiveTicketsDeleted int64
 }
 
@@ -99,6 +100,22 @@ func PruneBatch(ctx context.Context, db *sql.DB, now time.Time, policy Retention
 	if err != nil {
 		return RetentionResult{}, fmt.Errorf("count expired telemetry idempotency records: %w", err)
 	}
+	logBatchResult, err := tx.ExecContext(ctx, `
+		WITH expired AS (
+			SELECT agent_id, batch_id FROM agent_log_batches
+			WHERE received_at < $1 ORDER BY received_at
+			LIMIT $2 FOR UPDATE SKIP LOCKED
+		)
+		DELETE FROM agent_log_batches batch USING expired
+		WHERE batch.agent_id = expired.agent_id AND batch.batch_id = expired.batch_id
+	`, now.Add(-policy.IdempotencyAge), policy.BatchSize)
+	if err != nil {
+		return RetentionResult{}, fmt.Errorf("delete expired log idempotency records: %w", err)
+	}
+	logBatchesDeleted, err := logBatchResult.RowsAffected()
+	if err != nil {
+		return RetentionResult{}, fmt.Errorf("count expired log idempotency records: %w", err)
+	}
 	liveTicketResult, err := tx.ExecContext(ctx, `
 		WITH expired AS (
 			SELECT id
@@ -126,6 +143,7 @@ func PruneBatch(ctx context.Context, db *sql.DB, now time.Time, policy Retention
 	return RetentionResult{
 		SamplesDeleted:     samplesDeleted,
 		BatchesDeleted:     batchesDeleted,
+		LogBatchesDeleted:  logBatchesDeleted,
 		LiveTicketsDeleted: liveTicketsDeleted,
 	}, nil
 }
@@ -145,15 +163,17 @@ func RunRetention(ctx context.Context, db *sql.DB, policy RetentionPolicy, logge
 				}
 				return
 			}
-			if result.SamplesDeleted > 0 || result.BatchesDeleted > 0 || result.LiveTicketsDeleted > 0 {
+			if result.SamplesDeleted > 0 || result.BatchesDeleted > 0 || result.LogBatchesDeleted > 0 || result.LiveTicketsDeleted > 0 {
 				logger.Info("telemetry retention sweep completed",
 					"samples_deleted", result.SamplesDeleted,
 					"batch_records_deleted", result.BatchesDeleted,
+					"log_batch_records_deleted", result.LogBatchesDeleted,
 					"live_tickets_deleted", result.LiveTicketsDeleted,
 				)
 			}
 			if result.SamplesDeleted < int64(policy.BatchSize) &&
 				result.BatchesDeleted < int64(policy.BatchSize) &&
+				result.LogBatchesDeleted < int64(policy.BatchSize) &&
 				result.LiveTicketsDeleted < int64(policy.BatchSize) {
 				return
 			}
