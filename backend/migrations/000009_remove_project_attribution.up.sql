@@ -1,5 +1,5 @@
 -- Remove project/workload attribution from the monitoring data model.
--- Metric, log, dashboard, alert and machine records remain intact; only project
+-- Metric, log, dashboard, alert and machine records remain intact, and only project
 -- metadata and project-scoped associations are retired.
 BEGIN;
 
