@@ -117,7 +117,7 @@ try {
         $encodedValue = ConvertTo-Json -InputObject ([string]$entry.Value) -Compress
         "$($entry.Key)=$encodedValue"
     }
-    $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+    $utf8NoBom = New-Object System.Text.UTF8Encoding -ArgumentList $false
     [System.IO.File]::WriteAllLines($configFile, [string[]]$configLines, $utf8NoBom)
     $token = $null
     $secureToken = $null
