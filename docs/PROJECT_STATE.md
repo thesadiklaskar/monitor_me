@@ -19,8 +19,8 @@ This file is the authoritative resume point for Monitor Me. Read it before makin
 | Implementation status | Phases 1–3 remain Completed. Phase 4 has authenticated server inventory/enrollment, historical/live charts, project/mapping administration, alerts/in-app notifications, and allowlisted remote systemd operations with audit history. Phase 5 Linux preparation includes production Compose/Nginx, firewall, backup/restore, health probes and rollback tooling; no production VPS deployment or restore rehearsal has been executed. An initial Windows collector, Windows-aware agent state handling, local Docker-based x64 build/run scripts, host-health snapshot UI and Windows acceptance tests are now committed; Windows runtime/build verification, service installation/signing and macOS collector remain pending. |
 | Last source commit covered by latest successful CI run | 9685e115113123d5f9f8e8a1b222804752f5a283 (Go, frontend and native-agent jobs passed in run #45203706343; Compose integration failed at the web proxy login probe; later commits are not covered) |
 | Latest CI run | [#45208235137 — quota blocked](https://github.com/WorkRCS/monitor_me/actions/runs/45208235137); jobs failed before runner assignment/steps because the repository owner reports GitHub Actions free minutes are exhausted |
-| Latest implementation commit | [db253d0a9782bdffd44e5f1def88657a8a03fd7a](https://github.com/WorkRCS/monitor_me/commit/db253d0a9782bdffd44e5f1def88657a8a03fd7a) — Windows collector, cross-platform spool replacement, host-health dashboard snapshot, and corrected Docker build helper |
-| Next action | Owner pulls main, rebuilds the web service, runs scripts/build-windows-agent.ps1, creates a Windows local PC server record, then runs scripts/run-windows-agent.ps1 and verifies CPU/memory/disk/network/uptime/process/System information in the dashboard. Keep Windows acceptance In Progress until the actual Windows build and runtime checks pass. Do not delete local volumes or run production/firewall scripts for this local test. |
+| Latest implementation commit | [ff6a369e446822c6c9580cf5b9048b3e0ef510c6](https://github.com/WorkRCS/monitor_me/commit/ff6a369e446822c6c9580cf5b9048b3e0ef510c6) — refreshed monitoring detail UI, responsive resource KPI cards, chart controls, shaded history graph, and updated project state |
+| Next action | Owner runs `git pull origin main` and `docker compose up --build -d web`, then verifies the refreshed server-detail UI and live/history charts using the already-enrolled Windows PC. Keep the agent running. Do not delete local volumes or run production/firewall scripts for this local test. |
 
 
 
@@ -35,9 +35,9 @@ This file is the authoritative resume point for Monitor Me. Read it before makin
 - [ ] Pull the new main commit, rebuild the web container, and verify the refreshed UI against the enrolled Windows host. GitHub Actions quota is currently blocking fresh runner-based CI, so no new CI pass is claimed.
 - **Next action:** Run `git pull origin main` followed by `docker compose up --build -d web`, then open the Windows PC detail page and check current KPI values and the history chart. Keep the agent window running.
 
-## Next Work Session — 2026-11-23
+## Next Work Session — 2026-11-24
 
-**Target:** Owner-led Phase 4 acceptance, local Windows-agent validation, followed by Phase 5 Linux-MVP host validation. Dashboard and deployment/firewall tooling are implemented; current status is In Progress pending runtime test evidence and a real target host.
+**Target:** Finish owner-led Phase 4 dashboard acceptance, including the refreshed monitoring UI against the enrolled Windows agent, then continue Phase 5 Linux-MVP host validation. Dashboard and deployment/firewall tooling are implemented; current status is In Progress pending runtime test evidence and a real target host.
 
 ### Ordered release plan
 
