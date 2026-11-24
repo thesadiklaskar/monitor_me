@@ -17,22 +17,22 @@ import (
 )
 
 var (
-	ErrUnauthorized       = errors.New("installation session is invalid")
-	ErrForbidden          = errors.New("operation is not permitted")
-	ErrNotFound           = errors.New("resource not found")
-	ErrInvalidInput       = errors.New("invalid input")
+	ErrUnauthorized = errors.New("installation session is invalid")
+	ErrForbidden    = errors.New("operation is not permitted")
+	ErrNotFound     = errors.New("resource not found")
+	ErrInvalidInput = errors.New("invalid input")
 )
 
 const (
 	installationSessionTTL = 24 * time.Hour
-	enrollmentTokenTTL = 15 * time.Minute
-	liveTicketTTL      = 30 * time.Second
+	enrollmentTokenTTL     = 15 * time.Minute
+	liveTicketTTL          = 30 * time.Second
 )
 
 var (
-	uuidPattern        = regexp.MustCompile("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$")
-	slugPattern        = regexp.MustCompile("^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$")
-	alertMetricPattern = regexp.MustCompile("^[a-zA-Z][a-zA-Z0-9_.-]{0,127}$")
+	uuidPattern              = regexp.MustCompile("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$")
+	slugPattern              = regexp.MustCompile("^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$")
+	alertMetricPattern       = regexp.MustCompile("^[a-zA-Z][a-zA-Z0-9_.-]{0,127}$")
 	dashboardLabelKeyPattern = regexp.MustCompile("^[a-zA-Z][a-zA-Z0-9_.-]{0,63}$")
 )
 
@@ -89,33 +89,32 @@ type DashboardInput struct {
 }
 
 type DashboardPanel struct {
-	ID             string    `json:"id"`
-	DashboardID    string    `json:"dashboard_id"`
-	Title          string    `json:"title"`
-	Visualization  string    `json:"visualization"`
-	ServerID       string    `json:"server_id"`
-	MetricName     string    `json:"metric_name"`
-	TimeRange      string    `json:"time_range"`
-	Position       int       `json:"position"`
-	GridWidth      int       `json:"grid_width"`
-	LabelKey       string    `json:"label_key"`
-	LabelValue     string    `json:"label_value"`
-	CreatedAt      time.Time `json:"created_at"`
-	UpdatedAt      time.Time `json:"updated_at"`
+	ID            string    `json:"id"`
+	DashboardID   string    `json:"dashboard_id"`
+	Title         string    `json:"title"`
+	Visualization string    `json:"visualization"`
+	ServerID      string    `json:"server_id"`
+	MetricName    string    `json:"metric_name"`
+	TimeRange     string    `json:"time_range"`
+	Position      int       `json:"position"`
+	GridWidth     int       `json:"grid_width"`
+	LabelKey      string    `json:"label_key"`
+	LabelValue    string    `json:"label_value"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
 }
 
 type DashboardPanelInput struct {
-	Title          string
-	Visualization  string
-	ServerID       string
-	MetricName     string
-	TimeRange      string
-	Position       int
-	GridWidth      int
-	LabelKey       string
-	LabelValue     string
+	Title         string
+	Visualization string
+	ServerID      string
+	MetricName    string
+	TimeRange     string
+	Position      int
+	GridWidth     int
+	LabelKey      string
+	LabelValue    string
 }
-
 
 type AlertRule struct {
 	ID         string    `json:"id"`
@@ -1328,8 +1327,8 @@ func (s *Store) UpdateAlertRule(ctx context.Context, principal Principal, ruleID
 				WHERE membership.organization_id = $1
 				ON CONFLICT (event_id, user_id, kind) DO NOTHING
 			`, principal.OrganizationID, eventID,
-					"Alert updated: "+previous.Name,
-					"The alert condition or scope changed. The previous firing event was closed.")
+				"Alert updated: "+previous.Name,
+				"The alert condition or scope changed. The previous firing event was closed.")
 			if err != nil {
 				return AlertRule{}, fmt.Errorf("notify changed alert rule recovery: %w", err)
 			}
@@ -1455,4 +1454,3 @@ func (s *Store) MarkAlertNotificationRead(ctx context.Context, principal Princip
 	}
 	return nil
 }
-
