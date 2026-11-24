@@ -12,6 +12,22 @@ command -v curl >/dev/null || { echo "curl is required." >&2; exit 2; }
 compose() { docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" "$@"; }
 
 compose config --quiet
+
+auth_disabled="$(sed -n 's/^MONITOR_ME_AUTH_DISABLED=//p' "$ENV_FILE" | tail -n 1 | tr -d '"' | tr -d '\r')"
+if [[ "$auth_disabled" == "true" ]]; then
+  admin_cidr="$(sed -n 's/^ADMIN_CIDR=//p' "$ENV_FILE" | tail -n 1 | tr -d '"' | tr -d '\r')"
+  if [[ -z "$admin_cidr" ]]; then
+    echo "Refusing production no-login mode: set ADMIN_CIDR to the trusted administrator/VPN source range." >&2
+    exit 2
+  fi
+  if [[ "$EUID" -ne 0 ]]; then
+    echo "Production no-login firewall verification requires root. Re-run the deploy script with sudo." >&2
+    exit 2
+  fi
+  echo "Applying and verifying admin-only HTTPS access before enabling no-login dashboard APIs..."
+  "$ROOT/deploy/production/firewall.sh" --role control-plane --admin-cidr "$admin_cidr" --apply --verify-no-public-https
+fi
+
 compose build api web agent-artifacts
 compose up -d postgres redis
 ready=0
