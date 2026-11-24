@@ -58,7 +58,7 @@ func (api *API) installation(writer http.ResponseWriter, _ *http.Request) {
 
 // requireInstallation binds requests to the one implicit installation principal. It does
 // not accept browser credentials; remote access is restricted at the network edge.
-func (api *API) requireAuth(next http.Handler) http.Handler {
+func (api *API) requireInstallation(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		principal, err := api.installationPrincipal(request.Context())
 		if err != nil {
