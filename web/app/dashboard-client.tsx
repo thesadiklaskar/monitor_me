@@ -1,12 +1,10 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { Activity, Bell, Copy, FileText, Folder, LayoutDashboard, Plus, RefreshCw, Server as ServerIcon } from "lucide-react";
+import { Activity, Bell, Copy, FileText, LayoutDashboard, Plus, RefreshCw, Server as ServerIcon } from "lucide-react";
 import { apiRequest } from "@/lib/client-api";
 import { ServerDetail } from "./server-detail";
-import ProjectWorkspace from "./project-workspace";
 import AlertsWorkspace from "./alerts-workspace";
-import RemoteOperationsWorkspace from "./remote-operations-workspace";
 import DashboardsWorkspace from "./dashboards-workspace";
 import LogExplorer from "./log-explorer";
 
@@ -33,8 +31,6 @@ type IssuedServer = {
 };
 
 type InventoryResponse = { servers: Server[] };
-type Project = { id: string; name: string; slug: string; created_at: string };
-type ProjectListResponse = { projects: Project[] };
 type ConfigResponse = { agent_grpc_address: string | null; public_api_url: string | null };
 
 type ViewState = "checking" | "active" | "unavailable";
@@ -332,13 +328,9 @@ export default function DashboardClient() {
   const [grpcAddress, setGrpcAddress] = useState<string | null>(null);
   const [publicAPIURL, setPublicAPIURL] = useState<string | null>(null);
   const [selectedServer, setSelectedServer] = useState<Server | null>(null);
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [selectedProjectId, setSelectedProjectId] = useState("");
-  const [showProjects, setShowProjects] = useState(false);
   const [showDashboards, setShowDashboards] = useState(false);
   const [showLogs, setShowLogs] = useState(false);
   const [showAlerts, setShowAlerts] = useState(false);
-  const [showOperations, setShowOperations] = useState(false);
   const loadServers = useCallback(async () => {
     setInventoryBusy(true);
     setInventoryError("");
@@ -365,26 +357,6 @@ export default function DashboardClient() {
     return () => window.clearInterval(refresh);
   }, [loadServers, view]);
 
-  const loadWorkspaceMetadata = useCallback(async () => {
-    const [configResult, projectResult] = await Promise.allSettled([
-      apiRequest<ConfigResponse>("/api/config"),
-      apiRequest<ProjectListResponse>("/api/projects"),
-    ]);
-
-    if (configResult.status === "fulfilled") {
-      setGrpcAddress(configResult.value.agent_grpc_address);
-      setPublicAPIURL(configResult.value.public_api_url);
-    } else {
-      setNotice(displayError(configResult.reason));
-    }
-
-    if (projectResult.status === "fulfilled") {
-      setProjects(Array.isArray(projectResult.value.projects) ? projectResult.value.projects : []);
-    } else {
-      setNotice(displayError(projectResult.reason));
-    }
-  }, []);
-
   useEffect(() => {
     let active = true;
 
@@ -399,7 +371,7 @@ export default function DashboardClient() {
         if (!active) return;
 
         setView("active");
-        await Promise.all([loadWorkspaceMetadata(), loadServers()]);
+        await loadServers();
       } catch {
         if (!active) return;
         setView("unavailable");
@@ -408,16 +380,11 @@ export default function DashboardClient() {
 
     void initializeInstallation();
     return () => { active = false; };
-  }, [loadServers, loadWorkspaceMetadata]);
+  }, [loadServers]);
 
   const onlineCount = useMemo(() => servers.filter((server) => server.status.toLowerCase() === "online").length, [servers]);
   const pendingCount = useMemo(() => servers.filter((server) => server.status.toLowerCase() === "pending").length, [servers]);
   const canCreate = true;
-
-  const updateProjects = useCallback((nextProjects: Project[]) => {
-    setProjects(nextProjects);
-    setSelectedProjectId((current) => nextProjects.some((project) => project.id === current) ? current : "");
-  }, []);
 
   async function rotateToken(server: Server) {
     setNotice("");
@@ -433,15 +400,15 @@ export default function DashboardClient() {
   }
 
   if (view === "checking") {
-    return <main className="loading-screen"><div className="loading-mark">M</div><p>Connecting to your Monitor Me workspace…</p></main>;
+    return <main className="loading-screen"><div className="loading-mark">M</div><p>Connecting to your Monitor Me installation…</p></main>;
   }
 
   if (view === "unavailable") {
     return (
       <main className="loading-screen">
         <div className="loading-mark">M</div>
-        <h1>Local workspace unavailable</h1>
-        <p>Monitor Me could not initialize the local workspace. Check that the API, database, and Docker services are healthy.</p>
+        <h1>Monitoring service unavailable</h1>
+        <p>Monitor Me could not connect to its local services. Check that the API, database, and Docker services are healthy.</p>
         <button className="button button-primary" type="button" onClick={() => window.location.reload()}>Retry connection</button>
       </main>
     );
@@ -454,19 +421,16 @@ export default function DashboardClient() {
           <div className="brand-mark">M</div>
           <div className="sidebar-brand-copy"><p className="brand-name">MONITOR ME</p><p className="brand-subtitle">Observability</p></div>
         </div>
-        <div className="workspace-switcher" title="Single installation">
+        <div className="workspace-switcher" title="This self-hosted installation">
           <span className="workspace-icon"><Activity size={15} strokeWidth={1.8} /></span>
-          <div className="workspace-switcher-copy"><strong>Infrastructure</strong><span>Single installation</span></div>
+          <div className="workspace-switcher-copy"><strong>Infrastructure monitoring</strong><span>This installation</span></div>
         </div>
         <nav className="side-nav" aria-label="Main navigation">
           <span className="nav-section-label">Monitoring</span>
-          <button title="Server Inventory" aria-label="Server Inventory" className={!showProjects && !showDashboards && !showLogs && !showAlerts && !showOperations ? "nav-item nav-item-active" : "nav-item"} type="button" onClick={() => { setShowProjects(false); setShowDashboards(false); setShowLogs(false); setShowAlerts(false); setShowOperations(false); setSelectedServer(null); }}><span className="nav-item-icon"><ServerIcon size={18} strokeWidth={1.8} /></span><span className="nav-item-label">Server Inventory</span></button>
-          <button title="Log Explorer" aria-label="Log Explorer" className={showLogs ? "nav-item nav-item-active" : "nav-item"} type="button" onClick={() => { setShowProjects(false); setShowDashboards(false); setShowAlerts(false); setShowOperations(false); setSelectedServer(null); setShowLogs(true); }}><span className="nav-item-icon"><FileText size={18} strokeWidth={1.8} /></span><span className="nav-item-label">Log Explorer</span></button>
-          <button title="Project Mapping" aria-label="Project Mapping" className={showProjects ? "nav-item nav-item-active" : "nav-item"} type="button" onClick={() => { setShowDashboards(false); setShowLogs(false); setShowAlerts(false); setShowOperations(false); setSelectedServer(null); setShowProjects(true); }}><span className="nav-item-icon"><Folder size={18} strokeWidth={1.8} /></span><span className="nav-item-label">Project Mapping</span></button>
-          <button title="Saved Dashboards" aria-label="Saved Dashboards" className={showDashboards ? "nav-item nav-item-active" : "nav-item"} type="button" onClick={() => { setShowProjects(false); setShowLogs(false); setShowAlerts(false); setShowOperations(false); setSelectedServer(null); setShowDashboards(true); }}><span className="nav-item-icon"><LayoutDashboard size={18} strokeWidth={1.8} /></span><span className="nav-item-label">Saved Dashboards</span></button>
-          <span className="nav-section-label nav-section-spaced">Management</span>
-          <button title="Alert Rules" aria-label="Alert Rules" className={showAlerts ? "nav-item nav-item-active" : "nav-item"} type="button" onClick={() => { setShowProjects(false); setShowDashboards(false); setShowLogs(false); setShowOperations(false); setSelectedServer(null); setShowAlerts(true); }}><span className="nav-item-icon"><Bell size={18} strokeWidth={1.8} /></span><span className="nav-item-label">Alert Rules</span></button>
-          <button title="Remote Operations" aria-label="Remote Operations" className={showOperations ? "nav-item nav-item-active" : "nav-item"} type="button" onClick={() => { setShowProjects(false); setShowDashboards(false); setShowLogs(false); setShowAlerts(false); setSelectedServer(null); setShowOperations(true); }}><span className="nav-item-icon"><Activity size={18} strokeWidth={1.8} /></span><span className="nav-item-label">Remote Operations</span></button>
+          <button title="Server Inventory" aria-label="Server Inventory" className={!showDashboards && !showLogs && !showAlerts ? "nav-item nav-item-active" : "nav-item"} type="button" onClick={() => {  setShowDashboards(false); setShowLogs(false); setShowAlerts(false);  setSelectedServer(null); }}><span className="nav-item-icon"><ServerIcon size={18} strokeWidth={1.8} /></span><span className="nav-item-label">Server Inventory</span></button>
+          <button title="Log Explorer" aria-label="Log Explorer" className={showLogs ? "nav-item nav-item-active" : "nav-item"} type="button" onClick={() => {  setShowDashboards(false); setShowAlerts(false);  setSelectedServer(null); setShowLogs(true); }}><span className="nav-item-icon"><FileText size={18} strokeWidth={1.8} /></span><span className="nav-item-label">Log Explorer</span></button>
+          <button title="Saved Dashboards" aria-label="Saved Dashboards" className={showDashboards ? "nav-item nav-item-active" : "nav-item"} type="button" onClick={() => {  setShowLogs(false); setShowAlerts(false);  setSelectedServer(null); setShowDashboards(true); }}><span className="nav-item-icon"><LayoutDashboard size={18} strokeWidth={1.8} /></span><span className="nav-item-label">Saved Dashboards</span></button>
+                    <button title="Alert Rules" aria-label="Alert Rules" className={showAlerts ? "nav-item nav-item-active" : "nav-item"} type="button" onClick={() => {  setShowDashboards(false); setShowLogs(false);  setSelectedServer(null); setShowAlerts(true); }}><span className="nav-item-icon"><Bell size={18} strokeWidth={1.8} /></span><span className="nav-item-label">Alert Rules</span></button>
         </nav>
         <div className="sidebar-bottom">
           <div className="sidebar-status" title="Self-hosted single installation"><span className="status-dot status-dot-online" /><span className="sidebar-status-label">Self-hosted · Single install</span></div>
@@ -475,40 +439,21 @@ export default function DashboardClient() {
 
       <main className="dashboard-main" id="servers">
         {showLogs ? (
-          <LogExplorer servers={servers} projects={projects} onBack={() => setShowLogs(false)} />
-        ) : showOperations ? (
-          <RemoteOperationsWorkspace servers={servers} role="owner" onBack={() => setShowOperations(false)} />
+          <LogExplorer servers={servers} onBack={() => setShowLogs(false)} />
         ) : showAlerts ? (
-          <AlertsWorkspace servers={servers} projects={projects} role="owner" onBack={() => setShowAlerts(false)} />
+          <AlertsWorkspace servers={servers} role="owner" onBack={() => setShowAlerts(false)} />
         ) : showDashboards ? (
-          <DashboardsWorkspace servers={servers} projects={projects} role="owner" onBack={() => setShowDashboards(false)} />
-        ) : showProjects ? (
-          <ProjectWorkspace servers={servers} projects={projects} role="owner" onProjectsChanged={updateProjects} onBack={() => setShowProjects(false)} />
+          <DashboardsWorkspace servers={servers} role="owner" onBack={() => setShowDashboards(false)} />
         ) : selectedServer ? (
-          <div className="server-detail-shell">
-            <label className="project-scope-select detail-project-scope">
-              <span>Project scope</span>
-              <select value={selectedProjectId} onChange={(event) => setSelectedProjectId(event.target.value)}>
-                <option value="">All projects</option>
-                {projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
-              </select>
-            </label>
-            <ServerDetail server={selectedServer} apiPublicURL={publicAPIURL} projectId={selectedProjectId || null} onBack={() => setSelectedServer(null)} />
-          </div>
+          <ServerDetail server={selectedServer} apiPublicURL={publicAPIURL} projectId={null} onBack={() => setSelectedServer(null)} />
         ) : <>
         <header className="topbar">
-          <div><span className="breadcrumbs">Workspace / Servers</span><h1>Server overview</h1></div>
+          <div><span className="breadcrumbs">Monitoring / Machines</span><h1>Server overview</h1></div>
           <div className="topbar-actions">
             <span className="live-label">
               <span className={`status-dot ${apiStatus === "online" ? "status-dot-online" : apiStatus === "offline" ? "status-dot-unavailable" : "status-dot-pending"}`} />
               {apiStatus === "online" ? "API connected" : apiStatus === "offline" ? "API unavailable" : "Checking API"}
             </span>
-            <label className="project-scope-select"><span>Project scope</span>
-              <select value={selectedProjectId} onChange={(event) => setSelectedProjectId(event.target.value)}>
-                <option value="">All projects</option>
-                {projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
-              </select>
-            </label>
             <button className="button button-secondary" type="button" onClick={() => void loadServers()} disabled={inventoryBusy}><RefreshCw size={15} /> {inventoryBusy ? "Refreshing…" : "Refresh"}</button>
             {canCreate && <button className="button button-primary" type="button" onClick={() => setShowAdd(true)}><Plus size={16} /> Add machine</button>}
           </div>
@@ -536,11 +481,11 @@ export default function DashboardClient() {
 
         <section className="inventory-panel">
           <div className="panel-heading">
-            <div><h2>Servers</h2><p>Server records are scoped to your local workspace.</p></div>
+            <div><h2>Servers</h2><p>Machines connected to this installation.</p></div>
             {canCreate && <button className="button button-secondary" type="button" onClick={() => setShowAdd(true)}>Register a host</button>}
           </div>
           {inventoryBusy && servers.length === 0 ? (
-            <div className="empty-state"><div className="loading-mark small">M</div><h3>Loading server inventory</h3><p>Retrieving the servers in this installation.</p></div>
+            <div className="empty-state"><div className="loading-mark small">M</div><h3>Loading server inventory</h3><p>Retrieving connected machines in this installation.</p></div>
           ) : servers.length === 0 ? (
             <div className="empty-state">
               <div className="empty-icon">+</div><h3>No servers enrolled yet</h3>
