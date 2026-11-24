@@ -19,13 +19,32 @@ This file is the authoritative resume point for Monitor Me. Read it before makin
 | MVP status | No-login single-install shell and first metrics/log pipeline exist, but release-blocking builds/runtime acceptance remain open. Strict removal of legacy user/organization schema, Windows runtime acceptance, file logs, push-based live logs, Grafana-style panel editing, sustained-load tests and production bootstrap remain unfinished |
 | Implementation status | One self-hosted installation per owner is the target; no hosted SaaS, login, customer profile or organization workflow. Browser/API no-login shell exists, but SQL tables, FKs and backend query paths still retain legacy users/organizations/organization_id and need a safe data-preserving forward migration. Linux metrics and journald → bounded spool → TLS gRPC → ClickHouse search exist. Windows Application/System Event Log source exists but Windows runtime acceptance is pending; arbitrary file/syslog tail is missing. Log Explorer polls every 10 seconds; native push/replay is not implemented. Linux amd64/arm64 and Windows amd64 agent builds are targeted, but clean-host acceptance is pending; macOS logs are explicitly unsupported. Startup scripts check main/origin, dirty tree, Compose config, build images before start, start with --no-build and verify readiness. Backend Docker build no longer runs go mod tidy, builds only shipped binaries with -mod=mod, creates /out, and uses Go HTTP/1.1 transport with checksum verification still enabled. backend/go.sum and web/package-lock.json are absent and must be committed for reproducible builds. Go import namespace and installer sample-host cleanup were completed; source portability does not yet equal release certification. |
 | Last source commit covered by latest successful CI run | 9685e115113123d5f9f8e8a1b222804752f5a283 (Go, frontend and native-agent jobs passed in run #45203706343; Compose integration failed at the web proxy login probe; later commits are not covered) |
-| Latest CI run | #584 — four jobs all failed before steps with runner_id 0 and zero steps; no build/test command ran. No fresh green CI evidence exists; runner-allocation cause is unknown |
-| Latest source commit | `97e24898010e5e106c11c06dadd966f641c3842b` restores `slugPattern` to match the PostgreSQL 3–64 character lowercase slug constraint; `2c874c4a725a44ce569159b2e40a7d618b32c882` adds regression coverage. Source fix is committed; neither local Docker build nor CI tests have passed yet |
-| Next action | On the owner Windows checkout, run `git pull --ff-only origin main`, confirm the source revision, then rerun `scripts/start-local.ps1`. The reported `undefined: slugPattern` is fixed in source and covered by a regression test. Keep Docker volumes/data intact; do not run `docker compose down -v`. Record the next actual build/test result before starting dashboard/log feature upgrades. |
+| Latest CI run | #597 — all four jobs failed before any step with runner_id 0 and zero steps; no build/test command ran. No fresh green CI evidence; runner allocation cause remains unknown |
+| Latest source commit | `d3ff549d6bc73be469813cfbdd7698fe4d4d14fc` — UX/platform pass: full sidebar labels, slate/periwinkle theme, clearer log source/auto-refresh UI, structured log labels, time-aware dashboard charts with min/max bands and expanded metric panel catalog; OS/hosting matrix at `docs/PLATFORM_SUPPORT_MATRIX.md`. Source changes committed; frontend build/browser and agent OS runtime tests are still pending |
+| Next action | Owner Windows checkout: `git pull --ff-only origin main`, verify HEAD equals origin/main, then run `scripts/start-local.ps1`. Confirm the backend slugPattern compile fix and the latest web build. Review the changed UI in a browser at desktop and mobile widths. Do not run `docker compose down -v`; keep existing data. |
 
 
 
 
+
+
+## UI and platform verification pass — 2026-11-24
+
+**Status:** Source changes committed directly to `main`; frontend build, browser review, Windows runtime and Linux clean-host acceptance remain pending.
+
+- [x] Removed the sidebar collapse control and icon-only mode; navigation uses full labels: Server Inventory, Log Explorer, Project Mapping, Saved Dashboards, Alert Rules and Remote Operations.
+- [x] Refreshed the UI to a calmer slate/periwinkle palette, improved muted-text contrast and added keyboard focus outlines.
+- [x] Reworked saved dashboard charts to use timestamp-based x coordinates, average lines, min/max bands, y-axis labels, visible gaps and latest-point details; expanded the panel metric catalog.
+- [x] Updated Log Explorer to show structured event labels and to describe its 10-second control accurately as HTTP auto-refresh, not push-based live tail. Windows event source capability is mentioned with its runtime-acceptance limitation; macOS and arbitrary file-tail limitations are explicit.
+- [x] Replaced visible Organization wording in project, alert, remote-operation and saved-dashboard UI copy with installation-local language.
+- [x] Added [PLATFORM_SUPPORT_MATRIX.md](PLATFORM_SUPPORT_MATRIX.md), separating control-plane support from monitored-agent targets and explaining VPS/VM/cloud/bare-metal prerequisites.
+- [ ] Run frontend lint, TypeScript check and production Next.js build; visually inspect desktop/mobile layout and chart axes against real data.
+- [ ] Complete the user's Windows Docker Desktop local stack build after pulling latest main.
+- [ ] Execute Linux x86-64 clean-host install and Linux arm64 agent acceptance; execute Windows x64 agent service and Application/System event ingestion acceptance.
+- [ ] Complete actual push-based log stream/replay, file-tail rotation support, query editor/variables/annotations and Grafana-style dashboard interactions. These remain backlog items, not delivered features.
+- [ ] Remove legacy user/organization schema and organization_id query paths with a safe forward migration; this remains necessary for the strict single-install data model.
+
+**Verification caveat:** GitHub Actions run #597 created four jobs, but all had `runner_id: 0` and zero steps. No checks executed. The local owner must provide a successful build and browser/OS acceptance before these source changes can be called verified.
 
 
 ## Current engineering checkpoint — 2026-11-24
