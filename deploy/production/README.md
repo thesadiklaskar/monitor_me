@@ -9,7 +9,7 @@ This directory provides a single-node production-oriented Compose topology and o
 - The dashboard, its normal API routes and /v1/live/ws are restricted by a generated administrator/VPN allowlist when the no-login profile is enabled.
 - Nginx proxies /v1/live/ws to API HTTP on 127.0.0.1:18080 for browser live telemetry.
 - The API exposes TLS gRPC on TCP 8443 for enrolled agents.
-- PostgreSQL and Redis have no host-published ports and are reachable only on the Compose network.
+- PostgreSQL, Redis and ClickHouse have no host-published ports and are reachable only on the Compose network.
 - API HTTP and Next.js are loopback-bound. Do not change them to 0.0.0.0.
 
 ## Prepare and configure
@@ -21,7 +21,7 @@ Copy the repository to a stable host path, then run:
     cp deploy/production/.env.production.example .env.production
     chmod 600 .env.production
 
-Replace every placeholder with unique secrets. Set ADMIN_CIDR to the real operator/VPN source range (never leave the documentation example), set PUBLIC_HOSTNAME and AGENT_GRPC_PUBLIC_ADDRESS consistently, and URL-encode reserved characters in DATABASE_URL.
+Replace every placeholder with unique secrets, including CLICKHOUSE_PASSWORD. Set ADMIN_CIDR to the real operator/VPN source range (never leave the documentation example), set PUBLIC_HOSTNAME and AGENT_GRPC_PUBLIC_ADDRESS consistently, and URL-encode reserved characters in DATABASE_URL.
 
 After issuing the HTTPS certificate and creating the API-readable certificate copy, install the final Nginx vhost **before** running the deployment script:
 

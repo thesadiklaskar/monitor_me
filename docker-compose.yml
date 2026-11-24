@@ -37,6 +37,23 @@ services:
       retries: 12
       start_period: 5s
 
+  clickhouse:
+    image: "${CLICKHOUSE_IMAGE:-clickhouse/clickhouse-server:26.8.44.3}"
+    restart: unless-stopped
+    environment:
+      CLICKHOUSE_DB: monitor_me
+      CLICKHOUSE_USER: monitor_me
+      CLICKHOUSE_PASSWORD: "${CLICKHOUSE_PASSWORD:-local_only_change_me}"
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+    healthcheck:
+      test: ["CMD-SHELL", "clickhouse-client --user \"$$CLICKHOUSE_USER\" --password \"$$CLICKHOUSE_PASSWORD\" --query 'SELECT 1'"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
   migrate:
     build:
       context: .
@@ -61,6 +78,9 @@ services:
       DATABASE_URL: "postgres://${POSTGRES_USER:-monitor_me}:${POSTGRES_PASSWORD:-local_only_change_me}@postgres:5432/${POSTGRES_DB:-monitor_me}?sslmode=disable"
       REDIS_ADDR: "redis:6379"
       REDIS_PASSWORD: "${REDIS_PASSWORD:-local_only_change_me}"
+      CLICKHOUSE_URL: "http://clickhouse:8123"
+      CLICKHOUSE_USER: "monitor_me"
+      CLICKHOUSE_PASSWORD: "${CLICKHOUSE_PASSWORD:-local_only_change_me}"
       WEB_ALLOWED_ORIGINS: "${WEB_ALLOWED_ORIGINS:-http://localhost:3000}"
       REMOTE_ALLOWED_SYSTEMD_UNITS: "${REMOTE_ALLOWED_SYSTEMD_UNITS:-}"
       AGENT_GRPC_ADDR: ":8443"
@@ -75,6 +95,8 @@ services:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      clickhouse:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
@@ -130,4 +152,5 @@ services:
 volumes:
   postgres_data:
   redis_data:
+  clickhouse_data:
   agent_artifacts:
