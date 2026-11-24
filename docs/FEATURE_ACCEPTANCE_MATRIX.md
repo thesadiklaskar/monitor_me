@@ -1,5 +1,8 @@
 # Feature Acceptance Matrix
 
+> **Product-scope supersession (2026-11-24):** This matrix contains historical login-first/project-era test evidence. The final product is a monitoring-only, single-install tool with Servers, Logs, Dashboards and Alerts. No customer accounts, organizations, projects, workspaces or remote host-control actions. Legacy tests for organization/project isolation describe the old schema and do not certify the final model. See [PRODUCT_VISION_PLUG_AND_PLAY.md](PRODUCT_VISION_PLUG_AND_PLAY.md).
+
+
 This document is the test-oriented checklist for the product brief. The matrix is a plan until implementation and test evidence exist.
 
 ## Status Definitions
@@ -25,13 +28,13 @@ No item may be marked Verified based only on a code stub, mock UI, or documentat
 | F-008 | Durable local telemetry spool | P0 | Disconnect, process restart, recovery, quota, and acknowledgement tests | Verified |
 | F-009 | PostgreSQL historical persistence | P0 | Migration, batch-write, duplicate-delivery, and query tests | Verified |
 | F-010 | Redis live cache/state | P0 | Cache outage does not corrupt durable records; bounded reconnect tests | Verified |
-| F-011 | Server inventory and agent status | P0 | Organization-scoped inventory UI, loading/empty/error states and backend-reported status/last-seen display implemented; stale/disconnected component tests remain | In Progress |
+| F-011 | Server inventory and agent status | P0 | Single-install machine inventory, loading/empty/error states and backend-reported status/last-seen display; fresh acceptance remains pending | In Progress |
 | F-012 | Overall server dashboard | P0 | Server-detail history/live metrics, time ranges, units, gaps and stale-data states are implemented; dashboard acceptance/component evidence remains | In Progress |
 | F-013 | Authorized live WebSocket updates | P0 | Scope authorization, reconnect, slow-client, and bounded-buffer tests | Verified |
 | F-014 | Docker Compose local stack | P0 | Clean-start, health-check, restart, and documented local setup tests | Verified |
-| F-015 | All Projects / project switcher | P1 | Project scope selectors are present for server overview/detail and API queries; complete owner acceptance of every scoped panel remains | In Progress |
+| F-015 | All Projects / project switcher | — | **Retired by product decision.** There is no Project entity, selector or customer workspace in the target product. Legacy schema/query migration is tracked separately. | Retired |
 | F-016 | Docker and Systemd discovery | P1 | cgroup/Systemd/container selector fixtures; full Docker Engine API discovery and least-privilege runtime integration remain | In Progress |
-| F-017 | cgroups-based project attribution | P1 | Database-backed mappings and mapping administration API/UI are implemented; end-to-end attribution acceptance and full Docker Engine discovery remain | In Progress |
+| F-017 | cgroups-based project attribution | — | **Retired as a product feature.** Keep process/container/systemd/cgroup values as host-local technical labels; do not create project mappings. | Retired |
 | F-018 | Process and port monitoring | P1 | Top-128 process RSS and listening-port inventory verified; per-process CPU and lifecycle views remain | In Progress |
 | F-019 | Connection monitoring | P1 | TCP state/count fixtures and platform capability tests | Verified |
 | F-020 | Application request latency and HTTP errors | P1 | Controlled application/proxy test with known response distribution | Planned |
@@ -53,7 +56,7 @@ No item may be marked Verified based only on a code stub, mock UI, or documentat
 | F-036 | Production Linux host firewall setup | P1 | Dry-run/additive UFW/firewalld helper supports control-plane allow rules and agent-only no-inbound mode with recorded rollback; default-policy convergence, IPv4/IPv6, Docker, SSH and external host tests remain | In Progress |
 
 
-| F-037 | Single-install no-login operator mode | P0 | No signup/login/organization UI; implicit install workspace; local loopback access; remote no-login mode is blocked unless HTTPS and administrator network restrictions are verified | In Progress |
+| F-037 | Single-install no-login operator mode | P0 | No customer login, organization, project or workspace; installation-local data; loopback default and enforced HTTPS plus admin/VPN network policy for remote UI access | In Progress |
 | F-038 | Automatic control-plane and node bootstrap | P0 | Local one-command Compose starter and implicit-install bootstrap endpoint are implemented; production deployment helper enforces Nginx ADMIN_CIDR before app upgrade, and node launchers install checksum-verified Linux/Windows artifacts; full production host provisioning, publisher signing and runtime acceptance remain | In Progress |
 | F-039 | High-volume raw log ingestion and exploration | P0 | Initial Linux journald → bounded agent spool → TLS gRPC → ClickHouse ingestion, structured search, event detail and 200-row keyset pagination are implemented; Windows Event Log, Linux/Windows file-tail, native push tail, backups, crash/replay and sustained-load tests remain | In Progress |
 | F-040 | Professional monitoring-console shell | P0 | Single-install no-login shell, collapsible Lucide sidebar, saved dashboards with basic metric panels and initial Log Explorer are implemented; global node/time selectors, panel edit/reorder, template variables, advanced visualizations, saved queries and full UI acceptance remain | In Progress |
