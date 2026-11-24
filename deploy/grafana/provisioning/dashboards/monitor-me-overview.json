@@ -280,6 +280,30 @@
           "show": false
         }
       }
+    },
+    {
+      "id": 6,
+      "type": "logs",
+      "title": "Host logs",
+      "description": "Native Linux journald and supported host log events collected by Monitor Me and stored in ClickHouse.",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "monitor-me-clickhouse"
+      },
+      "gridPos": {
+        "h": 12,
+        "w": 24,
+        "x": 0,
+        "y": 24
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "queryType": "sql",
+          "format": "logs",
+          "rawSql": "SELECT event_time AS timestamp, body, severity AS level, source, toString(server_id) AS server_id, event_id AS id, attributes AS labels FROM monitor_me.logs WHERE $__timeFilter(event_time) AND ('${server:raw}' = 'All' OR toString(server_id) IN (${server:sqlstring})) ORDER BY event_time DESC LIMIT 1000"
+        }
+      ]
     }
   ]
 }
