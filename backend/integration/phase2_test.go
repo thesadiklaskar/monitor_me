@@ -10,9 +10,7 @@ import (
 	"crypto/x509"
 	"database/sql"
 	"encoding/json"
-	"errors"
 	"io"
-	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -31,12 +29,6 @@ import (
 )
 
 type apiResponse struct {
-	AccessToken string `json:"access_token"`
-	User        struct {
-		ID             string `json:"id"`
-		Role           string `json:"role"`
-		OrganizationID string `json:"organization_id"`
-	} `json:"user"`
 	Server struct {
 		ID     string `json:"id"`
 		Status string `json:"status"`
@@ -53,7 +45,7 @@ type httpResult struct {
 	Body       string
 }
 
-func TestPhase2AuthenticationAndAgentLifecycle(t *testing.T) {
+func TestSingleInstallAndAgentLifecycle(t *testing.T) {
 	baseURL := requiredEnv(t, "API_BASE_URL")
 	grpcAddress := requiredEnv(t, "AGENT_GRPC_ADDRESS")
 	rootCAPath := requiredEnv(t, "AGENT_GRPC_ROOT_CA")
@@ -82,10 +74,19 @@ func TestPhase2AuthenticationAndAgentLifecycle(t *testing.T) {
 	if installation.Installation.Mode != "single-install" || installation.Installation.Name != "Monitor Me" {
 		t.Fatalf("unexpected installation descriptor: %#v", installation.Installation)
 	}
-	for _, path := range []string{"/v1/auth/register", "/v1/auth/login", "/v1/auth/logout", "/v1/auth/me"} {
-		response := requestJSON(t, ctx, http.MethodPost, baseURL+path, "", map[string]any{})
+	for _, route := range []struct {
+		method string
+		path   string
+	}{
+		{method: http.MethodPost, path: "/v1/auth/register"},
+		{method: http.MethodPost, path: "/v1/auth/login"},
+		{method: http.MethodPost, path: "/v1/auth/logout"},
+		{method: http.MethodGet, path: "/v1/auth/me"},
+	} {
+		response := requestJSON(t, ctx, route.method, baseURL+route.path, "", nil)
 		if response.StatusCode != http.StatusNotFound {
-			t.Fatalf("interactive authentication route %s must not exist: got %d: %s", path, response.StatusCode, response.Body)
+			t.Fatalf("interactive authentication route %s %s must not exist: got %d: %s",
+				route.method, route.path, response.StatusCode, response.Body)
 		}
 	}
 
