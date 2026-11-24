@@ -38,6 +38,9 @@ func TestWindowsCollectorReportsHostVitals(t *testing.T) {
 	if values["host.info"].Labels["os"] != "windows" {
 		t.Errorf("host.info os label = %q, want windows", values["host.info"].Labels["os"])
 	}
+	if values["host.info"].Labels["environment_type"] == "" {
+		t.Error("host.info must include an environment_type classification")
+	}
 }
 
 func TestWindowsCollectorAdvertisesOnlySupportedHostCapabilities(t *testing.T) {
