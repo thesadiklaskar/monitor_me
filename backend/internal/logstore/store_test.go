@@ -148,6 +148,73 @@ func TestQueryAlwaysScopesOrganizationAndServerAndBindsFilters(t *testing.T) {
 	}
 }
 
+func TestQueryUsesKeysetCursorAndBindsItsParameters(t *testing.T) {
+	var receivedQuery string
+	var receivedParams url.Values
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		receivedParams = request.URL.Query()
+		body, err := io.ReadAll(request.Body)
+		if err != nil {
+			t.Errorf("read ClickHouse query body: %v", err)
+		}
+		receivedQuery = string(body)
+		_, _ = fmt.Fprintln(writer, `{"event_id":"`+strings.Repeat("a", 64)+`","event_time_unix_nanos":1795524000000000000,"event_time_unix_micros":1795524000000000,"source":"sshd.service","severity":"warning","body":"authentication failed","attributes":{},"project_id":""}`)
+	}))
+	defer server.Close()
+
+	query := testQuery()
+	query.Limit = 201
+	query.BeforeTimeUnixMicros = query.To.Add(-time.Minute).UnixMicro()
+	query.BeforeEventID = strings.Repeat("b", 64)
+	results, err := testStore(server).Query(context.Background(), query)
+	if err != nil {
+		t.Fatalf("Query() error = %v", err)
+	}
+	if len(results) != 1 || results[0].EventTimeUnixMicros != 1795524000000000 {
+		t.Fatalf("Query() results = %#v", results)
+	}
+	if !strings.Contains(receivedQuery, "tuple(event_time, event_id) < tuple(fromUnixTimestamp64Micro({before_time:Int64}), {before_event_id:String})") {
+		t.Fatalf("ClickHouse query missing keyset cursor predicate: %s", receivedQuery)
+	}
+	if receivedParams.Get("param_before_time") != strconv.FormatInt(query.BeforeTimeUnixMicros, 10) ||
+		receivedParams.Get("param_before_event_id") != query.BeforeEventID {
+		t.Fatalf("cursor parameters were not bound correctly: %#v", receivedParams)
+	}
+}
+
+func TestQueryRejectsPartialOrOutOfRangeCursor(t *testing.T) {
+	server := httptest.NewServer(http.NotFoundHandler())
+	defer server.Close()
+	tests := []struct {
+		name string
+		set func(*Query)
+	}{
+		{name: "time without event ID", set: func(query *Query) {
+			query.BeforeTimeUnixMicros = query.To.Add(-time.Minute).UnixMicro()
+		}},
+		{name: "event ID without time", set: func(query *Query) {
+			query.BeforeEventID = strings.Repeat("b", 64)
+		}},
+		{name: "timestamp outside query window", set: func(query *Query) {
+			query.BeforeTimeUnixMicros = query.From.Add(-time.Second).UnixMicro()
+			query.BeforeEventID = strings.Repeat("b", 64)
+		}},
+		{name: "invalid event ID", set: func(query *Query) {
+			query.BeforeTimeUnixMicros = query.To.Add(-time.Minute).UnixMicro()
+			query.BeforeEventID = "invalid"
+		}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			query := testQuery()
+			test.set(&query)
+			if _, err := testStore(server).Query(context.Background(), query); !errors.Is(err, ErrInvalidQuery) {
+				t.Fatalf("Query() error = %v, want ErrInvalidQuery", err)
+			}
+		})
+	}
+}
+
 func TestQueryRejectsInvalidRangeBeforeClickHouseRequest(t *testing.T) {
 	called := false
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {

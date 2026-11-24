@@ -18,13 +18,14 @@ type Project = { id: string; name: string; slug: string };
 type LogEvent = {
   event_id: string;
   event_time_unix_nanos: number;
+  event_time_unix_micros: number;
   source: string;
   severity: string;
   body: string;
   attributes: Record<string, string>;
   project_id?: string;
 };
-type LogResponse = { events: LogEvent[]; count: number };
+type LogResponse = { events: LogEvent[]; count: number; has_more: boolean };
 
 type Range = "15m" | "1h" | "6h" | "24h" | "7d";
 const ranges: Record<Range, number> = {
@@ -67,10 +68,13 @@ export default function LogExplorer({
   const [events, setEvents] = useState<LogEvent[]>([]);
   const [selectedEvent, setSelectedEvent] = useState<LogEvent | null>(null);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
   const [live, setLive] = useState(false);
   const [error, setError] = useState("");
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const requestSequence = useRef(0);
+  const queryWindow = useRef<{ from: string; to: string } | null>(null);
 
   const selectedServer = useMemo(
     () => servers.find((server) => server.id === serverId) ?? null,
@@ -89,10 +93,13 @@ export default function LogExplorer({
     setError("");
     const to = new Date();
     const from = new Date(to.getTime() - ranges[range]);
+    const window = { from: from.toISOString(), to: to.toISOString() };
+    queryWindow.current = window;
+    setHasMore(false);
     const query = new URLSearchParams({
-      from: from.toISOString(),
-      to: to.toISOString(),
-      limit: "200",
+      from: window.from,
+      to: window.to,
+      limit: "201",
     });
     if (applied.projectId) query.set("project_id", applied.projectId);
     if (applied.search) query.set("search", applied.search);
@@ -107,6 +114,7 @@ export default function LogExplorer({
         throw new Error("Log search returned an invalid response.");
       }
       setEvents(response.events);
+      setHasMore(response.has_more === true);
       setSelectedEvent((current) => current
         ? response.events.find((item) => item.event_id === current.event_id) ?? null
         : null);
@@ -132,6 +140,48 @@ export default function LogExplorer({
     const timer = window.setInterval(() => { void loadLogs(); }, 10000);
     return () => window.clearInterval(timer);
   }, [live, loadLogs]);
+
+  const loadOlder = useCallback(async () => {
+    const window = queryWindow.current;
+    const last = events[events.length - 1];
+    if (!window || !last || !hasMore || loadingMore) return;
+    if (!Number.isSafeInteger(last.event_time_unix_micros) || last.event_time_unix_micros <= 0) {
+      setError("The log cursor is invalid. Refresh the search before loading older events.");
+      return;
+    }
+
+    setLoadingMore(true);
+    setError("");
+    const query = new URLSearchParams({
+      from: window.from,
+      to: window.to,
+      limit: "201",
+      before_time: String(last.event_time_unix_micros),
+      before_id: last.event_id,
+    });
+    if (applied.projectId) query.set("project_id", applied.projectId);
+    if (applied.search) query.set("search", applied.search);
+    if (applied.source) query.set("source", applied.source);
+    if (applied.severity) query.set("severity", applied.severity);
+
+    try {
+      const response = await apiRequest<LogResponse>(
+        "/api/servers/" + encodeURIComponent(serverId) + "/logs?" + query.toString(),
+      );
+      if (!response || !Array.isArray(response.events)) {
+        throw new Error("Older log page returned an invalid response.");
+      }
+      setEvents((current) => {
+        const known = new Set(current.map((item) => item.event_id));
+        return [...current, ...response.events.filter((item) => !known.has(item.event_id))];
+      });
+      setHasMore(response.has_more === true);
+    } catch (pageError) {
+      setError(pageError instanceof Error ? pageError.message : "Older log events could not be loaded.");
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [serverId, events, hasMore, loadingMore, applied]);
 
   function applyFilters() {
     setApplied({ search: searchText.trim(), source: sourceText.trim(), severity, projectId });
@@ -207,7 +257,7 @@ export default function LogExplorer({
 
       <Card className="log-results-card">
         <CardHeader className="log-results-header">
-          <div><CardTitle>Events</CardTitle><p>{selectedServer?.name ?? "No machine selected"} · {events.length} returned · newest first</p></div>
+          <div><CardTitle>Events</CardTitle><p>{selectedServer?.name ?? "No machine selected"} · {events.length} loaded · newest first</p></div>
           <div className="log-results-meta">
             {live && <Badge variant="default">Live tail on</Badge>}
             <span>{lastUpdated ? "Updated " + lastUpdated.toLocaleTimeString() : "Not loaded"}</span>
@@ -234,6 +284,14 @@ export default function LogExplorer({
                 ))}
               </TableBody>
             </Table>
+          </div>
+        )}
+        {hasMore && (
+          <div className="log-load-older">
+            <Button variant="secondary" onClick={() => void loadOlder()} disabled={loadingMore || loading}>
+              {loadingMore ? "Loading older events…" : "Load older events"}
+            </Button>
+            <span>Each page is limited to 200 events.</span>
           </div>
         )}
       </Card>

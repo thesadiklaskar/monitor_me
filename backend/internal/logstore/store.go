@@ -24,7 +24,7 @@ const (
 	maxEventBody = 16 << 10
 	maxBatchBytes = 768 << 10
 	maxQueryRange = 7 * 24 * time.Hour
-	maxQueryRows = 200
+	maxQueryRows = 201
 )
 
 var (
@@ -67,11 +67,14 @@ type Query struct {
 	Severity string
 	Source string
 	Limit int
+	BeforeTimeUnixMicros int64
+	BeforeEventID string
 }
 
 type Result struct {
 	EventID string `json:"event_id"`
 	EventTimeUnixNanos int64 `json:"event_time_unix_nanos"`
+	EventTimeUnixMicros int64 `json:"event_time_unix_micros"`
 	Source string `json:"source"`
 	Severity string `json:"severity"`
 	Body string `json:"body"`
@@ -404,10 +407,19 @@ func (s *Store) Query(ctx context.Context, query Query) ([]Result, error) {
 		query.To.Sub(query.From) > maxQueryRange ||
 		query.Limit < 1 || query.Limit > maxQueryRows ||
 		len(query.Search) > 256 || len(query.Source) > 128 ||
-		(query.Severity != "" && !validSeverity(query.Severity)) {
+		(query.Severity != "" && !validSeverity(query.Severity)) ||
+		((query.BeforeTimeUnixMicros == 0) != (query.BeforeEventID == "")) {
 		return nil, ErrInvalidQuery
 	}
+	if query.BeforeTimeUnixMicros > 0 {
+		cursorTime := time.UnixMicro(query.BeforeTimeUnixMicros).UTC()
+		if !eventIDPattern.MatchString(query.BeforeEventID) ||
+			cursorTime.Before(query.From) || !cursorTime.Before(query.To) {
+			return nil, ErrInvalidQuery
+		}
+	}
 	sqlText := "SELECT event_id, toUnixTimestamp64Nano(event_time) AS event_time_unix_nanos, "+
+		"toUnixTimestamp64Micro(event_time) AS event_time_unix_micros, "+
 		"source, severity, body, attributes, ifNull(toString(project_id), '') AS project_id "+
 		"FROM "+s.database+".logs FINAL "+
 		"WHERE organization_id = {org_id:UUID} AND server_id = {server_id:UUID} "+
@@ -428,6 +440,11 @@ func (s *Store) Query(ctx context.Context, query Query) ([]Result, error) {
 	if query.ProjectID != "" {
 		sqlText += " AND project_id = {project_id:UUID}"
 		params.Set("param_project_id", query.ProjectID)
+	}
+	if query.BeforeTimeUnixMicros > 0 {
+		sqlText += " AND tuple(event_time, event_id) < tuple(fromUnixTimestamp64Micro({before_time:Int64}), {before_event_id:String})"
+		params.Set("param_before_time", strconv.FormatInt(query.BeforeTimeUnixMicros, 10))
+		params.Set("param_before_event_id", query.BeforeEventID)
 	}
 	sqlText += " ORDER BY event_time DESC, event_id DESC LIMIT {limit:UInt16} FORMAT JSONEachRow"
 
