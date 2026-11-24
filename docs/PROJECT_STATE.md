@@ -16,11 +16,11 @@ This file is the authoritative resume point for Monitor Me. Read it before makin
 | Completed phases | Phase 1 — Product Specification and Technical Blueprint; Phase 2 — Platform Foundation and Secure Connectivity; Phase 3 — Monitoring Agent and Telemetry Data Engine |
 | Current phase | Phase 4 dashboard acceptance and Phase 5 Linux-MVP / Windows local-agent validation |
 | Current phase status | In Progress — implementation is present; end-to-end acceptance is pending |
-| MVP status | No-login single-install shell and first metrics/log pipeline exist, but release-blocking builds/runtime acceptance remain open. Product UI is being simplified to Servers, Logs, Dashboards and Alerts with no project/workspace navigation; legacy user/organization/project schema and API paths, Windows runtime acceptance, file logs, push-based live logs, advanced dashboard editing, sustained-load tests and production bootstrap remain unfinished |
+| MVP status | No-login single-install shell and first metrics/log pipeline exist, but release-blocking builds/runtime acceptance remain open. Product-facing UI and browser proxy routes now focus on Servers, Logs, Dashboards and Alerts; legacy user/organization/project schema and internal Go APIs, Windows runtime acceptance, file logs, push-based live logs, advanced dashboard editing, sustained-load tests and production bootstrap remain unfinished |
 | Implementation status | One self-hosted installation per owner is the target; no hosted SaaS, login, customer profile, organization, workspace or project workflow. The browser shell has no login. SQL tables, FKs and backend query paths still retain legacy users/organizations/organization_id plus project tables/project_id filters and need safe data-preserving forward migrations. Linux metrics and journald → bounded spool → TLS gRPC → ClickHouse search exist. Windows Application/System Event Log source exists but Windows runtime acceptance is pending; arbitrary file/syslog tail is missing. Log Explorer polls every 10 seconds; native push/replay is not implemented. Linux amd64/arm64 and Windows amd64 agent builds are targeted, but clean-host acceptance is pending; macOS logs are explicitly unsupported. Startup scripts check main/origin, dirty tree, Compose config, build images before start, start with --no-build and verify readiness. Backend Docker build no longer runs go mod tidy, builds only shipped binaries with -mod=mod, creates /out, and uses Go HTTP/1.1 transport with checksum verification still enabled. backend/go.sum and web/package-lock.json are absent and must be committed for reproducible builds. Go import namespace and installer sample-host cleanup were completed; source portability does not yet equal release certification. |
 | Last source commit covered by latest successful CI run | 9685e115113123d5f9f8e8a1b222804752f5a283 (Go, frontend and native-agent jobs passed in run #45203706343; Compose integration failed at the web proxy login probe; later commits are not covered) |
 | Latest CI run | #597 — all four jobs failed before any step with runner_id 0 and zero steps; no build/test command ran. No fresh green CI evidence; runner allocation cause remains unknown |
-| Latest source commit | `b73b83dd10bb5ba1f9aab70dde01f3906d3a9af7` — UI palette changed from lavender to calmer slate/teal. Additional UI commits simplified navigation to Servers, Logs, Dashboards and Alerts; removed Project Mapping and Remote Operations from primary navigation; removed project filters from logs, dashboards, alerts and host metric detail. README, product contract and backlog now explicitly reject projects/workspaces. Frontend build/browser and agent OS runtime tests remain pending |
+| Latest source commit | `90e5dd70289870ca7b2f23f1b07986e8ec8d8006` — dark slate/teal UI, full-word Servers/Logs/Dashboards/Alerts navigation, larger readable menu/table typography and static self-hosted installation label. Project/remote-operation workspace components and browser API proxy routes were removed; project_id filters were removed from browser metric/log proxies and UI DTOs. Product contract, backlog, README, acceptance matrix, requirements and readiness audit now document monitoring-only scope. Frontend build/browser and agent OS runtime tests remain pending |
 | Next action | Owner Windows checkout: run `git pull --ff-only origin main`, verify the local hash matches `origin/main`, then run `scripts/start-local.ps1`. Confirm the backend slugPattern compile fix and simplified web build. Review Servers / Logs / Dashboards / Alerts at desktop and mobile widths. Do not run `docker compose down -v`; keep existing data. |
 
 
@@ -32,17 +32,17 @@ This file is the authoritative resume point for Monitor Me. Read it before makin
 
 **Status:** Source changes committed directly to `main`; frontend build, browser review, Windows runtime and Linux clean-host acceptance remain pending.
 
-- [x] Removed the sidebar collapse control and icon-only mode; navigation uses full labels: Server Inventory, Log Explorer, Project Mapping, Saved Dashboards, Alert Rules and Remote Operations.
-- [x] Refreshed the UI to a calmer slate/periwinkle palette, improved muted-text contrast and added keyboard focus outlines.
+- [x] Removed the sidebar collapse control and icon-only mode; navigation now uses full words: Servers, Logs, Dashboards and Alerts. Project Mapping and Remote Operations are not product-facing features.
+- [x] Refreshed the UI to a dark slate / muted teal palette, increased menu/table/control typography for readability and retained visible keyboard focus outlines.
 - [x] Reworked saved dashboard charts to use timestamp-based x coordinates, average lines, min/max bands, y-axis labels, visible gaps and latest-point details; expanded the panel metric catalog.
 - [x] Updated Log Explorer to show structured event labels and to describe its 10-second control accurately as HTTP auto-refresh, not push-based live tail. Windows event source capability is mentioned with its runtime-acceptance limitation; macOS and arbitrary file-tail limitations are explicit.
-- [x] Replaced visible Organization wording in project, alert, remote-operation and saved-dashboard UI copy with installation-local language.
+- [x] Removed project and remote-operation browser workspaces/routes; host technical context remains local to each monitored machine.
 - [x] Added [PLATFORM_SUPPORT_MATRIX.md](PLATFORM_SUPPORT_MATRIX.md), separating control-plane support from monitored-agent targets and explaining VPS/VM/cloud/bare-metal prerequisites.
 - [ ] Run frontend lint, TypeScript check and production Next.js build; visually inspect desktop/mobile layout and chart axes against real data.
 - [ ] Complete the user's Windows Docker Desktop local stack build after pulling latest main.
 - [ ] Execute Linux x86-64 clean-host install and Linux arm64 agent acceptance; execute Windows x64 agent service and Application/System event ingestion acceptance.
 - [ ] Complete actual push-based log stream/replay, file-tail rotation support, query editor/variables/annotations and Grafana-style dashboard interactions. These remain backlog items, not delivered features.
-- [ ] Remove legacy user/organization schema and organization_id query paths with a safe forward migration; this remains necessary for the strict single-install data model.
+- [ ] Remove legacy user/organization/project schema and organization_id/project_id query paths with safe forward migrations. Internal Go project and remote-operation route handlers also remain to be retired; preserve existing metric/log/dashboard data.
 
 **Verification caveat:** GitHub Actions run #597 created four jobs, but all had `runner_id: 0` and zero steps. No checks executed. The local owner must provide a successful build and browser/OS acceptance before these source changes can be called verified.
 
@@ -391,4 +391,20 @@ Phase 1 and Phase 2 implementation/verification history is recorded above. The f
 - No supported claim for “any OS/any VPS” or any unbenchmarked capacity profile.
 
 **Verification:** No fresh green CI/browser/runtime test was available for the above source changes. Keep the release state open until the local Docker build and the named acceptance gates pass.
+
+
+
+## Monitoring-only frontend and API cleanup — 2026-11-24
+
+**Source commit before this state update:** `90e5dd70289870ca7b2f23f1b07986e8ec8d8006`.
+
+- [x] Deleted the unmounted `ProjectWorkspace` component and the unused Next.js project/project-mapping API proxies.
+- [x] Removed `project_id` forwarding from browser metric and log proxies; host detail metric response types no longer expose project IDs.
+- [x] Deleted remote-operation workspace and browser API proxies. No stop/restart/shell controls are part of the monitoring product UI.
+- [x] Removed project/operation-only CSS, renamed generic installation indicator styles and increased primary UI typography.
+- [ ] Backend Go router still registers legacy project and remote-operation endpoints. They are not proxied by the web UI; remove them with their integration tests once the installation-only telemetry/live-stream model is migrated.
+- [ ] Legacy identity/session/org/project schema remains in backend and migrations. No destructive table/column changes have been made; safe migrations remain P0.
+- [ ] No fresh build, frontend lint/TypeScript/Next build, browser screenshot acceptance or OS runtime test has run after the changes.
+
+**Target UI contract:** four areas only — Servers, Logs, Dashboards, Alerts. This is a monitoring-only interface, not a remote administration console.
 
