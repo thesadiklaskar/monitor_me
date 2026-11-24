@@ -26,13 +26,11 @@ type LatestSample = {
   value: number;
   unit: string;
   labels?: Record<string, string>;
-  project_id?: string;
   observed_at: string;
 };
 
 type LatestResponse = {
   server_id: string;
-  project_id: string;
   window_seconds: number;
   samples: LatestSample[];
 };
@@ -52,7 +50,6 @@ type LiveSample = {
   unit: string;
   labels?: Record<string, string>;
   observed_at_unix_nanos: number;
-  project_id?: string;
 };
 
 type LiveEvent = {
