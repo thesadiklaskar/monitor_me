@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { Activity, Bell, Folder, PanelLeftClose, PanelLeftOpen, Server as ServerIcon } from "lucide-react";
+import { Activity, Bell, Copy, Folder, PanelLeftClose, PanelLeftOpen, Plus, RefreshCw, Server as ServerIcon } from "lucide-react";
 import { apiRequest } from "@/lib/client-api";
 import { ServerDetail } from "./server-detail";
 import ProjectWorkspace from "./project-workspace";
@@ -683,8 +683,8 @@ export default function DashboardClient() {
                 {projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
               </select>
             </label>
-            <button className="button button-secondary" type="button" onClick={() => void loadServers()} disabled={inventoryBusy}>{inventoryBusy ? "Refreshing…" : "Refresh"}</button>
-            {canCreate && <button className="button button-primary" type="button" onClick={() => setShowAdd(true)}>+ Add server</button>}
+            <button className="button button-secondary" type="button" onClick={() => void loadServers()} disabled={inventoryBusy}>{inventoryBusy ? <RefreshCw size={15} className="button-spinner" /> : <RefreshCw size={15} />} Refresh</button>
+            {canCreate && <button className="button button-primary" type="button" onClick={() => setShowAdd(true)}><Plus size={16} /> Add machine</button>}
           </div>
         </header>
 
