@@ -2,7 +2,7 @@
 
 A self-hosted infrastructure monitoring product for a VPS, VM, cloud VM, VPC-hosted Linux machine, dedicated server or a small fleet. Every installation runs independently on infrastructure controlled by its owner. Monitoring data stays with that installation.
 
-Monitor Me is an original monitoring product. It does not embed Grafana, Prometheus, Zabbix or Netdata.
+Monitor Me is an original monitoring product with an included Grafana OSS companion UI. Grafana is provisioned against Monitor Me's PostgreSQL telemetry using a dedicated read-only database role. Prometheus, Zabbix and Netdata are not required.
 
 > **Release status:** this is the development `main` branch, not a certified public release. The latest frontend changes and `install.sh` have not yet passed a fresh green CI run, browser review or a clean Ubuntu/Debian VPS installation. Treat the platform matrix and feature limits below as the current truth; do not assume zero-lag, unlimited scale or full Grafana parity.
 
@@ -22,7 +22,7 @@ Monitor Me is an original monitoring product. It does not embed Grafana, Prometh
 |---|---|---|
 | Machine inventory | Enrolment tokens, machine status, agent heartbeat and credential rotation | The owner must keep the dashboard protected by the configured network allowlist |
 | Host metrics | CPU, memory, swap, disk, network, uptime, process count and selected process/socket metadata | Metric availability differs by OS; no eBPF or HTTP request tracing |
-| Metric dashboards | Saved installation-wide dashboards, time-series/stat/table panels, historical averages and min/max ranges, persisted up/down ordering | No drag/resize grid, template variables, annotations, log panels or advanced query editor yet |
+| Metric dashboards | Native saved dashboards plus an included Grafana OSS UI at `/grafana/`; Grafana has SQL query building, variables, annotations, rich visualizations, Explore and Grafana alerting against Monitor Me telemetry | The native Monitor Me dashboard remains intentionally simpler; Grafana queries use a read-only PostgreSQL account and are bounded by the underlying telemetry retention |
 | Live metrics | Authenticated agent stream, bounded WebSocket updates and historical catch-up | Live freshness depends on agent sampling, storage and network; no zero-latency guarantee |
 | Logs | Linux journald ingestion through bounded local spool and ClickHouse search; time/severity/source filters and paged results | The UI's 10-second auto-refresh is HTTP polling, not push-based live tail. General file/syslog tail and rotation support are not delivered. Windows Event Log source code needs runtime acceptance |
 | Alerts | Metric threshold rules, firing/recovered events and in-app notifications | External email/chat notification providers are not implemented |
@@ -44,7 +44,7 @@ sudo ./install.sh
 
 The development repository is currently `WorkRCS/monitor_me`; the public target is `thesadiklaskar/monitor_me`. Do not use the public clone URL until the final code and release have actually been transferred there.
 
-The root `install.sh` is a guided Ubuntu/Debian Linux x86-64 bootstrap. It installs Docker/Compose, Nginx, Certbot and UFW when no host firewall is active (or uses an already-active firewalld); generates database/cache secrets; requests a Let's Encrypt certificate; enables automatic certificate renewal (including Nginx reload and gRPC API restart); applies an administrator CIDR boundary; builds the stack; runs migrations; and checks API/web readiness. The development `main` branch now stores `install.sh` as an executable file (`100755`), so the intended command is `sudo ./install.sh`. Preserve this executable mode when transferring the final source to `thesadiklaskar/monitor_me`.
+The root `install.sh` is a guided Ubuntu/Debian Linux x86-64 bootstrap. It installs Docker/Compose, Nginx, Certbot and UFW when no host firewall is active (or uses an already-active firewalld); generates database/cache/Grafana secrets; requests a Let's Encrypt certificate; enables automatic certificate renewal (including Nginx reload and gRPC API restart); applies an administrator CIDR boundary; builds the stack; runs migrations; provisions a read-only Grafana database user; and checks API/web/Grafana readiness. The development `main` branch stores `install.sh` as an executable file (`100755`), so the intended command is `sudo ./install.sh`. Preserve this executable mode when transferring the final source to `thesadiklaskar/monitor_me`.
 
 The installer asks for:
 1. A DNS hostname whose A record routes to the control plane or its public HTTPS load balancer.
@@ -160,7 +160,7 @@ The backend is the source of truth for telemetry; Redis messages are notificatio
 ## Configuration, data and security
 
 - Production settings and secrets live in `.env.production` (mode 0600); never commit it.
-- Dashboard/API/WebSocket access is network-restricted by Nginx to `ADMIN_CIDR`; agents use their own short-lived credentials.
+- Dashboard/API/WebSocket/Grafana access is network-restricted by Nginx to `ADMIN_CIDR`; Grafana additionally uses its own administrator login. Its PostgreSQL datasource uses `grafana_reader`, a dedicated SELECT-only role; agents use their own short-lived credentials.
 - PostgreSQL, Redis and ClickHouse are private to the Compose network. Do not publish ports 5432, 6379, 8080, 8123 or 9000.
 - PostgreSQL backups are provided by `deploy/production/backup.sh` and `restore.sh`. ClickHouse backup/restore must be designed and tested before a production retention commitment.
 - The current schema still contains legacy organization/user/session compatibility plumbing used internally for installation-local ownership and live tickets. It is not a customer account system and is not exposed in the UI; removing it fully requires a separate data-preserving schema refactor.
