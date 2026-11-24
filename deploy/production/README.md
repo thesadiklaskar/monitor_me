@@ -6,7 +6,7 @@ This directory provides a single-node production-oriented Compose topology and o
 
 - Host Nginx terminates HTTPS on TCP 443.
 - Nginx exposes only the Linux/Windows installer scripts, public agent CA, and checksum-verified artifact endpoints to monitored nodes.
-- The dashboard, its normal API routes and /v1/live/ws are restricted by a generated administrator/VPN allowlist when the no-login profile is enabled.
+- The dashboard, normal API routes and /v1/live/ws are always restricted by a generated administrator/VPN allowlist because the self-hosted operator console has no user login.
 - Nginx proxies /v1/live/ws to API HTTP on 127.0.0.1:18080 for browser live telemetry.
 - The API exposes TLS gRPC on TCP 8443 for enrolled agents.
 - PostgreSQL, Redis and ClickHouse have no host-published ports and are reachable only on the Compose network.
@@ -31,7 +31,7 @@ After issuing the HTTPS certificate and creating the API-readable certificate co
     sudo nginx -t
     sudo systemctl reload nginx
 
-The Nginx vhost includes `/etc/nginx/snippets/monitor-me-admin-allowlist.conf`. The deploy script creates this file automatically: with no-login enabled it restricts the dashboard/API/WebSocket to `ADMIN_CIDR`; with authentication enabled it leaves access control to the application. The dedicated installer, CA and artifact paths remain public for node enrollment. The API runs as a non-root user: do not mount Certbot's root-only private key directly. Instead, create a dedicated host group with the configured unused numeric CERT_GROUP_ID (default 15001), add the ID to .env.production, and let the certificate hook copy the files with group-only read permissions:
+The Nginx vhost includes `/etc/nginx/snippets/monitor-me-admin-allowlist.conf`. The deploy script always creates this file and restricts the dashboard/API/WebSocket to `ADMIN_CIDR`; there is no application login fallback. The dedicated installer, CA and artifact paths remain public for node enrollment. The API runs as a non-root user: do not mount Certbot's root-only private key directly. Instead, create a dedicated host group with the configured unused numeric CERT_GROUP_ID (default 15001), add the ID to .env.production, and let the certificate hook copy the files with group-only read permissions:
 
     sudo groupadd --system --gid 15001 monitor-me-cert
     sudo install -d -o root -g monitor-me-cert -m 0750 /var/lib/monitor-me/certs
@@ -44,7 +44,7 @@ Check that GID 15001 is unused before creating it; if it is already allocated, s
 
     sudo ./deploy/production/deploy.sh
 
-The script validates Compose interpolation, builds version-tagged images plus Linux/Windows native agent artifacts, starts PostgreSQL/Redis, waits for readiness, applies SQL migrations, starts API/web and probes API readiness plus the web config endpoint. When `MONITOR_ME_AUTH_DISABLED=true`, it requires root and an explicit `ADMIN_CIDR`, writes the Nginx administrator allowlist, validates/reloads Nginx, verifies that installer/CA/artifact paths remain public while dashboard and live-WebSocket paths include the allowlist, and only then applies host firewall rules. With auth disabled set to false, it creates the required but empty Nginx include and lets application authentication protect the dashboard. It still does not provision DNS, obtain certificates, install Nginx/Docker, or update cloud security groups.
+The script validates Compose interpolation, requires root and a specific `ADMIN_CIDR`, writes the Nginx administrator allowlist, validates/reloads Nginx, verifies the bootstrap routes remain public while the dashboard and live-WebSocket paths include the allowlist, and applies the host firewall boundary before starting the application. It then builds version-tagged images plus Linux/Windows native agent artifacts, starts PostgreSQL/Redis, waits for readiness, applies SQL migrations, starts API/web and probes API readiness plus the web installation endpoint. There is no password-login configuration or insecure public-dashboard mode. It still does not provision DNS, obtain certificates, install Nginx/Docker, or update cloud security groups.
 
 Certbot's deploy hook refreshes the API-readable group-restricted certificate copy on subsequent renewals. Verify HTTPS, the public installer/CA/artifact routes, dashboard access from an allowed and a denied source, /v1/live/ws WebSocket upgrade, and gRPC TLS from an independent network. Enrolled agents must trust the certificate chain used by the public gRPC endpoint.
 
