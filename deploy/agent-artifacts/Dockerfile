@@ -2,6 +2,10 @@ FROM golang:1.27.4-alpine3.23 AS build
 
 WORKDIR /src
 
+# Avoid transient HTTP/2 stream failures during verified module downloads.
+# Do not disable TLS or the public Go checksum database.
+ENV GODEBUG=http2client=0
+
 RUN apk add --no-cache protobuf && \
     go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.12 && \
     go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.6.2
