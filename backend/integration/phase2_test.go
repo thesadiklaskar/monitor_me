@@ -60,7 +60,7 @@ func TestSingleInstallAndAgentLifecycle(t *testing.T) {
 	}
 	defer database.Close()
 
-	installationResponse := requestJSON(t, ctx, http.MethodGet, baseURL+"/v1/installation", "", nil)
+	installationResponse := requestJSON(t, ctx, http.MethodGet, baseURL+"/v1/installation", nil)
 	if installationResponse.StatusCode != http.StatusOK {
 		t.Fatalf("single-install bootstrap: expected 200, got %d: %s", installationResponse.StatusCode, installationResponse.Body)
 	}
@@ -83,7 +83,7 @@ func TestSingleInstallAndAgentLifecycle(t *testing.T) {
 		{method: http.MethodPost, path: "/v1/auth/logout"},
 		{method: http.MethodGet, path: "/v1/auth/me"},
 	} {
-		response := requestJSON(t, ctx, route.method, baseURL+route.path, "", nil)
+		response := requestJSON(t, ctx, route.method, baseURL+route.path, nil)
 		if response.StatusCode != http.StatusNotFound {
 			t.Fatalf("interactive authentication route %s %s must not exist: got %d: %s",
 				route.method, route.path, response.StatusCode, response.Body)
@@ -99,9 +99,8 @@ func TestSingleInstallAndAgentLifecycle(t *testing.T) {
 	`).Scan(&userID, &organizationID); err != nil {
 		t.Fatalf("load internal installation scope: %v", err)
 	}
-	bearer := ""
 
-	serverResponse := createServer(t, ctx, baseURL, bearer, "integration-node")
+	serverResponse := createServer(t, ctx, baseURL, "integration-node")
 	serverID, enrollmentToken := serverResponse.Server.ID, serverResponse.Enrollment.Token
 	if serverID == "" || len(enrollmentToken) < 32 {
 		t.Fatalf("server creation did not return a one-time enrollment token: %#v", serverResponse)
@@ -111,7 +110,7 @@ func TestSingleInstallAndAgentLifecycle(t *testing.T) {
 	}
 
 	// Phase 4 project administration and server workload mapping authorization.
-	projectCreate := requestJSON(t, ctx, http.MethodPost, baseURL+"/v1/projects", bearer, map[string]any{
+	projectCreate := requestJSON(t, ctx, http.MethodPost, baseURL+"/v1/projects", map[string]any{
 		"name": "Payments API", "slug": "payments-api",
 	})
 	if projectCreate.StatusCode != http.StatusCreated {
@@ -129,7 +128,7 @@ func TestSingleInstallAndAgentLifecycle(t *testing.T) {
 	}
 
 	mappingCreate := requestJSON(t, ctx, http.MethodPost,
-		baseURL+"/v1/servers/"+serverID+"/project-mappings", bearer, map[string]any{
+		baseURL+"/v1/servers/"+serverID+"/project-mappings", map[string]any{
 			"project_id":         createdProject.Project.ID,
 			"workload_type":      "systemd",
 			"workload_selector":  "payments-api.service",
@@ -152,7 +151,7 @@ func TestSingleInstallAndAgentLifecycle(t *testing.T) {
 	}
 
 	mappingList := requestJSON(t, ctx, http.MethodGet,
-		baseURL+"/v1/servers/"+serverID+"/project-mappings", bearer, nil)
+		baseURL+"/v1/servers/"+serverID+"/project-mappings", nil)
 	if mappingList.StatusCode != http.StatusOK {
 		t.Fatalf("viewer workload mapping list: expected 200, got %d: %s", mappingList.StatusCode, mappingList.Body)
 	}
@@ -168,12 +167,12 @@ func TestSingleInstallAndAgentLifecycle(t *testing.T) {
 	}
 
 	mappingDelete := requestJSON(t, ctx, http.MethodDelete,
-		baseURL+"/v1/project-mappings/"+createdMapping.Mapping.ID, bearer, map[string]any{})
+		baseURL+"/v1/project-mappings/"+createdMapping.Mapping.ID, map[string]any{})
 	if mappingDelete.StatusCode != http.StatusNoContent {
 		t.Fatalf("owner workload mapping deletion: expected 204, got %d: %s", mappingDelete.StatusCode, mappingDelete.Body)
 	}
 	projectDelete := requestJSON(t, ctx, http.MethodDelete,
-		baseURL+"/v1/projects/"+createdProject.Project.ID, bearer, map[string]any{})
+		baseURL+"/v1/projects/"+createdProject.Project.ID, map[string]any{})
 	if projectDelete.StatusCode != http.StatusNoContent {
 		t.Fatalf("owner project deletion: expected 204, got %d: %s", projectDelete.StatusCode, projectDelete.Body)
 	}
@@ -237,10 +236,10 @@ func TestSingleInstallAndAgentLifecycle(t *testing.T) {
 	}
 
 	// Rotating a still-pending server credential invalidates the previous unused token.
-	pendingServer := createServer(t, ctx, baseURL, bearer, "pending-token-rotation-node")
+	pendingServer := createServer(t, ctx, baseURL, "pending-token-rotation-node")
 	pendingHash := sha256.Sum256([]byte(pendingServer.Enrollment.Token))
 	pendingRotation := requestJSON(t, ctx, http.MethodPost,
-		baseURL+"/v1/servers/"+pendingServer.Server.ID+"/enrollment-token", bearer, map[string]any{})
+		baseURL+"/v1/servers/"+pendingServer.Server.ID+"/enrollment-token", map[string]any{})
 	if pendingRotation.StatusCode != http.StatusCreated {
 		t.Fatalf("rotate pending server token: expected 201, got %d: %s", pendingRotation.StatusCode, pendingRotation.Body)
 	}
@@ -298,7 +297,7 @@ func TestSingleInstallAndAgentLifecycle(t *testing.T) {
 
 	// Reissue a single-use token for the same server and rotate its agent session.
 	rotationResponse := requestJSON(t, ctx, http.MethodPost,
-		baseURL+"/v1/servers/"+serverID+"/enrollment-token", bearer, map[string]any{})
+		baseURL+"/v1/servers/"+serverID+"/enrollment-token", map[string]any{})
 	if rotationResponse.StatusCode != http.StatusCreated {
 		t.Fatalf("reissue enrollment token: expected 201, got %d: %s", rotationResponse.StatusCode, rotationResponse.Body)
 	}
@@ -331,7 +330,7 @@ func TestSingleInstallAndAgentLifecycle(t *testing.T) {
 		t.Fatalf("consumed token should not be reusable; response=%v error=%v", reusedEnrollment, err)
 	}
 
-	expiredServer := createServer(t, ctx, baseURL, bearer, "expired-token-node")
+	expiredServer := createServer(t, ctx, baseURL, "expired-token-node")
 	expiredHash := sha256.Sum256([]byte(expiredServer.Enrollment.Token))
 	if _, err := database.ExecContext(ctx,
 		"UPDATE agent_enrollment_tokens SET expires_at = now() - interval '1 minute' WHERE token_hash = $1",
@@ -347,9 +346,9 @@ func TestSingleInstallAndAgentLifecycle(t *testing.T) {
 		t.Fatalf("expired token should be unauthenticated; response=%v error=%v", expiredResponse, err)
 	}
 
-	revokedServer := createServer(t, ctx, baseURL, bearer, "revoked-token-node")
+	revokedServer := createServer(t, ctx, baseURL, "revoked-token-node")
 	revokeToken := requestJSON(t, ctx, http.MethodPost,
-		baseURL+"/v1/enrollment-tokens/"+revokedServer.Enrollment.TokenID+"/revoke", bearer, map[string]any{})
+		baseURL+"/v1/enrollment-tokens/"+revokedServer.Enrollment.TokenID+"/revoke", map[string]any{})
 	if revokeToken.StatusCode != http.StatusNoContent {
 		t.Fatalf("enrollment token revocation: expected 204, got %d: %s", revokeToken.StatusCode, revokeToken.Body)
 	}
@@ -386,7 +385,7 @@ func TestSingleInstallAndAgentLifecycle(t *testing.T) {
 	}
 
 	// Saved dashboards and panels are durable, organization-scoped resources.
-	dashboardCreate := requestJSON(t, ctx, http.MethodPost, baseURL+"/v1/dashboards", bearer, map[string]any{
+	dashboardCreate := requestJSON(t, ctx, http.MethodPost, baseURL+"/v1/dashboards", map[string]any{
 		"name": "Infrastructure Overview", "description": "Production host signals",
 		"project_id": projectID, "is_default": true,
 	})
@@ -405,7 +404,7 @@ func TestSingleInstallAndAgentLifecycle(t *testing.T) {
 		t.Fatalf("dashboard creation returned incomplete data: %#v", createdDashboard.Dashboard)
 	}
 	panelCreate := requestJSON(t, ctx, http.MethodPost,
-		baseURL+"/v1/dashboards/"+createdDashboard.Dashboard.ID+"/panels", bearer, map[string]any{
+		baseURL+"/v1/dashboards/"+createdDashboard.Dashboard.ID+"/panels", map[string]any{
 			"title": "Host CPU", "visualization": "timeseries", "server_id": serverID,
 			"project_id": projectID, "metric_name": "host.cpu.utilization", "time_range": "1h", "position": 0,
 		})
@@ -427,7 +426,7 @@ func TestSingleInstallAndAgentLifecycle(t *testing.T) {
 		createdPanel.Panel.MetricName != "host.cpu.utilization" {
 		t.Fatalf("dashboard panel creation returned incomplete or mis-scoped data: %#v", createdPanel.Panel)
 	}
-	dashboardList := requestJSON(t, ctx, http.MethodGet, baseURL+"/v1/dashboards", bearer, nil)
+	dashboardList := requestJSON(t, ctx, http.MethodGet, baseURL+"/v1/dashboards", nil)
 	if dashboardList.StatusCode != http.StatusOK {
 		t.Fatalf("owner dashboard list: expected 200, got %d: %s", dashboardList.StatusCode, dashboardList.Body)
 	}
@@ -444,7 +443,7 @@ func TestSingleInstallAndAgentLifecycle(t *testing.T) {
 		t.Fatalf("dashboard persistence did not return its one saved panel: %#v", ownerDashboards.Dashboards)
 	}
 
-	ticketResponse := requestJSON(t, ctx, http.MethodPost, baseURL+"/v1/live/ticket", bearer, map[string]any{})
+	ticketResponse := requestJSON(t, ctx, http.MethodPost, baseURL+"/v1/live/ticket", map[string]any{})
 	if ticketResponse.StatusCode != http.StatusCreated {
 		t.Fatalf("create live ticket: expected 201, got %d: %s", ticketResponse.StatusCode, ticketResponse.Body)
 	}
@@ -464,7 +463,7 @@ func TestSingleInstallAndAgentLifecycle(t *testing.T) {
 	defer liveConnection.Close()
 
 	// Threshold rules are organization-scoped and can only be managed by owners/admins.
-	alertRuleResponse := requestJSON(t, ctx, http.MethodPost, baseURL+"/v1/alert-rules", bearer, map[string]any{
+	alertRuleResponse := requestJSON(t, ctx, http.MethodPost, baseURL+"/v1/alert-rules", map[string]any{
 		"name":        "High host memory",
 		"server_id":   serverID,
 		"metric_name": "host.memory.used",
@@ -602,7 +601,7 @@ func TestSingleInstallAndAgentLifecycle(t *testing.T) {
 		t.Fatalf("committed telemetry batch was not acknowledged: response=%v error=%v", firstAck, err)
 	}
 
-	firingAlerts := requestJSON(t, ctx, http.MethodGet, baseURL+"/v1/alerts", bearer, nil)
+	firingAlerts := requestJSON(t, ctx, http.MethodGet, baseURL+"/v1/alerts", nil)
 	if firingAlerts.StatusCode != http.StatusOK {
 		t.Fatalf("firing alert list: expected 200, got %d: %s", firingAlerts.StatusCode, firingAlerts.Body)
 	}
@@ -648,7 +647,7 @@ func TestSingleInstallAndAgentLifecycle(t *testing.T) {
 	}
 
 	// A fresh ticket restores the live stream after a normal reconnect.
-	reconnectTicketResponse := requestJSON(t, ctx, http.MethodPost, baseURL+"/v1/live/ticket", bearer, map[string]any{})
+	reconnectTicketResponse := requestJSON(t, ctx, http.MethodPost, baseURL+"/v1/live/ticket", map[string]any{})
 	if reconnectTicketResponse.StatusCode != http.StatusCreated {
 		t.Fatalf("issue reconnect ticket: expected 201, got %d: %s", reconnectTicketResponse.StatusCode, reconnectTicketResponse.Body)
 	}
@@ -772,7 +771,7 @@ func TestSingleInstallAndAgentLifecycle(t *testing.T) {
 	if err != nil || recoveryAck.GetAcknowledgement() == nil || !recoveryAck.GetAcknowledgement().GetAccepted() {
 		t.Fatalf("recovery telemetry batch was not acknowledged: response=%v error=%v", recoveryAck, err)
 	}
-	resolvedAlerts := requestJSON(t, ctx, http.MethodGet, baseURL+"/v1/alerts", bearer, nil)
+	resolvedAlerts := requestJSON(t, ctx, http.MethodGet, baseURL+"/v1/alerts", nil)
 	if resolvedAlerts.StatusCode != http.StatusOK {
 		t.Fatalf("resolved alert list: expected 200, got %d: %s", resolvedAlerts.StatusCode, resolvedAlerts.Body)
 	}
@@ -786,7 +785,7 @@ func TestSingleInstallAndAgentLifecycle(t *testing.T) {
 	if len(resolvedAlertList.Events) != 1 || resolvedAlertList.Events[0].RuleID != createdAlertRule.Rule.ID || resolvedAlertList.Events[0].Status != "resolved" {
 		t.Fatalf("below-threshold telemetry did not resolve the alert: %#v", resolvedAlertList.Events)
 	}
-	notificationResponse := requestJSON(t, ctx, http.MethodGet, baseURL+"/v1/notifications", bearer, nil)
+	notificationResponse := requestJSON(t, ctx, http.MethodGet, baseURL+"/v1/notifications", nil)
 	if notificationResponse.StatusCode != http.StatusOK {
 		t.Fatalf("owner notification list: expected 200, got %d: %s", notificationResponse.StatusCode, notificationResponse.Body)
 	}
@@ -811,7 +810,7 @@ func TestSingleInstallAndAgentLifecycle(t *testing.T) {
 	if !seenKinds["firing"] || !seenKinds["recovered"] || firingNotificationID == "" {
 		t.Fatalf("firing and recovery notifications were not both persisted: %#v", notificationList.Notifications)
 	}
-	markRead := requestJSON(t, ctx, http.MethodPost, baseURL+"/v1/notifications/"+firingNotificationID+"/read", bearer, map[string]any{})
+	markRead := requestJSON(t, ctx, http.MethodPost, baseURL+"/v1/notifications/"+firingNotificationID+"/read", map[string]any{})
 	if markRead.StatusCode != http.StatusNoContent {
 		t.Fatalf("mark notification as read: expected 204, got %d: %s", markRead.StatusCode, markRead.Body)
 	}
@@ -825,7 +824,7 @@ func TestSingleInstallAndAgentLifecycle(t *testing.T) {
 		"limit":  []string{"10"},
 	}
 	seriesURL := baseURL + "/v1/servers/" + serverID + "/metrics?" + seriesValues.Encode()
-	seriesResponse := requestJSON(t, ctx, http.MethodGet, seriesURL, bearer, nil)
+	seriesResponse := requestJSON(t, ctx, http.MethodGet, seriesURL, nil)
 	if seriesResponse.StatusCode != http.StatusOK {
 		t.Fatalf("server metrics history: expected 200, got %d: %s", seriesResponse.StatusCode, seriesResponse.Body)
 	}
@@ -918,7 +917,7 @@ func TestSingleInstallAndAgentLifecycle(t *testing.T) {
 		t.Fatalf("age agent heartbeat for stale-state test: %v", err)
 	}
 	readInventoryStatus := func() string {
-		response := requestJSON(t, ctx, http.MethodGet, baseURL+"/v1/servers", bearer, nil)
+		response := requestJSON(t, ctx, http.MethodGet, baseURL+"/v1/servers", nil)
 		if response.StatusCode != http.StatusOK {
 			t.Fatalf("read server inventory status: expected 200, got %d: %s", response.StatusCode, response.Body)
 		}
@@ -1029,7 +1028,7 @@ func TestSingleInstallAndAgentLifecycle(t *testing.T) {
 	}
 
 	revokeAgent := requestJSON(t, ctx, http.MethodPost,
-		baseURL+"/v1/agents/"+enrolled.GetAgentId()+"/revoke", bearer, map[string]any{})
+		baseURL+"/v1/agents/"+enrolled.GetAgentId()+"/revoke", map[string]any{})
 	if revokeAgent.StatusCode != http.StatusNoContent {
 		t.Fatalf("agent revocation: expected 204, got %d: %s", revokeAgent.StatusCode, revokeAgent.Body)
 	}
@@ -1042,15 +1041,15 @@ func TestSingleInstallAndAgentLifecycle(t *testing.T) {
 		t.Fatalf("revoked agent session should be rejected; response=%v error=%v", revokedHeartbeat, err)
 	}
 
-	servers := requestJSON(t, ctx, http.MethodGet, baseURL+"/v1/servers", bearer, nil)
+	servers := requestJSON(t, ctx, http.MethodGet, baseURL+"/v1/servers", nil)
 	if servers.StatusCode != http.StatusOK {
 		t.Fatalf("server inventory: expected 200, got %d: %s", servers.StatusCode, servers.Body)
 	}
 }
 
-func createServer(t *testing.T, ctx context.Context, baseURL, bearer, name string) apiResponse {
+func createServer(t *testing.T, ctx context.Context, baseURL, name string) apiResponse {
 	t.Helper()
-	response := requestJSON(t, ctx, http.MethodPost, baseURL+"/v1/servers", bearer, map[string]any{
+	response := requestJSON(t, ctx, http.MethodPost, baseURL+"/v1/servers", map[string]any{
 		"name": name, "hostname": name,
 	})
 	if response.StatusCode != http.StatusCreated {
@@ -1061,7 +1060,7 @@ func createServer(t *testing.T, ctx context.Context, baseURL, bearer, name strin
 	return decoded
 }
 
-func requestJSON(t *testing.T, ctx context.Context, method, endpoint, bearer string, body any) httpResult {
+func requestJSON(t *testing.T, ctx context.Context, method, endpoint string, body any) httpResult {
 	t.Helper()
 	var encoded []byte
 	var err error
@@ -1077,9 +1076,6 @@ func requestJSON(t *testing.T, ctx context.Context, method, endpoint, bearer str
 	}
 	if body != nil {
 		request.Header.Set("Content-Type", "application/json")
-	}
-	if bearer != "" {
-		request.Header.Set("Authorization", "Bearer "+bearer)
 	}
 	client := &http.Client{Timeout: 10 * time.Second}
 	response, err := client.Do(request)
