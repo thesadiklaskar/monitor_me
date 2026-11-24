@@ -156,6 +156,7 @@ ensure_hex_secret() {
 }
 ensure_hex_secret GRAFANA_DB_PASSWORD
 ensure_hex_secret GRAFANA_ADMIN_PASSWORD
+ensure_hex_secret GRAFANA_CLICKHOUSE_PASSWORD
 chmod 600 "$ENV_FILE"
 
 valid_domain "$PUBLIC_HOSTNAME" || fail "PUBLIC_HOSTNAME in .env.production must be a valid FQDN."
