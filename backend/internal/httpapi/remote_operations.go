@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/WorkRCS/monitor_me/backend/internal/identity"
+	"example.com/monitor-me/backend/internal/identity"
 )
 
 func (api *API) remoteOperationConfig(writer http.ResponseWriter, request *http.Request) {

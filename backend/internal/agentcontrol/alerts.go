@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/WorkRCS/monitor_me/backend/internal/telemetry"
+	"example.com/monitor-me/backend/internal/telemetry"
 )
 
 type alertRuleMatch struct {

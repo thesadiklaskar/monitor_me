@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	monitorv1 "github.com/WorkRCS/monitor_me/backend/gen/monitor/v1"
+	monitorv1 "example.com/monitor-me/backend/gen/monitor/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )

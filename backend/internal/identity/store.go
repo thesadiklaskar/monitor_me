@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/WorkRCS/monitor_me/backend/internal/security"
+	"example.com/monitor-me/backend/internal/security"
 )
 
 var (
