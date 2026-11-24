@@ -29,17 +29,16 @@ The product is being built around its own native host agent, telemetry ingestion
 
 Monitor Me aims to provide a guided, low-friction monitoring experience without requiring operators to assemble a monitoring stack manually.
 
-The target workflow is:
+The target workflow is a single-install, no-login monitoring console:
 
-1. An operator signs in and selects **Add Server**.
-2. The dashboard creates a scoped, short-lived enrollment credential and an installation instruction for the target operating system.
-3. The native Go agent is installed on a Bare Metal server, VPS, VM, or supported cloud host.
-4. The agent securely enrolls and starts reporting supported host metrics.
-5. The operator sees the server's overall health and resource usage.
-6. The operator can switch between **All Projects** and individual project views, where workload attribution is supported.
-7. The operator can investigate historical data, receive alerts, and perform explicitly authorized actions.
+1. An operator runs one control-plane installation command. Docker Compose, storage, TLS, migrations, health checks and safe network defaults are configured automatically.
+2. The dashboard opens directly. No signup, login or organization creation is required in the default single-install experience.
+3. The operator selects **Add machine** and receives a short-lived, single-use enrollment token.
+4. A platform-native launcher is run on the target host. It detects the target's OS, architecture, service manager and available virtualization/cloud metadata locally, then installs and starts the matching native agent.
+5. The agent enrolls and reports supported metrics and host identity. Each server remains a separately enrolled machine.
+6. The operator investigates fleet health, metrics, alerts and—once delivered—the searchable raw log pipeline.
 
-The long-term objective is an enterprise-oriented product with a straightforward user experience and a measured path from a small deployment to large monitored fleets.
+The complete product contract, architecture boundaries and acceptance targets are documented in [PRODUCT_VISION_PLUG_AND_PLAY.md](docs/PRODUCT_VISION_PLUG_AND_PLAY.md). The no-login production network boundary and ClickHouse log-store proposal are recorded in [ADR 0004](docs/adr/0004-single-install-no-login-network-boundary.md) and [ADR 0005](docs/adr/0005-clickhouse-high-volume-logs.md).
 
 ## Current Project Status
 
@@ -51,15 +50,15 @@ The long-term objective is an enterprise-oriented product with a straightforward
 | High-level architecture | **Completed** | Component boundaries, data flow, storage responsibilities, and security boundaries documented |
 | Feature acceptance matrix | **Completed** | Planned features mapped to implementation tests and CI evidence |
 | Backend implementation | **Phases 2–3 verified** | Authentication, organization-scoped APIs, TLS gRPC enrollment, durable telemetry ingestion, history, retention, and live transport pass CI |
-| Frontend implementation | **Phase 4 in progress — first slice CI verified** | Owner/login, HttpOnly-cookie session handling, organization-scoped server inventory, Add Server and one-time token controls pass frontend build and Compose integration in CI run #45188259431 |
+| Frontend implementation | **Phase 4 in progress** | Monitoring detail refresh, no-login local shell, OS-agnostic Add Machine enrollment, two shell launcher options and collapsible icon-led sidebar are implemented; full console redesign, operator acceptance and production network access gate remain |
 | Local platform stack | **Runtime verified** | PostgreSQL, Redis, migration runner, API, and web services start through Docker Compose |
 | Database and cache integration | **Runtime verified** | PostgreSQL remains durable; Redis and PostgreSQL dependency outage/readiness recovery are tested |
 | Agent protocol and ingestion | **Phase 3 verified** | TLS enrollment, persisted session, heartbeat, reconnect/backoff, streaming batches, post-commit ACK, and idempotent PostgreSQL persistence pass end-to-end CI |
-| Native host agent | **Linux verified; Windows initial implementation in progress** | Linux host/process/TCP/cgroup collection is verified. An initial Windows collector reports CPU, memory/swap, mounted-volume capacity/I/O, network throughput, uptime, host identity and readable process RSS; Windows build/run helpers are present, with runtime acceptance and service lifecycle still pending |
+| Native host agent | **Linux verified; Windows initial slice in progress** | Linux and Windows report OS/platform/architecture plus available virtualization metadata. Windows CPU, memory/swap, disk, network, uptime and process RSS collection is present; Windows runtime acceptance, Windows Service lifecycle and signed remote installers remain pending |
 | Telemetry history and live transport | **Phase 3 verified** | Bounded PostgreSQL range query, 30-day raw retention, 90-day idempotency retention, one-use session-bound WebSocket tickets, cross-tenant isolation, and bounded subscriber queues pass CI |
 | Project/workload attribution | **Phase 3 verified (Linux mapping path)** | cgroup/Systemd/container selectors, exact server/project mappings, and explicit host-total/unclassified/shared attribution pass database integration tests; full Docker Engine discovery remains later work |
-| Monitoring dashboard | **In Progress** | Phase 4 began 2026-11-23; authentication and server onboarding are CI-verified; server-detail metric views, project switching, charts and operations remain |
-| Production firewall setup | Planned | Phase 5 will add role-aware Linux host firewall profiles for the control plane and monitored agents |
+| Monitoring dashboard | **In Progress** | Operator shell polish, responsive collapse, vector icons, no-login local mode and host detail telemetry are implemented; professional fleet overview, log explorer, global selectors and complete UI acceptance remain |
+| Production firewall setup | **In Progress** | Additive UFW/firewalld helper is present; new HTTPS rules are now restricted to explicit administrator CIDRs. Full remote no-login gate, real-host IPv4/IPv6 verification and cloud security-group integration remain |
 | Production release | Not started | Planned for Phase 5 |
 
 **Status vocabulary:** Completed means implemented and verified for the documented environment. Specified means requirements are documented but implementation is not complete. Planned means work has not started. A design document or mock screen does not count as a working feature.
@@ -272,10 +271,14 @@ The initial collection target is configurable in the 100ms–500ms range where h
 
 ## Security Principles
 
-- TLS-protected and authenticated agent communication.
-- Short-lived, scoped, revocable enrollment credentials.
-- Server-side authorization for APIs and live subscriptions.
-- Organization, server, and project isolation.
+The default local Compose profile is no-login and is published only on loopback. The production profile is not yet switched to anonymous access; remote no-login must not be enabled until source-restricted HTTPS, HTTPS certificates, cloud-network review and IPv4/IPv6 verification are enforced. See ADR 0004.
+
+- TLS-protected agent communication with short-lived, single-use, revocable enrollment credentials.
+- Default single-install operation removes the signup/login workflow; the workspace identity is created internally.
+- Local no-login access is loopback-bound. Remote no-login access must be gated by HTTPS and an administrator CIDR/VPN boundary before it is enabled.
+- Keep operator dashboard access separate from agent gRPC enrollment. A node token never authenticates a browser session.
+- Keep PostgreSQL, Redis, ClickHouse (when implemented), API HTTP and internal web ports private.
+- Internal installation/server isolation remains mandatory even when the operator UI is single-tenant.
 - Least-privilege host collection and Docker access.
 - Explicit allowlists and audit records for remote actions.
 - No unrestricted remote shell feature.
@@ -285,7 +288,7 @@ The initial collection target is configurable in the 100ms–500ms range where h
 
 ## Production Firewall Requirements
 
-The production firewall policy is defined for two roles: a control-plane VPS/VM and agent-only monitored Linux hosts. Agent-only hosts require no inbound Monitor Me ports; they send outbound TLS gRPC to the control plane. The control plane normally exposes TCP 443 and TCP 8443, optional TCP 80 for ACME HTTP-01, and SSH only from a trusted administrator CIDR. PostgreSQL 5432, Redis 6379, API 8080, and web 3000 must remain private. See [Production Firewall Requirements](docs/PRODUCTION_FIREWALL.md) for UFW/firewalld examples, Docker firewall caveats, and local/LAN deployment rules. Firewall automation is a Phase 5 deliverable, not a currently implemented installer feature.
+The production firewall policy is defined for two roles: a control-plane VPS/VM and agent-only monitored Linux hosts. Agent-only hosts require no inbound Monitor Me ports; they send outbound TLS gRPC to the control plane. The no-login control-plane profile exposes TCP 443 only from the administrator CIDR/VPN, TCP 8443 to enrolled-agent networks (or public agent networks when required), optional TCP 80 for ACME HTTP-01, and SSH only from a trusted administrator CIDR. PostgreSQL 5432, Redis 6379, API 8080, and web 3000 must remain private. See [Production Firewall Requirements](docs/PRODUCTION_FIREWALL.md) for UFW/firewalld examples, Docker firewall caveats, and local/LAN deployment rules. Firewall automation is a Phase 5 deliverable, not a currently implemented installer feature.
 
 ## Five-Phase Delivery Roadmap
 
@@ -307,7 +310,10 @@ Phases 1–3 are complete and their phase gates pass CI. This does **not** mean 
 
 | Document | Purpose |
 | --- | --- |
-| [Product Requirements](docs/PRODUCT_REQUIREMENTS.md) | Product vision, MVP scope, functional requirements, and non-functional requirements |
+| [Product Requirements](docs/PRODUCT_REQUIREMENTS.md) | Product requirements and current functional acceptance baseline |
+| [Plug-and-Play Product Contract](docs/PRODUCT_VISION_PLUG_AND_PLAY.md) | Single-install no-login workflow, target-side discovery, firewall boundary, log scale and delivery sequence |
+| [ADR 0004](docs/adr/0004-single-install-no-login-network-boundary.md) | No-login single-install model and required network security boundary |
+| [ADR 0005](docs/adr/0005-clickhouse-high-volume-logs.md) | Proposed durable ClickHouse raw-log data plane |
 | [Metric Catalog](docs/METRIC_CATALOG.md) | Metric names, units, sources, calculations, and platform limitations |
 | [Feature Acceptance Matrix](docs/FEATURE_ACCEPTANCE_MATRIX.md) | Feature-by-feature verification criteria and evidence status |
 | [Architecture Overview](docs/ARCHITECTURE_OVERVIEW.md) | Components, data flow, storage, Docker boundaries, and security boundaries |
@@ -348,9 +354,11 @@ After the implementation is complete, the final Excalidraw system design will be
 
 The final diagram must describe the system that was actually built, not an aspirational architecture.
 
+**Raw logs are not implemented yet.** The current telemetry path stores host metrics in PostgreSQL and uses Redis for ephemeral live updates. ClickHouse is the proposed high-volume raw-log store; do not present log search, live tail or million-event reliability as shipped until ADR 0005 is implemented and load-tested.
+
 ---
 
-**Current resume point:** Phases 1–3 are complete on `main`; Phase 4 and Phase 5 have not started. The final audit passed all four CI jobs in [GitHub Actions run #45043161542](https://github.com/WorkRCS/monitor_me/actions/runs/45045054465). No Phase 4 or Phase 5 implementation was started during this audit. Read [docs/PROJECT_STATE.md](docs/PROJECT_STATE.md) for the exact next action.
+**Current resume point:** Phases 1–3 are complete. Phase 4 and Phase 5 are in progress. The original Phase 1–3 baseline passed in [GitHub Actions run #45045054465](https://github.com/WorkRCS/monitor_me/actions/runs/45045054465); newer CI execution is currently blocked by the repository's Actions free-minute quota. No fresh CI pass is claimed for the latest UI/bootstrap/firewall changes. Read [docs/PROJECT_STATE.md](docs/PROJECT_STATE.md) for the exact next action.
 
 ## Local no-login mode
 
