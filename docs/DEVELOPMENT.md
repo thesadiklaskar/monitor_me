@@ -23,18 +23,21 @@ This guide covers the Phase 1–3 backend/agent foundations and the current Phas
 - Protocol Buffers compiler (`protoc`) for local generation
 - OpenSSL for a local development certificate
 
-From the repository root on Linux, macOS, or Windows with WSL2 + Docker Desktop:
+For the quick local control-plane setup, start Docker Desktop / Docker Engine, pull the latest `main`, then run one helper from the repository root:
+
+```powershell
+git pull origin main
+.\scripts\start-local.ps1
+```
 
 ```sh
 git pull origin main
-cp .env.example .env
-# Change the local PostgreSQL and Redis passwords if this machine is shared.
-make certs
-docker compose up --build -d
-docker compose ps --all
+./scripts/start-local.sh
 ```
 
-The first build downloads the container images and compiles the API/web images. Compose starts PostgreSQL and Redis, runs the one-shot migration container, then starts the API and Next.js dashboard. Wait until all long-running services report healthy before opening the browser. The generated self-signed key is deliberately readable by the local non-root API container; it is for localhost development only and must never be reused on a public host.
+The helpers create `.env` from `.env.example` when absent, generate a localhost-only development certificate using a temporary Docker container, run `docker compose up --build -d`, and probe the dashboard. They preserve existing volumes. The certificate/private key are for local development only; never reuse them on a public host.
+
+The commands above require Docker only. Go, Node.js, npm and `protoc` are needed when running the individual backend, agent or frontend development/test commands below.
 
 ## Local endpoints
 
@@ -45,7 +48,7 @@ The first build downloads the container images and compiles the API/web images. 
 - PostgreSQL: localhost:5432
 - Redis: localhost:6379
 
-The API readiness endpoint requires PostgreSQL and Redis. Liveness is independent of these dependencies. Compose CI stops each dependency separately, verifies readiness becomes unhealthy, restarts the dependency, and verifies readiness recovers. The dashboard includes authenticated server views, historical/live charts, project/mapping administration, alerts/in-app notifications, and allowlisted remote operations. Owner acceptance remains required. The local stack binds published ports to 127.0.0.1; access it through localhost on the same machine.
+The API readiness endpoint requires PostgreSQL and Redis. Liveness is independent of these dependencies. Compose CI stops each dependency separately, verifies readiness becomes unhealthy, restarts the dependency, and verifies readiness recovers. The dashboard includes server views, historical/live charts, project/mapping administration, alerts/in-app notifications, and allowlisted remote operations. The default local Compose profile enables anonymous access for localhost convenience. Keep the local stack bound to 127.0.0.1; never expose anonymous mode to a LAN, reverse proxy or the public internet.
 
 ## First owner and server enrollment
 
@@ -97,7 +100,23 @@ MONITOR_AGENT_STATE_FILE=./.monitor-me/agent-state.json \
 ./monitor-agent
 ```
 
-Keep this terminal running while testing dashboard telemetry. The Linux collector runs on a Linux host. On Windows, the web/database/API stack can run with Docker Desktop, but real host metrics require a separate Linux VM or WSL2 environment with procfs support and network access to the host's `localhost:8443` gRPC port.
+For a supported systemd-based Linux host, the one-command native installer can build and install the agent from the repository checkout:
+
+```sh
+sudo ./scripts/setup-linux-agent.sh --grpc-address <control-plane-host:8443> --ca-file <trusted-control-plane-ca.pem>
+```
+
+It requires Docker for the source-based build and systemd for service lifecycle. It installs the native binary/service, securely prompts for a one-time enrollment token, waits for the persisted session, then removes the token from the service environment.
+
+On Windows, add a server in the dashboard and run the PowerShell helper from a repository checkout on the monitored Windows machine:
+
+```powershell
+.\scripts\setup-windows-agent.ps1 -GrpcAddress <control-plane-host:8443>
+```
+
+It builds the Windows x64 agent with Docker when the binary is absent and runs it in the foreground. The initial Windows helper does not yet install a Windows service or configure automatic start.
+
+The control plane and agent are separate roles: Compose starts the dashboard/API/data services, while a native agent runs on every host being monitored. `localhost:8443` works only when the agent and control plane share a host. For remote VPS/VMs, the target must reach a configured public/private gRPC endpoint and trust the control-plane CA. Host OS, architecture and available virtualization metadata are collected by the native agent. Hypervisor detection is best-effort; VPS/cloud provider hints may be unavailable, and unknown should remain unknown.
 
 The agent writes its session credential into a mode-0600 state file within a mode-0700 directory. On restarts it reuses the stored session and does not need the original enrollment token until that session expires or is revoked. If the agent has no valid local session, supply a fresh enrollment token.
 
