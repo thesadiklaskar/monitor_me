@@ -19,6 +19,6 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   }
   return backendResponse(await callBackend("/v1/dashboard-panels/" + encodeURIComponent(panelId) + "/position", {
     method: "PATCH",
-    body: JSON.stringify({ position: (body as { position: number }).position }),
+    body: { position: (body as { position: number }).position },
   }));
 }
