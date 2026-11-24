@@ -4,7 +4,7 @@
 
 The product is being built around its own native host agent, telemetry ingestion pipeline, metric model, project attribution, alert engine, and operator dashboard. It is intended for infrastructure engineers, platform teams, and organizations that need clear visibility into servers, workloads, and applications.
 
-> **Project setup:** **Historical baseline completed; current release gate open.** The original Phase 1–3 CI baseline passed in historical GitHub Actions runs, but recent single-install/startup changes do not yet have fresh green CI or owner-machine acceptance. The no-login browser shell, native metrics path and first ClickHouse log path exist; this is not yet a released Grafana replacement. The three reported compile blockers are corrected in current `main` source, but still need an actual Windows Docker Desktop build. Startup scripts verify `main` freshness, require a clean tree unless explicitly overridden, validate Compose, build all images (including Linux/Windows agent cross-compiles) before changing services, then start with `--no-build` and check API/dashboard readiness. The complete 84-file Go scan found no current GitHub owner/repository hard-coded URL or sample production hostname; Go imports use the stable internal namespace `monitor-me.internal`, while public install endpoints must be operator-configured. The latest Actions run #569 assigned no runners and executed zero steps, so it is not test evidence. The final product is one independent self-hosted installation per owner (VM, VPS, VPC, cloud or bare metal), with no hosted control plane, login, profile or organization workflow. Legacy user/organization database and query logic still exists and requires a safe data-preserving migration. Linux journald → ClickHouse ingestion and bounded Log Explorer exist; Windows Event Log source is not runtime-accepted; file tail and push-based live logs remain incomplete. The current Log Explorer live toggle polls every 10 seconds. Signed installs, one-command production bootstrap, true real-time log push, advanced dashboard editing, backups/restore and high-volume benchmarks remain open. See [the prioritized backlog](docs/PRODUCT_BACKLOG.md) and [current project state](docs/PROJECT_STATE.md).
+> **Project setup:** **Historical baseline completed; current release gate open.** The no-login browser shell, native metrics path and first Linux journald → ClickHouse log path exist; this is not yet a released Grafana replacement. The three earlier compile blockers are corrected in current source. The latest Go dependency failure was an HTTP/2 stream error while go mod tidy queried sum.golang.org; the backend image now avoids running tidy during image builds, compiles only the shipped API/migration binaries with -mod=mod, explicitly creates /out, and uses HTTP/1.1 for Go downloads while keeping TLS/checksum verification enabled. Startup scripts verify main freshness, require a clean tree unless explicitly overridden, validate Compose, build all images (including Linux/Windows agent cross-compiles) before changing services, then start with --no-build and check API/dashboard readiness. The 84 Go source/test files were scanned for owner-specific URLs; a follow-up installer/deployment-doc scan also removed sample monitor.example hosts. Go imports use the independent internal namespace monitor-me.internal. However backend/go.sum and web/package-lock.json are still missing, so dependency lock/reproducibility work remains. The latest Actions jobs were not assigned runners (runner_id 0, zero steps), so no fresh CI tests have executed. The intended product is one independent self-hosted installation per owner (VM, VPS, VPC, cloud or bare metal), with no hosted control plane, login, profile or organization workflow. Legacy user/organization database/query logic still requires a safe forward migration. Linux journald ingestion and bounded Log Explorer exist; Windows Event Log is source-only pending runtime acceptance; file tail and push-based live logs remain incomplete. The current Log Explorer live toggle polls every 10 seconds. One-command production bootstrap, advanced dashboard editing, backups/ClickHouse restore and high-volume benchmarks remain open. See the [release readiness audit](docs/RELEASE_READINESS_AUDIT.md), [prioritized backlog](docs/PRODUCT_BACKLOG.md), and [project state](docs/PROJECT_STATE.md).
 
 ---
 
@@ -325,9 +325,10 @@ The historical Phase 1–3 baseline passed its CI gates. The latest single-insta
 
 ## Documentation Map
 
-| [Product and Engineering Backlog](docs/PRODUCT_BACKLOG.md) | Prioritized stability gate, strict single-install migration, real-time logs, Grafana-style dashboards and production acceptance |
 | Document | Purpose |
 | --- | --- |
+| [Release Readiness Audit](docs/RELEASE_READINESS_AUDIT.md) | Evidence-based estimate, supported platform matrix, current gaps and release gates |
+| [Product and Engineering Backlog](docs/PRODUCT_BACKLOG.md) | Prioritized stability gate, strict single-install migration, real-time logs, Grafana-style dashboards and production acceptance |
 | [Product Requirements](docs/PRODUCT_REQUIREMENTS.md) | Product requirements and current functional acceptance baseline |
 | [Plug-and-Play Product Contract](docs/PRODUCT_VISION_PLUG_AND_PLAY.md) | Single-install no-login workflow, target-side discovery, firewall boundary, log scale and delivery sequence |
 | [ADR 0004](docs/adr/0004-single-install-no-login-network-boundary.md) | No-login single-install model and required network security boundary |
@@ -340,7 +341,6 @@ The historical Phase 1–3 baseline passed its CI gates. The latest single-insta
 | [Zero-to-Production Roadmap](docs/ROADMAP.md) | Five delivery phases and completion gates |
 | [Project State](docs/PROJECT_STATE.md) | Exact current phase, completed work, commit references, and next action |
 | [Repository Instructions](AGENTS.md) | Continuation, code quality, testing, security, and commit rules |
-
 ## Engineering and Contribution Standards
 
 - All source code, comments, documentation, UI strings, logs, tests, and commit messages must be written in English.
@@ -376,7 +376,7 @@ The final diagram must describe the system that was actually built, not an aspir
 
 ---
 
-**Current resume point:** Do not start feature upgrades until the full startup/acceptance gate passes. Pull exact latest `main`, run `scripts/start-local.ps1`, and capture fresh BuildKit output only if an image build fails. Latest Actions run #567 assigned no runners and executed no test steps; no fresh CI pass is claimed. See [docs/PROJECT_STATE.md](docs/PROJECT_STATE.md) and [docs/PRODUCT_BACKLOG.md](docs/PRODUCT_BACKLOG.md).
+**Current resume point:** Production readiness is estimated at approximately 35%; this is an engineering estimate, not a test result. Do not start real-time log/panel upgrades until the current build/start acceptance passes. Pull exact latest main and run scripts/start-local.ps1. The backend image no longer invokes go mod tidy and uses -mod=mod plus HTTP/1.1 for Go downloads without disabling checksum verification. backend/go.sum and web/package-lock.json are still release blockers. GitHub Actions currently assigns no runners and executes zero steps. See the [release readiness audit](docs/RELEASE_READINESS_AUDIT.md), [project state](docs/PROJECT_STATE.md), and [backlog](docs/PRODUCT_BACKLOG.md).
 
 ## Local single-install mode
 
