@@ -883,3 +883,10 @@ td { font-size: 13px; }
 @media(max-width:760px) {
   .sidebar-collapsed .side-nav { display:none; }
 }
+
+.dashboard-data-table-wrap { max-width:100%; overflow:auto; border:1px solid rgba(65,88,116,.48); border-radius:10px; }
+.dashboard-data-table { width:100%; border-collapse:collapse; min-width:560px; font-size:11px; font-variant-numeric:tabular-nums; }
+.dashboard-data-table th { padding:10px 12px; background:rgba(18,32,48,.8); color:#9fb1c5; text-align:left; font-size:10px; font-weight:700; letter-spacing:.045em; text-transform:uppercase; white-space:nowrap; }
+.dashboard-data-table td { padding:10px 12px; border-top:1px solid rgba(65,88,116,.32); color:#d7e1ec; white-space:nowrap; }
+.dashboard-data-table tbody tr:nth-child(even) { background:rgba(15,27,41,.45); }
+.dashboard-data-table tbody tr:hover { background:rgba(142,205,196,.055); }
