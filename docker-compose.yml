@@ -74,7 +74,6 @@ services:
     environment:
       API_ADDR: ":8080"
       SERVICE_VERSION: "0.1.0-dev"
-      MONITOR_ME_AUTH_DISABLED: "${MONITOR_ME_AUTH_DISABLED:-true}"
       DATABASE_URL: "postgres://${POSTGRES_USER:-monitor_me}:${POSTGRES_PASSWORD:-local_only_change_me}@postgres:5432/${POSTGRES_DB:-monitor_me}?sslmode=disable"
       REDIS_ADDR: "redis:6379"
       REDIS_PASSWORD: "${REDIS_PASSWORD:-local_only_change_me}"
@@ -124,7 +123,6 @@ services:
     restart: unless-stopped
     environment:
       NODE_ENV: production
-      MONITOR_ME_AUTH_DISABLED: "${MONITOR_ME_AUTH_DISABLED:-true}"
       PORT: "3000"
       HOSTNAME: "0.0.0.0"
       MONITOR_ME_API_BASE_URL: "http://api:8080"
