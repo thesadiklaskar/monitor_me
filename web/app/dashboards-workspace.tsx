@@ -40,11 +40,18 @@ type PanelSeries = { points: SeriesPoint[]; error?: string };
 const metricCatalog = [
   { value: "host.cpu.utilization", label: "CPU utilization", unit: "%" },
   { value: "host.memory.used", label: "Memory used", unit: "bytes" },
+  { value: "host.memory.available", label: "Memory available", unit: "bytes" },
   { value: "host.memory.swap.used", label: "Swap used", unit: "bytes" },
-  { value: "host.disk.read.bytes_per_second", label: "Disk read", unit: "bytes/s" },
-  { value: "host.network.receive.bytes_per_second", label: "Network receive", unit: "bytes/s" },
+  { value: "host.disk.used.percent", label: "Disk usage", unit: "%" },
+  { value: "host.disk.read.bytes_per_second", label: "Disk read throughput", unit: "bytes/s" },
+  { value: "host.disk.write.bytes_per_second", label: "Disk write throughput", unit: "bytes/s" },
+  { value: "host.network.receive.bytes_per_second", label: "Network receive throughput", unit: "bytes/s" },
+  { value: "host.network.transmit.bytes_per_second", label: "Network transmit throughput", unit: "bytes/s" },
+  { value: "host.network.receive.packets_per_second", label: "Network receive packets", unit: "packets/s" },
+  { value: "host.network.transmit.packets_per_second", label: "Network transmit packets", unit: "packets/s" },
   { value: "host.process.count", label: "Process count", unit: "processes" },
   { value: "process.memory.rss", label: "Process RSS", unit: "bytes" },
+  { value: "agent.cpu.utilization", label: "Agent CPU utilization", unit: "%" },
 ] as const;
 
 const rangeMilliseconds: Record<DashboardPanel["time_range"], number> = {
