@@ -23,4 +23,21 @@ install -d -o root -g "$certificate_group" -m 0750 "$destination"
 install -o root -g "$certificate_group" -m 0640 "$RENEWED_LINEAGE/fullchain.pem" "$destination/fullchain.pem"
 install -o root -g "$certificate_group" -m 0640 "$RENEWED_LINEAGE/privkey.pem" "$destination/privkey.pem"
 chmod 0750 "$destination"
-echo "Renewed gRPC TLS certificate copied to $destination with group-only read access."
+
+# Reload the HTTPS edge after the certificate files have been refreshed.
+nginx -t
+systemctl reload nginx
+
+# The Go gRPC server loads its TLS keypair at process startup. Restart it
+# only when this hook is running from a configured Monitor Me installation.
+if [[ -n "${MONITOR_ME_ROOT:-}" ]]; then
+  env_file="$MONITOR_ME_ROOT/.env.production"
+  compose_file="$MONITOR_ME_ROOT/deploy/production/compose.yml"
+  if [[ -s "$env_file" && -f "$compose_file" ]] && command -v docker >/dev/null 2>&1; then
+    if docker compose --env-file "$env_file" -f "$compose_file" ps -q api 2>/dev/null | grep -q .; then
+      docker compose --env-file "$env_file" -f "$compose_file" restart api
+    fi
+  fi
+fi
+
+echo "Renewed browser and gRPC TLS certificates; reloaded Nginx and restarted the running API when present."
