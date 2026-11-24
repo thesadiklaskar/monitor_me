@@ -9,7 +9,7 @@ Monitor Me's first native collector reads Linux procfs and reports only agent he
 
 ## Decision
 
-Use `github.com/shirou/gopsutil/v4` version `v4.26.9` in the agent's Windows-only collector implementation. The existing Linux procfs collector remains unchanged. The Windows collector reads CPU times, memory/swap, mounted-volume usage, disk/network counters, host uptime/identity and process RSS. Unsupported Linux-specific features are not advertised on Windows.
+Use `github.com/shirou/gopsutil/v4` version `v4.26.9` in the agent's Windows-only collector implementation. The Linux procfs metric semantics remain unchanged, with additive host OS/virtualization metadata. The Windows collector reads CPU times, memory/swap, mounted-volume usage, disk/network counters, host uptime/identity, process RSS and available virtualization metadata. Unsupported Linux-specific features are not advertised on Windows.
 
 ## Purpose
 
