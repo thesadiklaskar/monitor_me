@@ -541,6 +541,91 @@ func TestPhase2AuthenticationAndAgentLifecycle(t *testing.T) {
 		t.Fatalf("create Systemd project mapping: %v", err)
 	}
 
+	// Saved dashboards and panels are durable, organization-scoped resources.
+	dashboardCreate := requestJSON(t, ctx, http.MethodPost, baseURL+"/v1/dashboards", bearer, map[string]any{
+		"name": "Infrastructure Overview", "description": "Production host signals",
+		"project_id": projectID, "is_default": true,
+	})
+	if dashboardCreate.StatusCode != http.StatusCreated {
+		t.Fatalf("owner dashboard creation: expected 201, got %d: %s", dashboardCreate.StatusCode, dashboardCreate.Body)
+	}
+	var createdDashboard struct {
+		Dashboard struct {
+			ID        string `json:"id"`
+			Name      string `json:"name"`
+			IsDefault bool   `json:"is_default"`
+		} `json:"dashboard"`
+	}
+	decodeResponse(t, dashboardCreate.Body, &createdDashboard)
+	if createdDashboard.Dashboard.ID == "" || createdDashboard.Dashboard.Name != "Infrastructure Overview" || !createdDashboard.Dashboard.IsDefault {
+		t.Fatalf("dashboard creation returned incomplete data: %#v", createdDashboard.Dashboard)
+	}
+	panelCreate := requestJSON(t, ctx, http.MethodPost,
+		baseURL+"/v1/dashboards/"+createdDashboard.Dashboard.ID+"/panels", bearer, map[string]any{
+			"title": "Host CPU", "visualization": "timeseries", "server_id": serverID,
+			"project_id": projectID, "metric_name": "host.cpu.utilization", "time_range": "1h", "position": 0,
+		})
+	if panelCreate.StatusCode != http.StatusCreated {
+		t.Fatalf("owner dashboard panel creation: expected 201, got %d: %s", panelCreate.StatusCode, panelCreate.Body)
+	}
+	var createdPanel struct {
+		Panel struct {
+			ID          string `json:"id"`
+			DashboardID string `json:"dashboard_id"`
+			ServerID    string `json:"server_id"`
+			ProjectID   string `json:"project_id"`
+			MetricName  string `json:"metric_name"`
+		} `json:"panel"`
+	}
+	decodeResponse(t, panelCreate.Body, &createdPanel)
+	if createdPanel.Panel.ID == "" || createdPanel.Panel.DashboardID != createdDashboard.Dashboard.ID ||
+		createdPanel.Panel.ServerID != serverID || createdPanel.Panel.ProjectID != projectID ||
+		createdPanel.Panel.MetricName != "host.cpu.utilization" {
+		t.Fatalf("dashboard panel creation returned incomplete or mis-scoped data: %#v", createdPanel.Panel)
+	}
+	dashboardList := requestJSON(t, ctx, http.MethodGet, baseURL+"/v1/dashboards", bearer, nil)
+	if dashboardList.StatusCode != http.StatusOK {
+		t.Fatalf("owner dashboard list: expected 200, got %d: %s", dashboardList.StatusCode, dashboardList.Body)
+	}
+	var ownerDashboards struct {
+		Dashboards []struct {
+			ID     string            `json:"id"`
+			Panels []json.RawMessage `json:"panels"`
+		} `json:"dashboards"`
+	}
+	decodeResponse(t, dashboardList.Body, &ownerDashboards)
+	if len(ownerDashboards.Dashboards) != 1 ||
+		ownerDashboards.Dashboards[0].ID != createdDashboard.Dashboard.ID ||
+		len(ownerDashboards.Dashboards[0].Panels) != 1 {
+		t.Fatalf("dashboard persistence did not return its one saved panel: %#v", ownerDashboards.Dashboards)
+	}
+	viewerDashboardCreate := requestJSON(t, ctx, http.MethodPost, baseURL+"/v1/dashboards", viewerSession.AccessToken, map[string]any{
+		"name": "Viewer dashboard", "description": "", "project_id": "", "is_default": false,
+	})
+	if viewerDashboardCreate.StatusCode != http.StatusForbidden {
+		t.Fatalf("viewer dashboard creation: expected 403, got %d: %s", viewerDashboardCreate.StatusCode, viewerDashboardCreate.Body)
+	}
+	foreignDashboardList := requestJSON(t, ctx, http.MethodGet, baseURL+"/v1/dashboards", otherSession.AccessToken, nil)
+	if foreignDashboardList.StatusCode != http.StatusOK {
+		t.Fatalf("foreign organization dashboard list: expected 200, got %d: %s", foreignDashboardList.StatusCode, foreignDashboardList.Body)
+	}
+	var foreignDashboards struct {
+		Dashboards []json.RawMessage `json:"dashboards"`
+	}
+	decodeResponse(t, foreignDashboardList.Body, &foreignDashboards)
+	if len(foreignDashboards.Dashboards) != 0 {
+		t.Fatalf("cross-organization dashboard leak: received %d foreign dashboards", len(foreignDashboards.Dashboards))
+	}
+	foreignPanelCreate := requestJSON(t, ctx, http.MethodPost,
+		baseURL+"/v1/dashboards/"+createdDashboard.Dashboard.ID+"/panels", otherSession.AccessToken, map[string]any{
+			"title": "Foreign panel", "visualization": "stat", "server_id": serverID,
+			"project_id": "", "metric_name": "host.cpu.utilization", "time_range": "1h", "position": 0,
+		})
+	if foreignPanelCreate.StatusCode != http.StatusNotFound {
+		t.Fatalf("foreign organization must not add a panel to another organization's dashboard: expected 404, got %d: %s",
+			foreignPanelCreate.StatusCode, foreignPanelCreate.Body)
+	}
+
 	ticketResponse := requestJSON(t, ctx, http.MethodPost, baseURL+"/v1/live/ticket", bearer, map[string]any{})
 	if ticketResponse.StatusCode != http.StatusCreated {
 		t.Fatalf("create live ticket: expected 201, got %d: %s", ticketResponse.StatusCode, ticketResponse.Body)
