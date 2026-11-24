@@ -730,7 +730,7 @@ func (s *Store) CreateDashboardPanel(ctx context.Context, principal Principal, d
 	if !validUUID(dashboardID) || !validUUID(input.ServerID) ||
 		len(input.Title) < 2 || len(input.Title) > 120 ||
 		!alertMetricPattern.MatchString(input.MetricName) ||
-		(input.Visualization != "timeseries" && input.Visualization != "stat") ||
+		(input.Visualization != "timeseries" && input.Visualization != "stat" && input.Visualization != "table") ||
 		(input.TimeRange != "1h" && input.TimeRange != "6h" && input.TimeRange != "24h" &&
 			input.TimeRange != "7d" && input.TimeRange != "30d") ||
 		input.Position < 0 || input.Position > 1000 {
