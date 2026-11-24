@@ -13,7 +13,7 @@ type DashboardPanel = {
   id: string;
   dashboard_id: string;
   title: string;
-  visualization: "timeseries" | "stat";
+  visualization: "timeseries" | "stat" | "table";
   server_id: string;
   metric_name: string;
   time_range: "1h" | "6h" | "24h" | "7d" | "30d";
@@ -217,7 +217,7 @@ function DashboardPanelCard({
           <CardDescription>{serverName} · {panel.time_range}</CardDescription>
         </div>
         <div className="dashboard-panel-actions">
-          <Badge variant={panel.visualization === "stat" ? "secondary" : "default"}>{panel.visualization === "stat" ? "Stat" : "Time series"}</Badge>
+          <Badge variant={panel.visualization === "stat" ? "secondary" : panel.visualization === "table" ? "outline" : "default"}>{panel.visualization === "stat" ? "Stat" : panel.visualization === "table" ? "Table" : "Time series"}</Badge>
           {canEdit && <>
             <Button variant="ghost" size="icon" aria-label={"Move " + panel.title + " up"} title="Move panel up" disabled={panelIndex === 0} onClick={() => onMove(-1)}><ArrowUp size={14} /></Button>
             <Button variant="ghost" size="icon" aria-label={"Move " + panel.title + " down"} title="Move panel down" disabled={panelIndex === panelCount - 1} onClick={() => onMove(1)}><ArrowDown size={14} /></Button>
@@ -235,6 +235,25 @@ function DashboardPanelCard({
             <strong>{formatMetric(latest?.average ?? Number.NaN, metric?.unit ?? "")}</strong>
             <span>Latest aggregated bucket · {latest ? new Date(latest.bucket).toLocaleString() : "Unavailable"}</span>
           </div>
+        ) : panel.visualization === "table" ? (
+          points.length === 0 ? (
+            <div className="dashboard-chart-empty">No metric samples in this time range.</div>
+          ) : (
+            <div className="dashboard-data-table-wrap">
+              <table className="dashboard-data-table">
+                <thead><tr><th>Time</th><th>Average</th><th>Minimum</th><th>Maximum</th><th>Samples</th></tr></thead>
+                <tbody>{[...points].slice(-12).reverse().map((point) => (
+                  <tr key={point.bucket}>
+                    <td>{new Date(point.bucket).toLocaleString()}</td>
+                    <td>{formatMetric(point.average, metric?.unit ?? "")}</td>
+                    <td>{formatMetric(point.minimum, metric?.unit ?? "")}</td>
+                    <td>{formatMetric(point.maximum, metric?.unit ?? "")}</td>
+                    <td>{point.sample_count.toLocaleString()}</td>
+                  </tr>
+                ))}</tbody>
+              </table>
+            </div>
+          )
         ) : !chart ? (
           <div className="dashboard-chart-empty">No valid metric samples in this time range. Missing intervals are not drawn as zero.</div>
         ) : (
@@ -285,7 +304,7 @@ export default function DashboardsView({ servers }: {
   const [panelTitle, setPanelTitle] = useState("");
   const [panelServerId, setPanelServerId] = useState("");
   const [panelMetric, setPanelMetric] = useState<string>(metricCatalog[0].value);
-  const [panelVisualization, setPanelVisualization] = useState<"timeseries" | "stat">("timeseries");
+  const [panelVisualization, setPanelVisualization] = useState<"timeseries" | "stat" | "table">("timeseries");
   const [panelRange, setPanelRange] = useState<DashboardPanel["time_range"]>("1h");
 
   const canEdit = true;
@@ -549,7 +568,7 @@ export default function DashboardsView({ servers }: {
                       <label className="field"><span>Panel title</span><input value={panelTitle} onChange={(event) => setPanelTitle(event.target.value)} maxLength={120} placeholder="CPU utilization" /></label>
                       <label className="field"><span>Metric</span><select value={panelMetric} onChange={(event) => setPanelMetric(event.target.value)}>{metricCatalog.map((metric) => <option key={metric.value} value={metric.value}>{metric.label}</option>)}</select></label>
                       <label className="field"><span>Server</span><select value={panelServerId || selectedServerDefault} onChange={(event) => setPanelServerId(event.target.value)} required>{servers.map((server) => <option key={server.id} value={server.id}>{server.name}</option>)}</select></label>
-                                            <label className="field"><span>Visualization</span><select value={panelVisualization} onChange={(event) => setPanelVisualization(event.target.value as "timeseries" | "stat")}><option value="timeseries">Time series</option><option value="stat">Stat</option></select></label>
+                       <label className="field"><span>Visualization</span><select value={panelVisualization} onChange={(event) => setPanelVisualization(event.target.value as "timeseries" | "stat" | "table")}><option value="timeseries">Time series</option><option value="stat">Stat</option><option value="table">Table</option></select></label>
                       <label className="field"><span>Time range</span><select value={panelRange} onChange={(event) => setPanelRange(event.target.value as DashboardPanel["time_range"])}><option value="1h">Last hour</option><option value="6h">Last 6 hours</option><option value="24h">Last 24 hours</option><option value="7d">Last 7 days</option><option value="30d">Last 30 days</option></select></label>
                       <div className="dashboard-builder-actions">
                         <Button variant="secondary" type="button" onClick={() => setShowPanelForm(false)}>Cancel</Button>
