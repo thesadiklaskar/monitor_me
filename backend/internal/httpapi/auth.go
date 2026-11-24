@@ -6,7 +6,6 @@ import (
 	"errors"
 	"io"
 	"net/http"
-	"strings"
 	"sync"
 	"time"
 
@@ -17,16 +16,15 @@ import (
 )
 
 type API struct {
-	identities                *identity.Store
-	cache                     *redisv9.Client
-	telemetry                 *telemetry.Store
-	logs                      *logstore.Store
-	allowedLiveOrigins        map[string]struct{}
-	allowedRemoteUnits        []string
-	disableAuthentication     bool
-	localPrincipalMu          sync.Mutex
-	localPrincipal            identity.Principal
-	localPrincipalExpiresAt   time.Time
+	identities          *identity.Store
+	cache               *redisv9.Client
+	telemetry           *telemetry.Store
+	logs                *logstore.Store
+	allowedLiveOrigins  map[string]struct{}
+	allowedRemoteUnits  []string
+	localPrincipalMu    sync.Mutex
+	localPrincipal      identity.Principal
+	localPrincipalExpiresAt time.Time
 }
 
 type principalContextKey struct{}
@@ -48,35 +46,25 @@ func (api *API) anonymousLocalPrincipal(ctx context.Context) (identity.Principal
 	return principal, nil
 }
 
-func (api *API) authenticationDisabled(writer http.ResponseWriter, request *http.Request) {
-	writeAPIError(writer, http.StatusNotFound, "authentication_disabled", "Interactive login is disabled in local anonymous mode.")
+// installation reports the local self-hosted installation, not a user or organization.
+func (api *API) installation(writer http.ResponseWriter, _ *http.Request) {
+	writeJSON(writer, http.StatusOK, map[string]any{
+		"installation": map[string]string{
+			"name": "Monitor Me",
+			"mode": "single-install",
+		},
+	})
 }
 
+// requireAuth binds requests to the one implicit installation principal. It does
+// not accept browser credentials; remote access is restricted at the network edge.
 func (api *API) requireAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		if api.disableAuthentication {
-			principal, err := api.anonymousLocalPrincipal(request.Context())
-			if err != nil {
-				writeAPIError(writer, http.StatusServiceUnavailable, "local_workspace_unavailable", "The local workspace could not be initialized.")
-				return
-			}
-			ctx := context.WithValue(request.Context(), principalContextKey{}, principal)
-			next.ServeHTTP(writer, request.WithContext(ctx))
-			return
-		}
-		header := request.Header.Get("Authorization")
-		scheme, token, ok := strings.Cut(header, " ")
-		if !ok || scheme != "Bearer" || token == "" || strings.ContainsAny(token, " \t\r\n") {
-			writeAPIError(writer, http.StatusUnauthorized, "unauthorized", "A valid bearer token is required.")
-			return
-		}
-
-		principal, err := api.identities.Authenticate(request.Context(), token)
+		principal, err := api.anonymousLocalPrincipal(request.Context())
 		if err != nil {
-			writeAPIError(writer, http.StatusUnauthorized, "unauthorized", "The bearer token is invalid, expired, or revoked.")
+			writeAPIError(writer, http.StatusServiceUnavailable, "installation_unavailable", "The Monitor Me installation could not be initialized.")
 			return
 		}
-
 		ctx := context.WithValue(request.Context(), principalContextKey{}, principal)
 		next.ServeHTTP(writer, request.WithContext(ctx))
 	})
@@ -85,82 +73,6 @@ func (api *API) requireAuth(next http.Handler) http.Handler {
 func principalFromRequest(request *http.Request) identity.Principal {
 	principal, _ := request.Context().Value(principalContextKey{}).(identity.Principal)
 	return principal
-}
-
-func (api *API) register(writer http.ResponseWriter, request *http.Request) {
-	var input struct {
-		Email            string `json:"email"`
-		DisplayName      string `json:"display_name"`
-		Password         string `json:"password"`
-		OrganizationName string `json:"organization_name"`
-		OrganizationSlug string `json:"organization_slug"`
-	}
-	if !decodeJSON(writer, request, &input) {
-		return
-	}
-
-	user, err := api.identities.RegisterFirst(request.Context(), identity.RegisterInput{
-		Email: input.Email, DisplayName: input.DisplayName, Password: input.Password,
-		OrganizationName: input.OrganizationName, OrganizationSlug: input.OrganizationSlug,
-	})
-	switch {
-	case errors.Is(err, identity.ErrInvalidInput):
-		writeAPIError(writer, http.StatusBadRequest, "invalid_input", "Registration fields are invalid.")
-	case errors.Is(err, identity.ErrBootstrapComplete):
-		writeAPIError(writer, http.StatusForbidden, "bootstrap_complete", "Initial registration is disabled because an account already exists.")
-	case err != nil:
-		writeAPIError(writer, http.StatusInternalServerError, "registration_failed", "The initial account could not be created.")
-	default:
-		writeJSON(writer, http.StatusCreated, map[string]any{"user": user})
-	}
-}
-
-func (api *API) login(writer http.ResponseWriter, request *http.Request) {
-	var input struct {
-		Email    string `json:"email"`
-		Password string `json:"password"`
-	}
-	if !decodeJSON(writer, request, &input) {
-		return
-	}
-
-	session, err := api.identities.Login(request.Context(), input.Email, input.Password)
-	if err != nil {
-		if errors.Is(err, identity.ErrOrganizationSelectionRequired) {
-			writeAPIError(writer, http.StatusConflict, "organization_selection_required",
-				"This account is linked to multiple organizations. Organization switching is not available yet; use a separate account for each organization.")
-			return
-		}
-		if errors.Is(err, identity.ErrInvalidCredentials) {
-			writeAPIError(writer, http.StatusUnauthorized, "invalid_credentials", "Email or password is incorrect.")
-			return
-		}
-		writeAPIError(writer, http.StatusInternalServerError, "login_failed", "The session could not be created.")
-		return
-	}
-
-	writeJSON(writer, http.StatusOK, map[string]any{
-		"access_token": session.AccessToken,
-		"token_type":   "Bearer",
-		"expires_at":   session.ExpiresAt,
-		"user":         session.User,
-	})
-}
-
-func (api *API) me(writer http.ResponseWriter, request *http.Request) {
-	writeJSON(writer, http.StatusOK, map[string]any{"user": principalFromRequest(request)})
-}
-
-func (api *API) logout(writer http.ResponseWriter, request *http.Request) {
-	if api.disableAuthentication {
-		writer.WriteHeader(http.StatusNoContent)
-		return
-	}
-	if err := api.identities.Logout(request.Context(), principalFromRequest(request)); err != nil {
-		writeAPIError(writer, http.StatusInternalServerError, "logout_failed", "The session could not be revoked.")
-		return
-	}
-	writer.WriteHeader(http.StatusNoContent)
 }
 
 func decodeJSON(writer http.ResponseWriter, request *http.Request, target any) bool {
