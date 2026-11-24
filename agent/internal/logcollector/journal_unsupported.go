@@ -7,7 +7,7 @@ import (
 	"errors"
 	"time"
 
-	"example.com/monitor-me/agent/internal/logspool"
+	"monitor-me.internal/agent/internal/logspool"
 )
 
 // Journal is an explicit unsupported-platform stub. Windows Event Log and

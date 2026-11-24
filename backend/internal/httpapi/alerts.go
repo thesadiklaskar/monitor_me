@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strings"
 
-	"example.com/monitor-me/backend/internal/identity"
+	"monitor-me.internal/backend/internal/identity"
 )
 
 func (api *API) listAlertRules(writer http.ResponseWriter, request *http.Request) {

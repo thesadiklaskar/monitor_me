@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package monitor.v1;
 
-option go_package = "example.com/monitor-me/backend/gen/monitor/v1;monitorv1";
+option go_package = "monitor-me.internal/backend/gen/monitor/v1;monitorv1";
 
 // AgentControl defines the versioned, TLS-protected control contract between
 // a native host agent and the Monitor Me control plane.

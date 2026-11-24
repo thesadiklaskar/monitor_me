@@ -1,4 +1,4 @@
-module example.com/monitor-me/agent
+module monitor-me.internal/agent
 
 go 1.27.0
 
