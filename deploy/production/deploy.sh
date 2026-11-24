@@ -122,7 +122,7 @@ ready=0
 for attempt in $(seq 1 45); do
   if curl --connect-timeout 2 --max-time 5 -fsS "http://127.0.0.1:$api_port/health/ready" >/dev/null &&
      curl --connect-timeout 2 --max-time 5 -fsS "http://127.0.0.1:$web_port/api/config" >/dev/null &&
-     curl --connect-timeout 2 --max-time 5 -fsS "http://127.0.0.1:$grafana_port/api/health" >/dev/null; then
+     curl --connect-timeout 2 --max-time 5 -fsSL "http://127.0.0.1:$grafana_port/grafana/api/health" >/dev/null; then
     ready=1
     break
   fi
