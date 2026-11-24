@@ -50,7 +50,6 @@ func (api *API) logsSearch(writer http.ResponseWriter, request *http.Request) {
 	query := logstore.Query{
 		OrganizationID: principal.OrganizationID,
 		ServerID: request.PathValue("serverID"),
-		ProjectID: values.Get("project_id"),
 		From: from, To: to, Search: values.Get("search"),
 		Severity: values.Get("severity"), Source: values.Get("source"), Limit: limit,
 		BeforeTimeUnixMicros: beforeTime, BeforeEventID: beforeID,
@@ -67,7 +66,7 @@ func (api *API) logsSearch(writer http.ResponseWriter, request *http.Request) {
 			events = events[:200]
 		}
 		writeJSON(writer, http.StatusOK, map[string]any{
-			"server_id": query.ServerID, "project_id": query.ProjectID,
+			"server_id": query.ServerID,
 			"from": query.From, "to": query.To, "events": events,
 			"count": len(events), "has_more": hasMore,
 		})
