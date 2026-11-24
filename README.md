@@ -159,7 +159,7 @@ After choosing **Add Machine**, copy the command for the terminal available on t
 **Windows · PowerShell (Run as Administrator)**
 
 ```powershell
-& ([scriptblock]::Create((Invoke-RestMethod -Uri 'https://monitor.example/install/agent-windows.ps1'))) -ServerUrl 'https://monitor.example' -GrpcAddress 'monitor.example:8443'
+& ([scriptblock]::Create((Invoke-RestMethod -Uri 'https://YOUR_MONITOR_HOST/install/agent-windows.ps1'))) -ServerUrl 'https://YOUR_MONITOR_HOST' -GrpcAddress 'YOUR_MONITOR_HOST:8443'
 ```
 
 The installer detects Windows x64, downloads the matching artifact, verifies its SHA-256, installs a restart-enabled Windows Service and securely prompts for the one-time token. The session is stored under ProgramData and the token is removed after enrollment.
@@ -167,7 +167,7 @@ The installer detects Windows x64, downloads the matching artifact, verifies its
 **Linux · Shell (systemd, run as root)**
 
 ```sh
-curl -fsSL 'https://monitor.example/install/agent-linux.sh' | sudo bash -s -- --server-url 'https://monitor.example' --grpc-address 'monitor.example:8443'
+curl -fsSL 'https://YOUR_MONITOR_HOST/install/agent-linux.sh' | sudo bash -s -- --server-url 'https://YOUR_MONITOR_HOST' --grpc-address 'YOUR_MONITOR_HOST:8443'
 ```
 
 The installer detects Linux amd64/arm64, downloads and checksum-verifies the native agent, installs/enables the systemd service, securely prompts for the one-time token and removes it after session persistence.
