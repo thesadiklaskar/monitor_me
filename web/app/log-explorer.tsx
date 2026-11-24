@@ -49,10 +49,8 @@ function severityVariant(value: string): "default" | "secondary" | "destructive"
 
 export default function LogExplorer({
   servers,
-  onBack,
 }: {
   servers: Server[];
-  onBack: () => void;
 }) {
   const [serverId, setServerId] = useState(servers[0]?.id ?? "");
   const [range, setRange] = useState<Range>("1h");
@@ -201,10 +199,9 @@ export default function LogExplorer({
     <section className="log-explorer">
       <header className="log-explorer-header">
         <div>
-          <button className="detail-back-button" type="button" onClick={onBack}>← Back to servers</button>
-          <div className="eyebrow">Searchable host events</div>
-          <h1>Log Explorer</h1>
-          <p>Search Linux systemd journal events and Windows Application/System events when the host agent advertises the matching log capability. Results are time-bounded and loaded in pages of up to 200 events.</p>
+          <div className="eyebrow">EXPLORE / LOG EVENTS</div>
+          <h1>Logs</h1>
+          <p>Search and inspect host events with time, severity and source filters. Results are bounded and loaded in pages of up to 200 events.</p>
         </div>
         <div className="log-explorer-header-actions">
           <Button variant="secondary" onClick={() => void loadLogs()} disabled={loading}><RefreshCw size={14} /> Refresh</Button>
