@@ -257,12 +257,8 @@ function DashboardPanelCard({
   );
 }
 
-export default function DashboardsView({
-  servers,
-  role,
-}: {
+export default function DashboardsView({ servers }: {
   servers: Server[];
-  role: string;
 }) {
   const [dashboards, setDashboards] = useState<Dashboard[]>([]);
   const [selectedId, setSelectedId] = useState("");
@@ -282,7 +278,7 @@ export default function DashboardsView({
   const [panelVisualization, setPanelVisualization] = useState<"timeseries" | "stat">("timeseries");
   const [panelRange, setPanelRange] = useState<DashboardPanel["time_range"]>("1h");
 
-  const canEdit = role === "owner" || role === "admin";
+  const canEdit = true;
   const selectedDashboard = useMemo(
     () => dashboards.find((dashboard) => dashboard.id === selectedId) ?? null,
     [dashboards, selectedId],
