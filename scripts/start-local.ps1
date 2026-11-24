@@ -23,7 +23,7 @@ New-Item -ItemType Directory -Force -Path $certificateDirectory | Out-Null
 
 if (-not (Test-Path $certificate) -or -not (Test-Path $key)) {
     Write-Host "Generating a local-only development TLS certificate with Docker..."
-    docker run --rm --entrypoint /bin/sh --mount "type=bind,source=$certificateDirectory,target=/certs" alpine:3.23 -c "apk add --no-cache openssl >/dev/null && openssl req -x509 -newkey rsa:2048 -nodes -keyout /certs/server.key -out /certs/server.crt -days 365 -subj '/CN=localhost' -addext 'subjectAltName=DNS:localhost,IP:127.0.0.1' && chmod 644 /certs/server.crt /certs/server.key"
+    docker run --rm --entrypoint /bin/sh --mount "type=bind,source=$certificateDirectory,target=/certs" alpine:3.23 -c "apk add --no-cache openssl >/dev/null && openssl req -x509 -newkey rsa:2048 -nodes -keyout /certs/server.key -out /certs/server.crt -days 365 -subj '/CN=localhost' -addext 'subjectAltName=DNS:localhost,IP:127.0.0.1' && chmod 644 /certs/server.crt && chmod 600 /certs/server.key"
     if ($LASTEXITCODE -ne 0) {
         throw "Local certificate generation failed."
     }
