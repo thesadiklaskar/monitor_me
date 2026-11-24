@@ -54,7 +54,7 @@ No item may be marked Verified based only on a code stub, mock UI, or documentat
 
 
 | F-037 | Single-install no-login operator mode | P0 | No signup/login/organization UI; implicit install workspace; local loopback access; remote no-login mode is blocked unless HTTPS and administrator network restrictions are verified | In Progress |
-| F-038 | Automatic control-plane and node bootstrap | P0 | One control-plane command generates secrets/TLS, starts Compose, applies migrations/health checks and firewall policy; per-node command detects OS/architecture, installs signed native agent and service without Docker/source checkout | In Progress |
+| F-038 | Automatic control-plane and node bootstrap | P0 | One control-plane command generates secrets/TLS, starts Compose, applies migrations/health checks and firewall policy; per-node PowerShell/POSIX command detects target OS/architecture, installs checksum-verified native artifact and system service without Docker/source checkout; publisher signing and runtime acceptance are still pending | In Progress |
 | F-039 | High-volume raw log ingestion and exploration | P0 | Linux journald/files and Windows Event Logs/files; ClickHouse durable batch ingestion, indexed time-bounded search, live tail, retention, redaction, back-pressure and crash/replay/load tests; currently not implemented | Planned |
 | F-040 | Professional monitoring-console shell | P0 | Responsive operator console, collapsible icon sidebar, consistent icon system, global node/time selectors, accessible controls, clear status/data states and removal of placeholder UI | In Progress |
 
