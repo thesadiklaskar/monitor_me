@@ -29,7 +29,7 @@ var (
 	labelKeyPattern   = regexp.MustCompile("^[a-zA-Z][a-zA-Z0-9_.-]{0,63}$")
 )
 
-// Stream acknowledges telemetry only after its database transaction commits.
+// Stream acknowledges telemetry and log batches only after their durable writes commit.
 // A lost acknowledgement is safe because retries use a stable per-agent batch ID.
 func (s *Service) Stream(stream monitorv1.AgentControl_StreamServer) error {
 	for {
