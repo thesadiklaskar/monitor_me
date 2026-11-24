@@ -18,12 +18,10 @@ type alertRuleMatch struct {
 	Operator  string
 	Threshold float64
 	Metric    string
-	ProjectID string
 }
 
-// evaluateCommittedSamples runs inside the same transaction that stores the
-// telemetry batch. Any rule/event/notification write failure aborts the batch,
-// so the agent can retry its durable WAL record without silently losing an alert.
+// evaluateCommittedSamples runs in the telemetry transaction. Every enabled
+// rule applies to the installation-wide or selected-machine metric stream.
 func evaluateCommittedSamples(ctx context.Context, tx *sql.Tx, organizationID, serverID string, samples []telemetry.LiveSample) error {
 	metricSet := make(map[string]struct{}, len(samples))
 	for _, sample := range samples {
@@ -38,11 +36,8 @@ func evaluateCommittedSamples(ctx context.Context, tx *sql.Tx, organizationID, s
 	}
 	sort.Strings(metricNames)
 
-	// Metric names cannot contain commas, so one array expression covers all
-	// distinct metric names with a single tenant-scoped rule query per batch.
 	rows, err := tx.QueryContext(ctx, `
-		SELECT id::text, name, operator, threshold, metric_name,
-		       COALESCE(project_id::text, '')
+		SELECT id::text, name, operator, threshold, metric_name
 		FROM alert_rules
 		WHERE organization_id = $1
 		  AND enabled = true
@@ -56,7 +51,7 @@ func evaluateCommittedSamples(ctx context.Context, tx *sql.Tx, organizationID, s
 	rulesByMetric := make(map[string][]alertRuleMatch)
 	for rows.Next() {
 		var rule alertRuleMatch
-		if err := rows.Scan(&rule.ID, &rule.Name, &rule.Operator, &rule.Threshold, &rule.Metric, &rule.ProjectID); err != nil {
+		if err := rows.Scan(&rule.ID, &rule.Name, &rule.Operator, &rule.Threshold, &rule.Metric); err != nil {
 			_ = rows.Close()
 			return fmt.Errorf("scan matching alert rule: %w", err)
 		}
@@ -73,9 +68,6 @@ func evaluateCommittedSamples(ctx context.Context, tx *sql.Tx, organizationID, s
 
 	for _, sample := range samples {
 		for _, rule := range rulesByMetric[sample.MetricName] {
-			if rule.ProjectID != "" && rule.ProjectID != sample.ProjectID {
-				continue
-			}
 			if err := applyAlertRule(ctx, tx, organizationID, serverID, sample, rule); err != nil {
 				return fmt.Errorf("evaluate alert rule %s: %w", rule.ID, err)
 			}
@@ -99,24 +91,22 @@ func applyAlertRule(ctx context.Context, tx *sql.Tx, organizationID, serverID st
 		return fmt.Errorf("unsupported alert operator %q", rule.Operator)
 	}
 
-	projectScope := sample.ProjectID
-	lockKey := rule.ID + ":" + serverID + ":" + projectScope
+	lockKey := rule.ID + ":" + serverID
 	if _, err := tx.ExecContext(ctx, "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", lockKey); err != nil {
 		return fmt.Errorf("lock alert event scope: %w", err)
 	}
 	var eventID string
 	err := tx.QueryRowContext(ctx,
 		"SELECT id::text FROM alert_events WHERE rule_id = $1 AND organization_id = $2 "+
-			"AND server_id = $3 AND project_id IS NOT DISTINCT FROM NULLIF($4, '')::uuid "+
-			"AND status = 'firing' FOR UPDATE",
-		rule.ID, organizationID, serverID, projectScope).Scan(&eventID)
+			"AND server_id = $3 AND status = 'firing' FOR UPDATE",
+		rule.ID, organizationID, serverID).Scan(&eventID)
 
 	if breached {
 		if errors.Is(err, sql.ErrNoRows) {
 			insertErr := tx.QueryRowContext(ctx,
-				"INSERT INTO alert_events (organization_id, rule_id, server_id, project_id, metric_name, status, last_value) "+
-					"VALUES ($1, $2, $3, NULLIF($4, '')::uuid, $5, 'firing', $6) RETURNING id::text",
-				organizationID, rule.ID, serverID, projectScope, sample.MetricName, sample.Value).Scan(&eventID)
+				"INSERT INTO alert_events (organization_id, rule_id, server_id, metric_name, status, last_value) "+
+					"VALUES ($1, $2, $3, $4, 'firing', $5) RETURNING id::text",
+				organizationID, rule.ID, serverID, sample.MetricName, sample.Value).Scan(&eventID)
 			if insertErr != nil {
 				return fmt.Errorf("insert firing alert event: %w", insertErr)
 			}
