@@ -1,11 +1,15 @@
 param(
-    [string]$GrpcAddress = "localhost:8443"
+    [string]$GrpcAddress = "localhost:8443",
+    [string]$CaFile = ""
 )
 
 $ErrorActionPreference = "Stop"
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $binary = Join-Path $repoRoot ".data\windows-agent\monitor-agent.exe"
 $certificate = Join-Path $repoRoot ".data\certs\server.crt"
+if (-not [string]::IsNullOrWhiteSpace($CaFile)) {
+    $certificate = (Resolve-Path $CaFile).Path
+}
 
 if (-not (Test-Path $binary)) {
     throw "Windows agent binary not found. Run .\scripts\build-windows-agent.ps1 first."
