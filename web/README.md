@@ -9,7 +9,7 @@ The navigation is intentionally limited to four areas:
 - **Servers** — machine inventory, enrollment and per-machine health/metrics.
 - **Logs** — time-bounded search, severity/source filters, event details and paged results.
 - **Dashboards** — saved installation-wide dashboards with metric panels.
-- **Alerts** — threshold rules, firing/recovered events and in-app notifications.
+- **Alerts** — editable threshold rules, pause/resume, firing/recovered events and in-app notifications.
 
 There is no login/signup, customer profile, organization, project, workspace or remote host-control UI. Do not add those concepts back. Processes, systemd units, containers, cgroups, disks and network interfaces are host metadata, not customer projects.
 
