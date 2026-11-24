@@ -22,27 +22,27 @@ type API struct {
 	logs                *logstore.Store
 	allowedLiveOrigins  map[string]struct{}
 	allowedRemoteUnits  []string
-	localPrincipalMu    sync.Mutex
-	localPrincipal      identity.Principal
-	localPrincipalExpiresAt time.Time
+	installationPrincipalMu    sync.Mutex
+	cachedInstallationPrincipal      identity.Principal
+	installationPrincipalExpiresAt time.Time
 }
 
 type principalContextKey struct{}
 
 func (api *API) installationPrincipal(ctx context.Context) (identity.Principal, error) {
-	api.localPrincipalMu.Lock()
-	defer api.localPrincipalMu.Unlock()
+	api.installationPrincipalMu.Lock()
+	defer api.installationPrincipalMu.Unlock()
 
-	if api.localPrincipal.SessionID != "" && time.Until(api.localPrincipalExpiresAt) > time.Minute {
-		return api.localPrincipal, nil
+	if api.cachedInstallationPrincipal.SessionID != "" && time.Until(api.installationPrincipalExpiresAt) > time.Minute {
+		return api.cachedInstallationPrincipal, nil
 	}
 
 	principal, expiresAt, err := api.identities.CreateInstallationPrincipal(ctx)
 	if err != nil {
 		return identity.Principal{}, err
 	}
-	api.localPrincipal = principal
-	api.localPrincipalExpiresAt = expiresAt
+	api.cachedInstallationPrincipal = principal
+	api.installationPrincipalExpiresAt = expiresAt
 	return principal, nil
 }
 
