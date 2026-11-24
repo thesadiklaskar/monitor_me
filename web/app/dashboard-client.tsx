@@ -445,7 +445,7 @@ export default function DashboardClient() {
         ) : showDashboards ? (
           <DashboardsWorkspace servers={servers} role="owner" onBack={() => setShowDashboards(false)} />
         ) : selectedServer ? (
-          <ServerDetail server={selectedServer} apiPublicURL={publicAPIURL} projectId={null} onBack={() => setSelectedServer(null)} />
+          <ServerDetail server={selectedServer} apiPublicURL={publicAPIURL} onBack={() => setSelectedServer(null)} />
         ) : <>
         <header className="topbar">
           <div><span className="breadcrumbs">Monitoring / Machines</span><h1>Server overview</h1></div>
