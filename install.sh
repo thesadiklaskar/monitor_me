@@ -144,6 +144,20 @@ ENV
   chmod 600 "$ENV_FILE"
 fi
 
+# Grafana uses a separate administrator login and a dedicated SELECT-only
+# PostgreSQL account. Replace absent/example values with strong random secrets.
+ensure_hex_secret() {
+  local key="$1" value
+  value="$(sed -n "s/^$key=//p" "$ENV_FILE" | tail -n 1 | tr -d '\r')"
+  if [[ ! "$value" =~ ^[A-Fa-f0-9]{64}$ ]]; then
+    sed -i "/^$key=/d" "$ENV_FILE"
+    printf '%s=%s\n' "$key" "$(openssl rand -hex 32)" >> "$ENV_FILE"
+  fi
+}
+ensure_hex_secret GRAFANA_DB_PASSWORD
+ensure_hex_secret GRAFANA_ADMIN_PASSWORD
+chmod 600 "$ENV_FILE"
+
 valid_domain "$PUBLIC_HOSTNAME" || fail "PUBLIC_HOSTNAME in .env.production must be a valid FQDN."
 valid_cidr "$ADMIN_CIDR" || fail "ADMIN_CIDR in .env.production is invalid or unrestricted."
 if [[ -z "$LE_EMAIL" ]]; then
