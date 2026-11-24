@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS remote_operations (
     agent_id UUID NOT NULL REFERENCES agents (id) ON DELETE CASCADE,
     created_by UUID REFERENCES users (id) ON DELETE SET NULL,
     operation TEXT NOT NULL CHECK (operation IN ('restart_service', 'stop_service')),
-    target TEXT NOT NULL CHECK (target ~ '^[A-Za-z0-9_.:@-]{1,180}\\.service$'),
+    target TEXT NOT NULL CHECK (target ~ '^[A-Za-z0-9_.:@-]{1,180}\.service$'),
     status TEXT NOT NULL DEFAULT 'queued'
         CHECK (status IN ('queued', 'dispatched', 'succeeded', 'failed', 'expired')),
     result TEXT,
