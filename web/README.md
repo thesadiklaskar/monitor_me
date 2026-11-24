@@ -52,6 +52,7 @@ A committed npm lockfile is a release requirement; until it exists, `npm install
 - Keep data bounded and paginated. Do not load unbounded log events into the browser.
 - Every control must work. Do not add decorative controls, fake charts or sample customer data.
 - Charts must label ranges and values clearly. Use host data returned by the API only.
+- Saved metric panels support time-series, stat and table views; panel order is saved with the up/down controls. Never add project mapping or user-role concepts.
 
 ## Main source files
 
