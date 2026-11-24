@@ -46,7 +46,6 @@ func TestValidDashboardTimeRange(t *testing.T) {
 	}
 }
 
-
 func TestValidPanelLabelSelector(t *testing.T) {
 	valid := [][2]string{
 		{"", ""},
