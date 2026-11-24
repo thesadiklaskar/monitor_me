@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"net/mail"
 	"regexp"
 	"strings"
 	"time"
@@ -18,23 +17,19 @@ import (
 )
 
 var (
-	ErrBootstrapComplete  = errors.New("initial account is already configured")
-	ErrInvalidCredentials = errors.New("invalid credentials")
-	ErrUnauthorized       = errors.New("authentication required")
+	ErrUnauthorized       = errors.New("installation session is invalid")
 	ErrForbidden          = errors.New("operation is not permitted")
-	ErrOrganizationSelectionRequired = errors.New("account belongs to multiple organizations")
 	ErrNotFound           = errors.New("resource not found")
 	ErrInvalidInput       = errors.New("invalid input")
 )
 
 const (
-	userSessionTTL     = 24 * time.Hour
+	installationSessionTTL = 24 * time.Hour
 	enrollmentTokenTTL = 15 * time.Minute
 	liveTicketTTL      = 30 * time.Second
 )
 
 var (
-	slugPattern        = regexp.MustCompile("^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$")
 	uuidPattern        = regexp.MustCompile("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$")
 	alertMetricPattern = regexp.MustCompile("^[a-zA-Z][a-zA-Z0-9_.-]{0,127}$")
 )
@@ -49,7 +44,7 @@ func NewStore(db *sql.DB) *Store {
 	return &Store{db: db}
 }
 
-// Principal is the authenticated user's organization-scoped authorization context.
+// Principal is the private installation scope retained for legacy database relationships.
 type Principal struct {
 	UserID         string `json:"user_id"`
 	SessionID      string `json:"-"`
@@ -60,33 +55,7 @@ type Principal struct {
 	Role           string `json:"role"`
 }
 
-// RegisterInput is the one-time initial owner registration request.
-type RegisterInput struct {
-	Email            string
-	DisplayName      string
-	Password         string
-	OrganizationName string
-	OrganizationSlug string
-}
-
-// User is the safe public subset of an account.
-type User struct {
-	ID               string `json:"id"`
-	Email            string `json:"email"`
-	DisplayName      string `json:"display_name"`
-	OrganizationID   string `json:"organization_id"`
-	OrganizationName string `json:"organization_name"`
-	Role             string `json:"role"`
-}
-
-// AuthSession contains a new opaque bearer credential and its expiry.
-type AuthSession struct {
-	AccessToken string
-	ExpiresAt   time.Time
-	User        User
-}
-
-// Server is an organization-scoped server inventory record.
+// Server is a monitored host within the private installation scope.
 type Server struct {
 	ID        string     `json:"id"`
 	Name      string     `json:"name"`
@@ -97,7 +66,7 @@ type Server struct {
 	CreatedAt time.Time  `json:"created_at"`
 }
 
-// Project is a project owned by the authenticated organization.
+// Project groups monitored workloads within this installation.
 type Project struct {
 	ID        string    `json:"id"`
 	Name      string    `json:"name"`
@@ -224,79 +193,67 @@ type IssuedServer struct {
 	TokenExpiresAt    time.Time `json:"token_expires_at"`
 }
 
-// RegisterFirst creates the first user, organization, and owner membership atomically.
-// A transaction-scoped advisory lock prevents concurrent first-user registrations.
-func (s *Store) RegisterFirst(ctx context.Context, input RegisterInput) (User, error) {
-	email := strings.ToLower(strings.TrimSpace(input.Email))
-	displayName := strings.TrimSpace(input.DisplayName)
-	organizationName := strings.TrimSpace(input.OrganizationName)
-	slug := strings.ToLower(strings.TrimSpace(input.OrganizationSlug))
-
-	if !validEmail(email) || len(displayName) < 1 || len(displayName) > 120 ||
-		len(organizationName) < 2 || len(organizationName) > 120 ||
-		!slugPattern.MatchString(slug) || len(input.Password) < 12 || len(input.Password) > 128 {
-		return User{}, ErrInvalidInput
-	}
-
-	passwordHash, err := security.HashPassword(input.Password)
+// createInstallationIdentity provisions private compatibility rows for the
+// legacy relational schema. It does not create an interactive account: the
+// random password is discarded and the application exposes no login endpoint.
+func (s *Store) createInstallationIdentity(ctx context.Context) error {
+	randomPassword, err := newOpaqueToken()
 	if err != nil {
-		return User{}, fmt.Errorf("hash initial password: %w", err)
+		return fmt.Errorf("generate installation-only secret: %w", err)
+	}
+	passwordHash, err := security.HashPassword(randomPassword)
+	if err != nil {
+		return fmt.Errorf("hash installation-only secret: %w", err)
 	}
 
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
-		return User{}, fmt.Errorf("begin initial registration: %w", err)
+		return fmt.Errorf("begin installation identity transaction: %w", err)
 	}
 	defer tx.Rollback()
 
 	if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(722041102)`); err != nil {
-		return User{}, fmt.Errorf("lock initial registration: %w", err)
+		return fmt.Errorf("lock installation identity creation: %w", err)
 	}
 
 	var hasUsers bool
 	if err := tx.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM users)`).Scan(&hasUsers); err != nil {
-		return User{}, fmt.Errorf("check initial account state: %w", err)
+		return fmt.Errorf("check legacy identity state: %w", err)
 	}
 	if hasUsers {
-		return User{}, ErrBootstrapComplete
+		return nil
 	}
 
 	var organizationID, userID string
 	if err := tx.QueryRowContext(ctx,
-		`INSERT INTO organizations (name, slug) VALUES ($1, $2) RETURNING id::text`,
-		organizationName, slug,
+		`INSERT INTO organizations (name, slug) VALUES ('Monitor Me Installation', 'monitor-me-installation') RETURNING id::text`,
 	).Scan(&organizationID); err != nil {
-		return User{}, fmt.Errorf("create initial organization: %w", err)
+		return fmt.Errorf("create private installation scope: %w", err)
 	}
 
 	if err := tx.QueryRowContext(ctx,
-		`INSERT INTO users (email, display_name, password_hash) VALUES ($1, $2, $3) RETURNING id::text`,
-		email, displayName, passwordHash,
+		`INSERT INTO users (email, display_name, password_hash) VALUES ('local@monitor.me', 'Monitor Me Installation', $1) RETURNING id::text`,
+		passwordHash,
 	).Scan(&userID); err != nil {
-		return User{}, fmt.Errorf("create initial user: %w", err)
+		return fmt.Errorf("create private installation identity: %w", err)
 	}
 
 	if _, err := tx.ExecContext(ctx,
 		`INSERT INTO organization_memberships (organization_id, user_id, role) VALUES ($1, $2, 'owner')`,
 		organizationID, userID,
 	); err != nil {
-		return User{}, fmt.Errorf("create initial owner membership: %w", err)
+		return fmt.Errorf("link private installation scope: %w", err)
 	}
 
 	if err := tx.Commit(); err != nil {
-		return User{}, fmt.Errorf("commit initial registration: %w", err)
+		return fmt.Errorf("commit installation identity transaction: %w", err)
 	}
-
-	return User{
-		ID: userID, Email: email, DisplayName: displayName,
-		OrganizationID: organizationID, OrganizationName: organizationName, Role: "owner",
-	}, nil
+	return nil
 }
 
-// CreateLocalPrincipal resolves the first workspace owner and creates an internal
-// short-lived session used only to bind live-stream tickets in local anonymous mode.
-// It never returns or exposes a bearer credential to the browser.
-func (s *Store) CreateLocalPrincipal(ctx context.Context) (Principal, time.Time, error) {
+// CreateInstallationPrincipal resolves the private compatibility identity and creates an internal
+// short-lived session used only to bind live-stream tickets. No browser credential is created.
+func (s *Store) CreateInstallationPrincipal(ctx context.Context) (Principal, time.Time, error) {
 	loadPrincipal := func() (Principal, error) {
 		var principal Principal
 		err := s.db.QueryRowContext(ctx, `
@@ -315,17 +272,8 @@ func (s *Store) CreateLocalPrincipal(ctx context.Context) (Principal, time.Time,
 
 	principal, err := loadPrincipal()
 	if errors.Is(err, sql.ErrNoRows) {
-		password, tokenErr := newOpaqueToken()
-		if tokenErr != nil {
-			return Principal{}, time.Time{}, fmt.Errorf("generate local owner password: %w", tokenErr)
-		}
-		_, registerErr := s.RegisterFirst(ctx, RegisterInput{
-			Email: "local@monitor.me", DisplayName: "Local Administrator",
-			Password: password, OrganizationName: "Local Workspace",
-			OrganizationSlug: "local-workspace",
-		})
-		if registerErr != nil && !errors.Is(registerErr, ErrBootstrapComplete) {
-			return Principal{}, time.Time{}, fmt.Errorf("bootstrap local workspace: %w", registerErr)
+		if createErr := s.createInstallationIdentity(ctx); createErr != nil {
+			return Principal{}, time.Time{}, fmt.Errorf("bootstrap private installation scope: %w", createErr)
 		}
 		principal, err = loadPrincipal()
 	}
@@ -338,7 +286,7 @@ func (s *Store) CreateLocalPrincipal(ctx context.Context) (Principal, time.Time,
 		return Principal{}, time.Time{}, fmt.Errorf("create local live session secret: %w", err)
 	}
 	hash := sha256.Sum256([]byte(internalToken))
-	expiresAt := time.Now().UTC().Add(userSessionTTL)
+	expiresAt := time.Now().UTC().Add(installationSessionTTL)
 	err = s.db.QueryRowContext(ctx, `
 		INSERT INTO user_sessions (user_id, organization_id, token_hash, expires_at)
 		VALUES ($1, $2, $3, $4)
@@ -348,104 +296,6 @@ func (s *Store) CreateLocalPrincipal(ctx context.Context) (Principal, time.Time,
 		return Principal{}, time.Time{}, fmt.Errorf("persist local live session: %w", err)
 	}
 	return principal, expiresAt, nil
-}
-
-// Login verifies a password and creates a 24-hour opaque bearer session.
-// Only the SHA-256 digest of the bearer secret is persisted.
-func (s *Store) Login(ctx context.Context, email, password string) (AuthSession, error) {
-	email = strings.ToLower(strings.TrimSpace(email))
-	if !validEmail(email) || len(password) == 0 || len(password) > 128 {
-		return AuthSession{}, ErrInvalidCredentials
-	}
-
-	var user User
-	var passwordHash string
-	var membershipCount int
-	err := s.db.QueryRowContext(ctx, `
-		SELECT u.id::text, u.email, u.display_name, o.id::text, o.name, m.role, u.password_hash,
-		       (SELECT count(*) FROM organization_memberships membership WHERE membership.user_id = u.id)
-		FROM users u
-		JOIN organization_memberships m ON m.user_id = u.id
-		JOIN organizations o ON o.id = m.organization_id
-		WHERE lower(u.email) = $1
-		ORDER BY m.created_at
-		LIMIT 1
-	`, email).Scan(&user.ID, &user.Email, &user.DisplayName, &user.OrganizationID, &user.OrganizationName, &user.Role, &passwordHash, &membershipCount)
-	if err != nil || !security.VerifyPassword(passwordHash, password) {
-		return AuthSession{}, ErrInvalidCredentials
-	}
-	if membershipCount != 1 {
-		if membershipCount > 1 {
-			return AuthSession{}, ErrOrganizationSelectionRequired
-		}
-		return AuthSession{}, ErrInvalidCredentials
-	}
-
-	token, err := newOpaqueToken()
-	if err != nil {
-		return AuthSession{}, fmt.Errorf("create user session: %w", err)
-	}
-	expiresAt := time.Now().UTC().Add(userSessionTTL)
-	hash := sha256.Sum256([]byte(token))
-
-	if _, err := s.db.ExecContext(ctx, `
-		INSERT INTO user_sessions (user_id, organization_id, token_hash, expires_at)
-		VALUES ($1, $2, $3, $4)
-	`, user.ID, user.OrganizationID, hash[:], expiresAt); err != nil {
-		return AuthSession{}, fmt.Errorf("persist user session: %w", err)
-	}
-
-	return AuthSession{AccessToken: token, ExpiresAt: expiresAt, User: user}, nil
-}
-
-// Authenticate resolves an opaque bearer token to an active user session.
-func (s *Store) Authenticate(ctx context.Context, token string) (Principal, error) {
-	if len(token) < 32 || len(token) > 128 {
-		return Principal{}, ErrUnauthorized
-	}
-	hash := sha256.Sum256([]byte(token))
-
-	var principal Principal
-	err := s.db.QueryRowContext(ctx, `
-		SELECT us.id::text, u.id::text, us.organization_id::text, u.email,
-		       u.display_name, o.name, m.role
-		FROM user_sessions us
-		JOIN users u ON u.id = us.user_id
-		JOIN organizations o ON o.id = us.organization_id
-		JOIN organization_memberships m
-		  ON m.organization_id = us.organization_id AND m.user_id = us.user_id
-		WHERE us.token_hash = $1
-		  AND us.revoked_at IS NULL
-		  AND us.expires_at > now()
-	`, hash[:]).Scan(
-		&principal.SessionID, &principal.UserID, &principal.OrganizationID,
-		&principal.Email, &principal.DisplayName, &principal.Organization, &principal.Role,
-	)
-	if err != nil {
-		return Principal{}, ErrUnauthorized
-	}
-	_, _ = s.db.ExecContext(ctx, `UPDATE user_sessions SET last_seen_at = now() WHERE id = $1`, principal.SessionID)
-	return principal, nil
-}
-
-// Logout revokes the current bearer session.
-func (s *Store) Logout(ctx context.Context, principal Principal) error {
-	result, err := s.db.ExecContext(ctx, `
-		UPDATE user_sessions
-		SET revoked_at = COALESCE(revoked_at, now())
-		WHERE id = $1 AND user_id = $2
-	`, principal.SessionID, principal.UserID)
-	if err != nil {
-		return fmt.Errorf("revoke user session: %w", err)
-	}
-	affected, err := result.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("inspect session revocation: %w", err)
-	}
-	if affected == 0 {
-		return ErrUnauthorized
-	}
-	return nil
 }
 
 type LiveTicket struct {
@@ -530,7 +380,7 @@ func (s *Store) ConsumeLiveTicket(ctx context.Context, token string) (Principal,
 	return principal, nil
 }
 
-// CreateServer creates a pending server and its first scoped enrollment token atomically.
+// CreateServer creates a pending host and its first one-time enrollment credential atomically.
 func (s *Store) CreateServer(ctx context.Context, principal Principal, name, hostname string) (IssuedServer, error) {
 	name = strings.TrimSpace(name)
 	hostname = strings.TrimSpace(hostname)
@@ -782,7 +632,7 @@ func (s *Store) RevokeAgent(ctx context.Context, principal Principal, agentID st
 	return nil
 }
 
-// ListProjects returns only projects belonging to the authenticated organization.
+// ListProjects returns only projects belonging to the installation.
 func (s *Store) ListProjects(ctx context.Context, principal Principal) ([]Project, error) {
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT id::text, name, slug, created_at
@@ -1231,14 +1081,6 @@ func canManageServers(role string) bool {
 
 func canAdminister(role string) bool {
 	return role == "owner" || role == "admin"
-}
-
-func validEmail(email string) bool {
-	if len(email) < 5 || len(email) > 254 {
-		return false
-	}
-	parsed, err := mail.ParseAddress(email)
-	return err == nil && strings.EqualFold(parsed.Address, email) && !strings.ContainsAny(email, " <>")
 }
 
 func validUUID(value string) bool {
