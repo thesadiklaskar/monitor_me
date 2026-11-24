@@ -218,13 +218,13 @@ npm run build
 
 ## Current limitations
 
-- The native collector is Linux-only. Windows and macOS collectors are Phase 5 work.
+- Native host collection currently supports Linux and an initial Windows slice. Windows reports CPU, memory/swap, disk, network, uptime, process inventory and OS/virtualization metadata; Linux also reports TCP, cgroup and Systemd workload context. macOS collection remains Phase 5 work.
 - Docker container metadata is currently inferred from exposed cgroup paths; a full Docker Engine API integration is not yet implemented.
 - Process RSS is collected, but per-process CPU attribution is not yet implemented.
 - Application HTTP request rate, latency, and status metrics require application instrumentation, a supported reverse-proxy integration, or tracing; they are not inferred from open ports.
 - eBPF and kernel-level event tracing are not yet implemented.
 - Historical queries aggregate raw samples; persistent materialized downsampling/rollups remain future work.
-- Windows/macOS collectors, full Docker Engine discovery, per-process CPU/lifecycle data, application request instrumentation, persistent rollups, signed installers and fleet-scale testing remain unfinished.
+- Windows TCP/listening-port metrics, per-process CPU, workload attribution, automatic Windows service lifecycle and signed installers remain unfinished. macOS collection, complete Docker Engine discovery, application request instrumentation, persistent rollups and fleet-scale testing also remain unfinished.
 - The local Compose deployment is a development topology. Production Compose and operator scripts are in deploy/production/README.md, but no VPS deployment/restore rehearsal is claimed.
 
 ## Production deployment preparation
