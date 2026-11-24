@@ -49,7 +49,7 @@ The complete product contract, architecture boundaries and acceptance targets ar
 | Metric definitions | **Completed** | Names, units, calculations, timestamps, and platform limitations documented |
 | High-level architecture | **Completed** | Component boundaries, data flow, storage responsibilities, and security boundaries documented |
 | Feature acceptance matrix | **Completed** | Planned features mapped to implementation tests and CI evidence |
-| Backend implementation | **Phases 2–3 verified** | Authentication, organization-scoped APIs, TLS gRPC enrollment, durable telemetry ingestion, history, retention, and live transport pass CI |
+| Backend implementation | **Single-install refactor in progress** | Browser login/register routes removed; the API bootstraps one implicit installation context, with TLS gRPC agent enrollment, durable telemetry ingestion, history, retention and live transport. The new no-login contract still needs a fresh CI pass |
 | Frontend implementation | **Phase 4 in progress** | Monitoring detail refresh, no-login local shell, OS-agnostic Add Machine enrollment, two shell launcher options and collapsible icon-led sidebar are implemented; full console redesign, operator acceptance and production network access gate remain |
 | Local platform stack | **Runtime verified** | PostgreSQL, Redis, migration runner, API, and web services start through Docker Compose |
 | Database and cache integration | **Runtime verified** | PostgreSQL remains durable; Redis and PostgreSQL dependency outage/readiness recovery are tested |
@@ -240,7 +240,7 @@ Browser live connections first call `POST /v1/live/ticket` with the bearer sessi
                  | Authenticated gRPC + Protocol Buffers
                  v
           Custom Go Backend
-       - Authentication and enrollment
+       - Single-install context and agent enrollment
        - Telemetry validation and ingestion
        - Project and workload attribution
        - Historical query and alert processing
@@ -262,7 +262,7 @@ Browser live connections first call `POST /v1/live/ticket` with the bearer sessi
        - Alerts, events, and operations
 ```
 
-The control plane implements owner bootstrap, bearer authentication, organization-scoped server inventory, enrollment-token lifecycle, and TLS-protected gRPC enrollment/heartbeat. Phase 3 now provides a native Linux collector, durable spool, authenticated idempotent PostgreSQL ingestion, range queries, retention, and authorized WebSocket delivery. Dashboards and operator workflows remain in Phase 4. The diagram shows the intended end-state data flow, not a claim that every component is already implemented.
+The control plane opens as one self-hosted installation with no user login or organization-creation workflow. A private compatibility identity remains inside the database schema for existing foreign keys and resource scoping; it is not a customer account or selectable organization. Monitored nodes still enroll through short-lived, single-use credentials and TLS-protected gRPC. Phase 3 provides a native Linux collector, durable spool, idempotent PostgreSQL ingestion, range queries, retention, and live delivery. The diagram shows the intended end-state data flow, not a claim that every component is already implemented.
 
 ## Docker and Deployment Model
 
@@ -287,11 +287,11 @@ The initial collection target is configurable in the 100ms–500ms range where h
 
 ## Security Principles
 
-The default local Compose profile is no-login and is published only on loopback. The production Compose profile defaults to authenticated mode when the variable is omitted. The provided `.env.production.example` opts into no-login and deploy fails closed unless ADMIN_CIDR is configured and Nginx applies the allowlist to dashboard/API/WebSocket paths. Public installer/CA/artifact routes remain reachable over HTTPS. See ADR 0004.
+Every installation is no-login and single-install. Local Compose publishes the dashboard/API only on loopback. Production deployment refuses to proceed until a specific `ADMIN_CIDR` is supplied and the Nginx allowlist plus host firewall boundary are installed for the dashboard/API/WebSocket. Public installer/CA/artifact routes remain reachable over HTTPS for node bootstrap. There is no environment switch to restore password login. See ADR 0004.
 
 - TLS-protected agent communication with short-lived, single-use, revocable enrollment credentials.
-- Default single-install operation removes the signup/login workflow; the workspace identity is created internally.
-- Local no-login access is loopback-bound. Production no-login relies on HTTPS plus an Nginx administrator CIDR/VPN allowlist for the dashboard/API/WebSocket; only dedicated node bootstrap, CA and artifact paths are public.
+- Single-install operation has no signup, login, user management or organization-creation workflow. A non-interactive compatibility scope remains internal to the database for legacy foreign keys.
+- Local access is loopback-bound. Production management access always relies on HTTPS plus an Nginx administrator CIDR/VPN allowlist for the dashboard/API/WebSocket; only dedicated node bootstrap, CA and artifact paths are public.
 - Keep operator dashboard access separate from agent gRPC enrollment. A node token never authenticates a browser session.
 - Keep PostgreSQL, Redis, ClickHouse (when implemented), API HTTP and internal web ports private.
 - Internal installation/server isolation remains mandatory even when the operator UI is single-tenant.
@@ -304,14 +304,14 @@ The default local Compose profile is no-login and is published only on loopback.
 
 ## Production Firewall Requirements
 
-The production firewall policy is defined for two roles: a control-plane VPS/VM and agent-only monitored Linux hosts. Agent-only hosts require no inbound Monitor Me ports; they send outbound TLS gRPC to the control plane. The no-login control-plane profile exposes TCP 443 to Nginx for public installer/CA/artifact routes; Nginx restricts the dashboard/API/WebSocket to the administrator CIDR/VPN. TCP 8443 is the TLS agent endpoint (public or source-restricted), optional TCP 80 is for ACME HTTP-01, and SSH is limited to a trusted administrator CIDR. PostgreSQL 5432, Redis 6379, API 8080, and web 3000 must remain private. See [Production Firewall Requirements](docs/PRODUCTION_FIREWALL.md) for UFW/firewalld examples, Docker firewall caveats, and local/LAN deployment rules. An additive UFW/firewalld helper and a production no-login Nginx access gate are implemented; host/provider verification and fully automatic firewall provisioning remain Phase 5 acceptance work.
+The production firewall policy is defined for two roles: a control-plane VPS/VM and agent-only monitored Linux hosts. Agent-only hosts require no inbound Monitor Me ports; they send outbound TLS gRPC to the control plane. The no-login control plane exposes TCP 443 to Nginx for public installer/CA/artifact routes; Nginx always restricts the dashboard/API/WebSocket to the administrator CIDR/VPN. TCP 8443 is the TLS agent endpoint (public or source-restricted), optional TCP 80 is for ACME HTTP-01, and SSH is limited to a trusted administrator CIDR. PostgreSQL 5432, Redis 6379, API 8080, and web 3000 must remain private. See [Production Firewall Requirements](docs/PRODUCTION_FIREWALL.md) for UFW/firewalld examples, Docker firewall caveats, and local/LAN deployment rules. An additive UFW/firewalld helper and a mandatory production no-login Nginx access gate are implemented; host/provider verification and fully automatic firewall provisioning remain Phase 5 acceptance work.
 
 ## Five-Phase Delivery Roadmap
 
 | Phase | Name | Status | Main outcome |
 | --- | --- | --- | --- |
 | 1 | Product Specification and Technical Blueprint | **Completed** | Requirements, metric catalog, acceptance matrix, and architecture baseline |
-| 2 | Platform Foundation and Secure Connectivity | **Completed** | Go/Next.js foundation, PostgreSQL/Redis, migrations, owner authentication, organization authorization, TLS gRPC enrollment, heartbeat, reconnect, and revocation pass CI |
+| 2 | Platform Foundation and Secure Connectivity | **Completed** | Go/Next.js foundation, PostgreSQL/Redis, migrations, internal installation scope, TLS gRPC enrollment, heartbeat, reconnect, and revocation pass the historical CI baseline |
 | 3 | Monitoring Agent and Telemetry Data Engine | **Completed** | Linux host collection, durable spool, TLS gRPC ingestion, PostgreSQL history/retention, authorized live delivery, workload attribution, and CI benchmarks all verified |
 | 4 | Dashboard and Operational Features | **In Progress** | Server/project dashboards, custom charts, application visibility, alerts, notifications, one-click installation workflow, and secure remote actions |
 | 5 | Cross-Platform Production and Scale | In Progress | Linux amd64/arm64 and Windows x64 checksummed agent bundles, target-side service installers, Nginx no-login access gate, and UFW/firewalld helper are implemented in code. Windows runtime acceptance, publisher signing, macOS, raw logs, fleet tests and real-host verification remain |
@@ -376,21 +376,10 @@ The final diagram must describe the system that was actually built, not an aspir
 
 **Current resume point:** Phases 1–3 are complete. Phase 4 and Phase 5 are in progress. The original Phase 1–3 baseline passed in GitHub Actions run #45045054465 (historical Actions run); newer CI execution is currently blocked by the repository's Actions free-minute quota. No fresh CI pass is claimed for the latest UI/bootstrap/firewall changes. Read [docs/PROJECT_STATE.md](docs/PROJECT_STATE.md) for the exact next action.
 
-## Local no-login mode
+## Local single-install mode
 
-The default Docker Compose stack enables anonymous local dashboard access so the
-web UI opens directly without an owner login. Existing workspace data is retained;
-on a fresh database, Monitor Me creates a local workspace automatically.
+The default Docker Compose stack opens the monitoring dashboard directly. There is no signup, login, logout, user management or organization-creation screen. On first use, the API initializes one private installation scope for existing database relationships; this is not a customer account and is not exposed in the UI.
 
-The web and API host ports are bound to `127.0.0.1` by default. **Do not expose
-this anonymous mode to a LAN, reverse proxy, or the public internet.** Anyone
-who can reach the dashboard can manage monitored hosts, enrollment tokens,
-alerts, projects, and any enabled remote operations.
+The dashboard, API, PostgreSQL and Redis host ports are loopback-bound by default. Only the machine running the Compose stack can reach the local management interface. Do not change those bindings to a public interface without a production reverse proxy and network policy.
 
-To restore password authentication on an installation with an already-provisioned
-owner password, set `MONITOR_ME_AUTH_DISABLED=false` in the environment used by
-Docker Compose and recreate the `api` and `web` services. A fresh anonymous
-installation creates a local owner with a random password that is never shown;
-provision a known owner credential before switching that fresh installation to
-password mode. Backend authentication remains enabled by default outside this
-local Compose configuration.
+Production deployment is also no-login. The deployment script refuses to continue until a specific trusted administrator/VPN ADMIN_CIDR is configured and the Nginx allowlist and host firewall checks are applied. Public installer, CA and checksum-verified agent artifact routes remain available for monitored nodes; the dashboard, normal API and live WebSocket remain restricted to the administrator network. There is no configuration flag to turn password login back on.
