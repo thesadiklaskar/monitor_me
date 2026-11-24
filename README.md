@@ -132,6 +132,22 @@ git pull --ff-only origin main
 .\scripts\start-local.ps1
 ```
 
+For direct Go package tests on Windows, generate both modules' Protocol Buffer sources first:
+
+```powershell
+.\scripts\generate-proto.ps1
+$env:GOFLAGS = "-mod=mod"
+Push-Location .\backend
+go test ./...
+Pop-Location
+Push-Location .\agent
+go test ./...
+Pop-Location
+Remove-Item Env:GOFLAGS
+```
+
+The agent gRPC source directory is generated and intentionally ignored by Git. The module update flag matches the repository's Go check environment and populates missing checksum entries. Before running frontend lint or type checks directly, run `npm install` from `web/`.
+
 Linux/macOS development shell (the control plane still targets Linux containers):
 
 ```bash
