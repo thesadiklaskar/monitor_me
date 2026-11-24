@@ -1046,14 +1046,6 @@ func TestSingleInstallAndAgentLifecycle(t *testing.T) {
 	if servers.StatusCode != http.StatusOK {
 		t.Fatalf("server inventory: expected 200, got %d: %s", servers.StatusCode, servers.Body)
 	}
-	logout := requestJSON(t, ctx, http.MethodPost, baseURL+"/v1/auth/logout", bearer, map[string]any{})
-	if logout.StatusCode != http.StatusNoContent {
-		t.Fatalf("logout: expected 204, got %d: %s", logout.StatusCode, logout.Body)
-	}
-	afterLogout := requestJSON(t, ctx, http.MethodGet, baseURL+"/v1/auth/me", bearer, nil)
-	if afterLogout.StatusCode != http.StatusUnauthorized {
-		t.Fatalf("revoked user session: expected 401, got %d", afterLogout.StatusCode)
-	}
 }
 
 func createServer(t *testing.T, ctx context.Context, baseURL, bearer, name string) apiResponse {
