@@ -5,11 +5,11 @@
 
 ## Product scope lock — 2026-11-24
 
-The intended product is a simple independent monitoring installation, not a hosted team workspace. The main operator navigation is limited to **Servers**, **Logs**, **Dashboards** and **Alerts**. There are no browser user accounts, organizations, customer projects, workspace selectors or Project Mapping screens. Technical workload context (process, systemd unit, container, cgroup, volume and interface) stays attached to the host as metadata. The UI source has been simplified accordingly, but no fresh frontend build or browser acceptance has run yet.
+The intended product is a simple independent monitoring installation, not a hosted team workspace. The main operator navigation is limited to **Servers**, **Logs**, **Dashboards** and **Alerts**. There are no browser user accounts, organizations, customer projects, workspace selectors or Project Mapping screens. Technical workload context (process, systemd unit, container, cgroup, volume and interface) stays attached to the host as metadata. The UI and Next.js proxy surface have been simplified accordingly: unmounted Project Workspace, project API routes, project mapping proxy and remote-operation proxy routes are removed. No fresh frontend build or browser acceptance has run yet.
 
-Do not treat removing a menu item as completing the backend migration. Existing project and organization tables, keys and filters still exist in the database/API and must be removed through forward migrations that preserve machine, metric, log, alert and dashboard data. Do not delete project/organization tables or reset volumes as a shortcut.
+Do not treat removing a menu item as completing the backend migration. Existing project and organization tables, keys and filters still exist in the database and internal Go APIs. The browser-facing project/remote-operation proxy routes have been removed. Remaining database and backend paths must be removed through forward migrations that preserve machine, metric, log, alert and dashboard data. Do not delete project/organization tables or reset volumes as a shortcut.
 
-The root-level `install.sh` does not yet exist. The current `deploy/production/deploy.sh` requires an operator-prepared environment file, Docker, Nginx, Certbot, a valid TLS certificate, hostname, gRPC address and `ADMIN_CIDR`. The requested `git clone ... && sudo ./install.sh` workflow is a release-blocking deliverable, not an implemented command.
+The root-level `install.sh` does not yet exist. The current `deploy/production/deploy.sh` requires an operator-prepared environment file, Docker, Nginx, Certbot, a valid TLS certificate, hostname, gRPC address and `ADMIN_CIDR`. The requested clone + `sudo ./install.sh` workflow is a release-blocking deliverable, not an implemented command. Existing remote-operation Go handlers remain internal cleanup debt and must not be re-exposed through the web app.
 
 ## 0. Release-blocking stability gate — first
 
@@ -69,7 +69,7 @@ The root-level `install.sh` does not yet exist. The current `deploy/production/d
 
 - [ ] Add alert duration/for windows, severity, grouping/deduplication, maintenance silences, multi-condition rules and recovery semantics.
 - [ ] Add configurable notification routing (webhook/email and other explicitly configured channels), retry/delivery history and escalation policy.
-- [ ] Keep remote operations least-privilege, allowlisted, audited, idempotent and disabled where the platform cannot safely enforce them.
+- [ ] Retire remote host-control endpoints and background operation handlers. Monitor Me is read-only for host control: no stop/restart/shell/command feature. Keep agent enrollment, token rotation/revocation and diagnostic health reporting only.
 
 ## 7. Reliability, security and production acceptance
 
