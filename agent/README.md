@@ -1,6 +1,6 @@
 # Native Monitoring Agent
 
-The native Go agent runs directly on a monitored host. Linux collection is verified; an initial Windows host collector is now available for local acceptance. Docker is not required on the monitored machine.
+The native Go agent runs directly on each monitored host. Linux host collection has prior verification; the initial Windows collector and Windows Service Control Manager entry point are implemented but still require runtime acceptance. Target bootstrap installers download the matching artifact; Docker is not required on the monitored machine.
 
 ## Current implementation
 
@@ -16,7 +16,7 @@ The native Go agent runs directly on a monitored host. Linux collection is verif
 - Agent-health telemetry includes process CPU utilization, collector errors per interval, persistent WAL byte size and unacknowledged batch depth. Last successful send is omitted until a matching durable ACK has been received.
 - A hardened Linux systemd unit is provided at `agent/deploy/systemd/monitor-me-agent.service`; the monitored machine needs systemd but does not need Docker.
 
-macOS and other unsupported operating systems currently report only agent health/spool capabilities. Windows does not currently expose Linux TCP-state/listening-port inventory, cgroup/Systemd workload attribution, or per-process CPU through this collector. Windows service installation and signed installers are not included in this first local-test slice.
+macOS and other unsupported operating systems currently report only agent health/spool capabilities. Windows does not currently expose Linux TCP-state/listening-port inventory, cgroup/Systemd workload attribution, or per-process CPU through this collector. Windows Service lifecycle code and a target-side Windows Service installer are now present, but they have not yet passed runtime acceptance or publisher code-signing.
 
 ## Build and test
 
@@ -54,6 +54,7 @@ go test -run '^$' -bench 'Benchmark(ProcCollectorCollect|CounterRate|SpoolAppend
 | `MONITOR_SPOOL_DIR` | `./.monitor-me/spool` | Local durable queue directory |
 | `MONITOR_SPOOL_MAX_BYTES` | `67108864` | Maximum local spool size (64MiB) |
 | `MONITOR_LOG_LEVEL` | `info` | `debug`, `info`, `warn`, or `error` |
+| `MONITOR_LOG_FILE` | stdout | Optional bounded rotating JSON log output for managed services |
 | `MONITOR_GRPC_ADDRESS` | unset | TLS gRPC endpoint, e.g. `localhost:8443` |
 | `MONITOR_TLS_CA_FILE` | unset | Explicit CA certificate used to verify the backend |
 | `MONITOR_ENROLLMENT_TOKEN` | unset | One-use token for first enrollment or session renewal |
