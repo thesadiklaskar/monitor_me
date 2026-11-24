@@ -951,13 +951,38 @@ func (s *Store) MoveDashboardPanel(ctx context.Context, principal Principal, pan
 	defer tx.Rollback()
 
 	var dashboardID string
-	var currentPosition int
-	err = tx.QueryRowContext(ctx, `
-		SELECT dashboard_id::text, position
+	if err := tx.QueryRowContext(ctx, `
+		SELECT dashboard_id::text
 		FROM dashboard_panels
 		WHERE id = $1 AND organization_id = $2
+	`, panelID, principal.OrganizationID).Scan(&dashboardID); errors.Is(err, sql.ErrNoRows) {
+		return ErrNotFound
+	} else if err != nil {
+		return fmt.Errorf("load dashboard for panel reorder: %w", err)
+	}
+
+	// Lock the parent first so concurrent moves of different panels in the
+	// same dashboard serialize without acquiring panel locks in opposite order.
+	var lockedDashboardID string
+	err = tx.QueryRowContext(ctx, `
+		SELECT id::text FROM dashboards
+		WHERE id = $1 AND organization_id = $2
 		FOR UPDATE
-	`, panelID, principal.OrganizationID).Scan(&dashboardID, &currentPosition)
+	`, dashboardID, principal.OrganizationID).Scan(&lockedDashboardID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrNotFound
+	}
+	if err != nil {
+		return fmt.Errorf("lock dashboard for panel reorder: %w", err)
+	}
+
+	var currentPosition int
+	err = tx.QueryRowContext(ctx, `
+		SELECT position
+		FROM dashboard_panels
+		WHERE id = $1 AND dashboard_id = $2 AND organization_id = $3
+		FOR UPDATE
+	`, panelID, lockedDashboardID, principal.OrganizationID).Scan(&currentPosition)
 	if errors.Is(err, sql.ErrNoRows) {
 		return ErrNotFound
 	}
@@ -978,16 +1003,6 @@ func (s *Store) MoveDashboardPanel(ctx context.Context, principal Principal, pan
 	}
 	if currentPosition == position {
 		return tx.Commit()
-	}
-
-	// Serialize all order changes for this dashboard, including moves of two
-	// different panels that would otherwise hold different panel row locks.
-	if _, err := tx.ExecContext(ctx, `
-		SELECT id FROM dashboards
-		WHERE id = $1 AND organization_id = $2
-		FOR UPDATE
-	`, dashboardID, principal.OrganizationID); err != nil {
-		return fmt.Errorf("lock dashboard for panel reorder: %w", err)
 	}
 
 	if position < currentPosition {
