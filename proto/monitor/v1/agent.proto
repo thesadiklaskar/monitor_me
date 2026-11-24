@@ -13,8 +13,7 @@ service AgentControl {
   // ReportHeartbeat validates an opaque agent session credential and refreshes liveness.
   rpc ReportHeartbeat(HeartbeatRequest) returns (HeartbeatResponse);
 
-  // Stream accepts bounded telemetry batches and acknowledges only committed data.
-  // AgentEvent and AgentHealth payloads are reserved and are not accepted yet.
+  // Stream accepts bounded telemetry and log batches and acknowledges only committed data.
   rpc Stream(stream AgentToServerMessage) returns (stream ServerToAgentMessage);
 }
 
@@ -55,9 +54,10 @@ message AgentToServerMessage {
   string agent_id = 1;
   string session_token = 2;
 
+  reserved 4, 5;
+
   oneof payload {
     TelemetryBatch telemetry_batch = 3;
-    AgentHealth health = 5;
     LogBatch log_batch = 6;
   }
 }
@@ -75,15 +75,6 @@ message MetricSample {
   string unit = 3;
   map<string, string> labels = 4;
   int64 observed_at_unix_nanos = 5;
-}
-
-// AgentHealth is reserved for a future health-reporting path. Current agent
-// liveness is reported through the authenticated heartbeat RPC.
-message AgentHealth {
-  uint64 queue_depth = 1;
-  uint64 spool_bytes = 2;
-  uint64 collector_error_count = 3;
-  int64 reported_at_unix_nanos = 4;
 }
 
 message ServerToAgentMessage {
