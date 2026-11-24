@@ -460,7 +460,7 @@ export default function DashboardsWorkspace({
           <button className="detail-back-button" type="button" onClick={onBack}>← Back to servers</button>
           <div className="eyebrow">Saved monitoring layouts</div>
           <h1>Dashboards</h1>
-          <p>Build persistent metric views from real server history. Panels refresh automatically and respect organization and project scope.</p>
+          <p>Build persistent metric views from real server history. Panels refresh automatically and respect installation and project scope.</p>
         </div>
         <div className="dashboards-header-actions">
           <Button variant="secondary" onClick={() => { void loadDashboards(); void refreshSeries(); }} disabled={loading}><RefreshCw size={14} /> Refresh</Button>
@@ -473,7 +473,7 @@ export default function DashboardsWorkspace({
 
       {showDashboardForm && (
         <Card className="dashboard-editor-card">
-          <CardHeader><CardTitle>Create dashboard</CardTitle><CardDescription>Saved dashboards belong to this installation and organization.</CardDescription></CardHeader>
+          <CardHeader><CardTitle>Create dashboard</CardTitle><CardDescription>Saved dashboards belong to this installation.</CardDescription></CardHeader>
           <CardContent>
             <form className="dashboard-builder-grid" onSubmit={createDashboard}>
               <label className="field"><span>Name</span><input value={dashboardName} onChange={(event) => setDashboardName(event.target.value)} required minLength={2} maxLength={120} placeholder="Production overview" /></label>
