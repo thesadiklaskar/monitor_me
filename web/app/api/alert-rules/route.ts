@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { backendResponse, callBackend, errorResponse, requestJSON, sameOriginMutation } from "@/lib/server-api";
 export const dynamic = "force-dynamic";
-export async function GET(_request: NextRequest) {
+export async function GET() {
   return backendResponse(await callBackend("/v1/alert-rules", {}));
 }
 export async function POST(request: NextRequest) {
