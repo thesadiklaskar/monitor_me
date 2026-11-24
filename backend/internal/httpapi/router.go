@@ -25,7 +25,7 @@ type LiveDependencies struct {
 	Logs                   *logstore.Store
 }
 
-// NewRouter registers health, identity, inventory, telemetry, and live routes.
+// NewRouter registers health, installation, inventory, telemetry, and live routes.
 func NewRouter(version string, dependencies []Dependency, identities *identity.Store, live ...LiveDependencies) http.Handler {
 	mux := http.NewServeMux()
 
@@ -44,43 +44,43 @@ func NewRouter(version string, dependencies []Dependency, identities *identity.S
 				api.allowedLiveOrigins[origin] = struct{}{}
 			}
 		}
-		mux.Handle("GET /v1/installation", api.requireAuth(http.HandlerFunc(api.installation)))
-		mux.Handle("GET /v1/remote-operations/config", api.requireAuth(http.HandlerFunc(api.remoteOperationConfig)))
-		mux.Handle("GET /v1/remote-operations", api.requireAuth(http.HandlerFunc(api.listRemoteOperations)))
-		mux.Handle("POST /v1/servers/{serverID}/remote-operations", api.requireAuth(http.HandlerFunc(api.createRemoteOperation)))
-		mux.Handle("GET /v1/remote-operation-audit", api.requireAuth(http.HandlerFunc(api.listRemoteOperationAudit)))
-		mux.Handle("GET /v1/alert-rules", api.requireAuth(http.HandlerFunc(api.listAlertRules)))
-		mux.Handle("POST /v1/alert-rules", api.requireAuth(http.HandlerFunc(api.createAlertRule)))
-		mux.Handle("DELETE /v1/alert-rules/{ruleID}", api.requireAuth(http.HandlerFunc(api.deleteAlertRule)))
-		mux.Handle("GET /v1/alerts", api.requireAuth(http.HandlerFunc(api.listAlertEvents)))
-		mux.Handle("GET /v1/notifications", api.requireAuth(http.HandlerFunc(api.listAlertNotifications)))
-		mux.Handle("POST /v1/notifications/{notificationID}/read", api.requireAuth(http.HandlerFunc(api.markAlertNotificationRead)))
-		mux.Handle("GET /v1/dashboards", api.requireAuth(http.HandlerFunc(api.listDashboards)))
-		mux.Handle("POST /v1/dashboards", api.requireAuth(http.HandlerFunc(api.createDashboard)))
-		mux.Handle("DELETE /v1/dashboards/{dashboardID}", api.requireAuth(http.HandlerFunc(api.deleteDashboard)))
-		mux.Handle("POST /v1/dashboards/{dashboardID}/panels", api.requireAuth(http.HandlerFunc(api.createDashboardPanel)))
-		mux.Handle("DELETE /v1/dashboard-panels/{panelID}", api.requireAuth(http.HandlerFunc(api.deleteDashboardPanel)))
-		mux.Handle("GET /v1/projects", api.requireAuth(http.HandlerFunc(api.listProjects)))
-		mux.Handle("POST /v1/projects", api.requireAuth(http.HandlerFunc(api.createProject)))
-		mux.Handle("DELETE /v1/projects/{projectID}", api.requireAuth(http.HandlerFunc(api.deleteProject)))
-		mux.Handle("GET /v1/servers/{serverID}/project-mappings", api.requireAuth(http.HandlerFunc(api.listServerProjectMappings)))
-		mux.Handle("POST /v1/servers/{serverID}/project-mappings", api.requireAuth(http.HandlerFunc(api.createServerProjectMapping)))
-		mux.Handle("DELETE /v1/project-mappings/{mappingID}", api.requireAuth(http.HandlerFunc(api.deleteServerProjectMapping)))
-		mux.Handle("GET /v1/servers", api.requireAuth(http.HandlerFunc(api.listServers)))
-		mux.Handle("POST /v1/servers", api.requireAuth(http.HandlerFunc(api.createServer)))
-		mux.Handle("POST /v1/servers/{serverID}/enrollment-token", api.requireAuth(http.HandlerFunc(api.reissueEnrollmentToken)))
-		mux.Handle("POST /v1/enrollment-tokens/{tokenID}/revoke", api.requireAuth(http.HandlerFunc(api.revokeEnrollmentToken)))
-		mux.Handle("POST /v1/agents/{agentID}/revoke", api.requireAuth(http.HandlerFunc(api.revokeAgent)))
+		mux.Handle("GET /v1/installation", api.requireInstallation(http.HandlerFunc(api.installation)))
+		mux.Handle("GET /v1/remote-operations/config", api.requireInstallation(http.HandlerFunc(api.remoteOperationConfig)))
+		mux.Handle("GET /v1/remote-operations", api.requireInstallation(http.HandlerFunc(api.listRemoteOperations)))
+		mux.Handle("POST /v1/servers/{serverID}/remote-operations", api.requireInstallation(http.HandlerFunc(api.createRemoteOperation)))
+		mux.Handle("GET /v1/remote-operation-audit", api.requireInstallation(http.HandlerFunc(api.listRemoteOperationAudit)))
+		mux.Handle("GET /v1/alert-rules", api.requireInstallation(http.HandlerFunc(api.listAlertRules)))
+		mux.Handle("POST /v1/alert-rules", api.requireInstallation(http.HandlerFunc(api.createAlertRule)))
+		mux.Handle("DELETE /v1/alert-rules/{ruleID}", api.requireInstallation(http.HandlerFunc(api.deleteAlertRule)))
+		mux.Handle("GET /v1/alerts", api.requireInstallation(http.HandlerFunc(api.listAlertEvents)))
+		mux.Handle("GET /v1/notifications", api.requireInstallation(http.HandlerFunc(api.listAlertNotifications)))
+		mux.Handle("POST /v1/notifications/{notificationID}/read", api.requireInstallation(http.HandlerFunc(api.markAlertNotificationRead)))
+		mux.Handle("GET /v1/dashboards", api.requireInstallation(http.HandlerFunc(api.listDashboards)))
+		mux.Handle("POST /v1/dashboards", api.requireInstallation(http.HandlerFunc(api.createDashboard)))
+		mux.Handle("DELETE /v1/dashboards/{dashboardID}", api.requireInstallation(http.HandlerFunc(api.deleteDashboard)))
+		mux.Handle("POST /v1/dashboards/{dashboardID}/panels", api.requireInstallation(http.HandlerFunc(api.createDashboardPanel)))
+		mux.Handle("DELETE /v1/dashboard-panels/{panelID}", api.requireInstallation(http.HandlerFunc(api.deleteDashboardPanel)))
+		mux.Handle("GET /v1/projects", api.requireInstallation(http.HandlerFunc(api.listProjects)))
+		mux.Handle("POST /v1/projects", api.requireInstallation(http.HandlerFunc(api.createProject)))
+		mux.Handle("DELETE /v1/projects/{projectID}", api.requireInstallation(http.HandlerFunc(api.deleteProject)))
+		mux.Handle("GET /v1/servers/{serverID}/project-mappings", api.requireInstallation(http.HandlerFunc(api.listServerProjectMappings)))
+		mux.Handle("POST /v1/servers/{serverID}/project-mappings", api.requireInstallation(http.HandlerFunc(api.createServerProjectMapping)))
+		mux.Handle("DELETE /v1/project-mappings/{mappingID}", api.requireInstallation(http.HandlerFunc(api.deleteServerProjectMapping)))
+		mux.Handle("GET /v1/servers", api.requireInstallation(http.HandlerFunc(api.listServers)))
+		mux.Handle("POST /v1/servers", api.requireInstallation(http.HandlerFunc(api.createServer)))
+		mux.Handle("POST /v1/servers/{serverID}/enrollment-token", api.requireInstallation(http.HandlerFunc(api.reissueEnrollmentToken)))
+		mux.Handle("POST /v1/enrollment-tokens/{tokenID}/revoke", api.requireInstallation(http.HandlerFunc(api.revokeEnrollmentToken)))
+		mux.Handle("POST /v1/agents/{agentID}/revoke", api.requireInstallation(http.HandlerFunc(api.revokeAgent)))
 
 		if api.logs != nil {
-			mux.Handle("GET /v1/servers/{serverID}/logs", api.requireAuth(http.HandlerFunc(api.logsSearch)))
+			mux.Handle("GET /v1/servers/{serverID}/logs", api.requireInstallation(http.HandlerFunc(api.logsSearch)))
 		}
 		if api.telemetry != nil {
-			mux.Handle("GET /v1/servers/{serverID}/metrics", api.requireAuth(http.HandlerFunc(api.metrics)))
-			mux.Handle("GET /v1/servers/{serverID}/metrics/latest", api.requireAuth(http.HandlerFunc(api.latestMetrics)))
+			mux.Handle("GET /v1/servers/{serverID}/metrics", api.requireInstallation(http.HandlerFunc(api.metrics)))
+			mux.Handle("GET /v1/servers/{serverID}/metrics/latest", api.requireInstallation(http.HandlerFunc(api.latestMetrics)))
 		}
 		if api.cache != nil {
-			mux.Handle("POST /v1/live/ticket", api.requireAuth(http.HandlerFunc(api.createLiveTicket)))
+			mux.Handle("POST /v1/live/ticket", api.requireInstallation(http.HandlerFunc(api.createLiveTicket)))
 			mux.HandleFunc("GET /v1/live/ws", api.liveStream)
 		}
 	}
