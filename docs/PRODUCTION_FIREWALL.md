@@ -81,8 +81,9 @@ sudo firewall-cmd --get-active-zones
 sudo firewall-cmd --permanent --zone=public \
   --add-rich-rule='rule family="ipv4" source address="<ADMIN_CIDR>" service name="ssh" accept'
 sudo firewall-cmd --permanent --zone=public --remove-service=ssh
-sudo firewall-cmd --permanent --zone=public \\
-  --add-rich-rule='rule family="ipv4" source address="<ADMIN_CIDR>" port port="443" protocol="tcp" accept'
+# TCP 443 reaches Nginx for public installer/CA/artifact paths;
+# Nginx restricts the dashboard/API/WebSocket to the administrator CIDR/VPN.
+sudo firewall-cmd --permanent --zone=public --add-port=443/tcp
 sudo firewall-cmd --permanent --zone=public --add-port=8443/tcp
 
 # Optional: only when using ACME HTTP-01 validation.
