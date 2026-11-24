@@ -5,7 +5,9 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"sort"
 	"strconv"
+	"strings"
 
 	"example.com/monitor-me/backend/internal/telemetry"
 )
@@ -15,40 +17,65 @@ type alertRuleMatch struct {
 	Name      string
 	Operator  string
 	Threshold float64
+	Metric    string
+	ProjectID string
 }
 
 // evaluateCommittedSamples runs inside the same transaction that stores the
 // telemetry batch. Any rule/event/notification write failure aborts the batch,
 // so the agent can retry its durable WAL record without silently losing an alert.
 func evaluateCommittedSamples(ctx context.Context, tx *sql.Tx, organizationID, serverID string, samples []telemetry.LiveSample) error {
+	metricSet := make(map[string]struct{}, len(samples))
 	for _, sample := range samples {
-		rows, err := tx.QueryContext(ctx,
-			"SELECT id::text, name, operator, threshold FROM alert_rules "+
-				"WHERE organization_id = $1 AND enabled = true AND metric_name = $2 "+
-				"AND (server_id IS NULL OR server_id = $3) "+
-				"AND (project_id IS NULL OR project_id = NULLIF($4, '')::uuid) ORDER BY created_at",
-			organizationID, sample.MetricName, serverID, sample.ProjectID)
-		if err != nil {
-			return fmt.Errorf("load matching alert rules for %s: %w", sample.MetricName, err)
+		metricSet[sample.MetricName] = struct{}{}
+	}
+	if len(metricSet) == 0 {
+		return nil
+	}
+	metricNames := make([]string, 0, len(metricSet))
+	for metric := range metricSet {
+		metricNames = append(metricNames, metric)
+	}
+	sort.Strings(metricNames)
+
+	// Metric names cannot contain commas, so one array expression covers all
+	// distinct metric names with a single tenant-scoped rule query per batch.
+	rows, err := tx.QueryContext(ctx, `
+		SELECT id::text, name, operator, threshold, metric_name,
+		       COALESCE(project_id::text, '')
+		FROM alert_rules
+		WHERE organization_id = $1
+		  AND enabled = true
+		  AND (server_id IS NULL OR server_id = $2)
+		  AND metric_name = ANY(string_to_array($3, ','))
+		ORDER BY metric_name, created_at, id
+	`, organizationID, serverID, strings.Join(metricNames, ","))
+	if err != nil {
+		return fmt.Errorf("load matching alert rules: %w", err)
+	}
+	rulesByMetric := make(map[string][]alertRuleMatch)
+	for rows.Next() {
+		var rule alertRuleMatch
+		if err := rows.Scan(&rule.ID, &rule.Name, &rule.Operator, &rule.Threshold, &rule.Metric, &rule.ProjectID); err != nil {
+			_ = rows.Close()
+			return fmt.Errorf("scan matching alert rule: %w", err)
 		}
-		matches := make([]alertRuleMatch, 0)
-		for rows.Next() {
-			var rule alertRuleMatch
-			if err := rows.Scan(&rule.ID, &rule.Name, &rule.Operator, &rule.Threshold); err != nil {
-				_ = rows.Close()
-				return fmt.Errorf("scan matching alert rule: %w", err)
+		rulesByMetric[rule.Metric] = append(rulesByMetric[rule.Metric], rule)
+	}
+	rowsErr := rows.Err()
+	closeErr := rows.Close()
+	if rowsErr != nil {
+		return fmt.Errorf("iterate matching alert rules: %w", rowsErr)
+	}
+	if closeErr != nil {
+		return fmt.Errorf("close matching alert rule rows: %w", closeErr)
+	}
+
+	for _, sample := range samples {
+		for _, rule := range rulesByMetric[sample.MetricName] {
+			if rule.ProjectID != "" && rule.ProjectID != sample.ProjectID {
+				continue
 			}
-			matches = append(matches, rule)
-		}
-		rowsErr := rows.Err()
-		closeErr := rows.Close()
-		if rowsErr != nil {
-			return fmt.Errorf("iterate matching alert rules: %w", rowsErr)
-		}
-		if closeErr != nil {
-			return fmt.Errorf("close matching alert rule rows: %w", closeErr)
-		}
-		for _, rule := range matches {
 			if err := applyAlertRule(ctx, tx, organizationID, serverID, sample, rule); err != nil {
 				return fmt.Errorf("evaluate alert rule %s: %w", rule.ID, err)
 			}
