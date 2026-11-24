@@ -248,7 +248,7 @@ function AddServerDialog({
       <section className="modal-card" role="dialog" aria-modal="true" aria-labelledby="add-server-title">
         <div className="modal-heading">
           <div>
-            <div className="eyebrow">New node enrollment</div>
+            <div className="eyebrow">Machine enrollment</div>
             <h2 id="add-server-title">Add a machine</h2>
           </div>
           <button className="icon-button" type="button" onClick={onClose} aria-label="Close">×</button>
@@ -256,9 +256,9 @@ function AddServerDialog({
         <p className="modal-copy">Create a one-time enrollment token. No operating system needs to be selected here; host discovery happens on the target machine.</p>
         <form onSubmit={submit} className="form-stack">
           <label className="field">
-            <span>Node label</span>
+            <span>Machine name</span>
             <input autoFocus required minLength={2} maxLength={120} value={name} onChange={(event) => setName(event.target.value)} placeholder="production-api-01" />
-            <small>A display label only. The agent reports the actual hostname and operating system.</small>
+            <small>Choose a recognizable name. The agent reports the actual hostname and operating system.</small>
           </label>
           <label className="field">
             <span>Expected hostname (optional)</span>
@@ -267,7 +267,7 @@ function AddServerDialog({
           {error && <div className="notice notice-error" role="alert">{error}</div>}
           <div className="modal-actions">
             <button className="button button-secondary" type="button" onClick={onClose}>Cancel</button>
-            <button className="button button-primary" type="submit" disabled={busy}>{busy ? "Creating…" : "Create node token"}</button>
+            <button className="button button-primary" type="submit" disabled={busy}>{busy ? "Creating…" : "Create enrollment token"}</button>
           </div>
         </form>
       </section>
@@ -385,6 +385,7 @@ export default function DashboardClient() {
 
   const onlineCount = useMemo(() => servers.filter((server) => server.status.toLowerCase() === "online").length, [servers]);
   const pendingCount = useMemo(() => servers.filter((server) => server.status.toLowerCase() === "pending").length, [servers]);
+  const fleetHealthStatus = onlineCount > 0 ? "online" : pendingCount > 0 ? "pending" : servers.length > 0 ? "offline" : "disabled";
   const canCreate = true;
 
   async function rotateToken(server: Server) {
@@ -459,8 +460,8 @@ export default function DashboardClient() {
         {inventoryError && <div className="notice notice-error" role="alert">{inventoryError}</div>}
 
         <section className="welcome-strip">
-          <div><div className="eyebrow">Fleet overview</div><p>Monitor the health and performance of every enrolled machine from one place.</p></div>
-          <div className="phase-label"><span className="status-dot status-dot-online" /> {onlineCount} online · {pendingCount} pending</div>
+          <div><div className="eyebrow">Current health</div><p>Live status for the machines connected to this installation.</p></div>
+          <div className="phase-label"><span className={`status-dot status-dot-${fleetHealthStatus}`} /> {onlineCount} online · {pendingCount} pending</div>
         </section>
 
         <section className="summary-grid" aria-label="Server totals">
