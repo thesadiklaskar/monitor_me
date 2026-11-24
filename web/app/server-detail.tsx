@@ -54,7 +54,6 @@ type LiveSample = {
 
 type LiveEvent = {
   type: string;
-  organization_id: string;
   server_id: string;
   batch_id: string;
   samples: LiveSample[];
