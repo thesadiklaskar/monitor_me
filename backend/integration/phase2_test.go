@@ -20,9 +20,9 @@ import (
 	"testing"
 	"time"
 
-	monitorv1 "github.com/WorkRCS/monitor_me/backend/gen/monitor/v1"
-	"github.com/WorkRCS/monitor_me/backend/internal/security"
-	"github.com/WorkRCS/monitor_me/backend/internal/identity"
+	monitorv1 "example.com/monitor-me/backend/gen/monitor/v1"
+	"example.com/monitor-me/backend/internal/security"
+	"example.com/monitor-me/backend/internal/identity"
 	"github.com/gorilla/websocket"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"google.golang.org/grpc"

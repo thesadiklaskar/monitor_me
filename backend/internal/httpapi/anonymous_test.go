@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/WorkRCS/monitor_me/backend/internal/identity"
+	"example.com/monitor-me/backend/internal/identity"
 )
 
 func TestAnonymousModeDisablesInteractiveAuthenticationEndpoints(t *testing.T) {
