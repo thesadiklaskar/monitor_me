@@ -17,6 +17,7 @@ const (
 )
 
 var (
+	seriesUUID       = regexp.MustCompile("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$")
 	seriesMetricName = regexp.MustCompile("^[a-zA-Z][a-zA-Z0-9_.-]{0,127}$")
 )
 
@@ -39,7 +40,7 @@ type SeriesPoint struct {
 }
 
 func ValidateRangeQuery(query RangeQuery, now time.Time) error {
-	if query.OrganizationID == "" || query.ServerID == "" || !seriesMetricName.MatchString(query.MetricName) {
+	if query.OrganizationID == "" || !seriesUUID.MatchString(query.ServerID) || !seriesMetricName.MatchString(query.MetricName) {
 		return errors.New("organization, server, and valid metric name are required")
 	}
 	if query.From.IsZero() || query.To.IsZero() || !query.From.Before(query.To) ||
