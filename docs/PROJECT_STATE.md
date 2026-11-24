@@ -20,7 +20,7 @@ This file is the authoritative resume point for Monitor Me. Read it before makin
 | Last source commit covered by latest successful CI run | 9685e115113123d5f9f8e8a1b222804752f5a283 (Go, frontend and native-agent jobs passed in run #45203706343; Compose integration failed at the web proxy login probe; later commits are not covered) |
 | Latest CI run | [#45208235137 — quota blocked](https://github.com/WorkRCS/monitor_me/actions/runs/45208235137); jobs failed before runner assignment/steps because the repository owner reports GitHub Actions free minutes are exhausted |
 | Latest implementation commit | [57889c0884e7cba595ea0e6c389ff12e385f258d](https://github.com/WorkRCS/monitor_me/commit/57889c0884e7cba595ea0e6c389ff12e385f258d) — Linux/Windows environment metadata assertions and one-command onboarding/UI changes |
-| Next action | Owner pulls `main`, rebuilds/restarts the local Compose stack, then stops the old Windows foreground agent and runs `.` scripts\\setup-windows-agent.ps1 -Rebuild` to validate the updated native collector and environment card. Keep all existing volumes; do not run production/firewall scripts for local acceptance. |
+| Next action | Owner pulls `main`, rebuilds/restarts the local Compose stack, then stops the old Windows foreground agent and restarts the updated native collector with the Windows installer’s `-Rebuild` option to validate the environment card. Keep all existing volumes; do not run production/firewall scripts for local acceptance. |
 
 
 
