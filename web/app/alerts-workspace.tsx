@@ -3,6 +3,7 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { apiRequest } from "@/lib/client-api";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 type Server = { id: string; name: string };
 type Project = { id: string; name: string; slug: string };
@@ -128,10 +129,10 @@ export default function AlertsWorkspace({ servers, projects, role, onBack }: {
           <h2>Create threshold rule</h2>
           <form className="form-stack" onSubmit={createRule}>
             <div className="alert-form-grid">
-              <label className="field"><span>Rule name</span><input value={ruleName} onChange={(event) => setRuleName(event.target.value)} required minLength={2} maxLength={120} placeholder="High CPU utilization" /></label>
+              <label className="field"><span>Rule name</span><Input value={ruleName} onChange={(event) => setRuleName(event.target.value)} required minLength={2} maxLength={120} placeholder="High CPU utilization" /></label>
               <label className="field"><span>Metric</span><select value={metric} onChange={(event) => setMetric(event.target.value)}>{METRICS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
               <label className="field"><span>Condition</span><select value={operator} onChange={(event) => setOperator(event.target.value as Rule["operator"])}><option value="gt">Greater than</option><option value="gte">At least</option><option value="lt">Less than</option><option value="lte">At most</option></select></label>
-              <label className="field"><span>Threshold ({metricInfo.unit})</span><input type="number" step="any" value={threshold} onChange={(event) => setThreshold(event.target.value)} required /></label>
+              <label className="field"><span>Threshold ({metricInfo.unit})</span><Input type="number" step="any" value={threshold} onChange={(event) => setThreshold(event.target.value)} required /></label>
               <label className="field"><span>Server scope</span><select value={serverId} onChange={(event) => setServerId(event.target.value)}><option value="">All servers</option>{servers.map((server) => <option key={server.id} value={server.id}>{server.name}</option>)}</select></label>
               <label className="field"><span>Project scope</span><select value={projectId} onChange={(event) => setProjectId(event.target.value)}><option value="">All projects</option>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label>
             </div>

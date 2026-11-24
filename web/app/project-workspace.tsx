@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { apiRequest } from "@/lib/client-api";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 type Server = { id: string; name: string; hostname?: string };
 type Project = { id: string; name: string; slug: string; created_at: string };
@@ -173,11 +174,11 @@ export default function ProjectWorkspace({
             <div className="project-form-grid">
               <label className="field">
                 <span>Project name</span>
-                <input value={projectName} onChange={(event) => { setProjectName(event.target.value); setProjectSlug(slugFromName(event.target.value)); }} required minLength={2} maxLength={120} placeholder="Payments API" />
+                <Input value={projectName} onChange={(event) => { setProjectName(event.target.value); setProjectSlug(slugFromName(event.target.value)); }} required minLength={2} maxLength={120} placeholder="Payments API" />
               </label>
               <label className="field">
                 <span>Project slug</span>
-                <input value={projectSlug} onChange={(event) => setProjectSlug(slugFromName(event.target.value))} required minLength={3} maxLength={64} />
+                <Input value={projectSlug} onChange={(event) => setProjectSlug(slugFromName(event.target.value))} required minLength={3} maxLength={64} />
               </label>
             </div>
             <div className="project-form-actions">
@@ -219,7 +220,7 @@ export default function ProjectWorkspace({
                 </select>
               </label>
               <label className="field"><span>Workload selector</span>
-                <input value={workloadSelector} onChange={(event) => setWorkloadSelector(event.target.value)} required maxLength={512} placeholder="payments-api.service" />
+                <Input value={workloadSelector} onChange={(event) => setWorkloadSelector(event.target.value)} required maxLength={512} placeholder="payments-api.service" />
               </label>
             </div>
             <div className="project-form-actions">
