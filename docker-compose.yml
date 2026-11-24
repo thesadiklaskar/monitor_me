@@ -132,6 +132,21 @@ services:
       migrate:
         condition: service_completed_successfully
 
+  grafana-clickhouse-setup:
+    image: ${CLICKHOUSE_IMAGE:-clickhouse/clickhouse-server:26.8.44.3}
+    entrypoint: ["/bin/sh", "/bootstrap-clickhouse-reader.sh"]
+    restart: "no"
+    environment:
+      CLICKHOUSE_DB: monitor_me
+      CLICKHOUSE_USER: monitor_me
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-local_only_change_me}
+      GRAFANA_CLICKHOUSE_PASSWORD: ${GRAFANA_CLICKHOUSE_PASSWORD:-abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789}
+    volumes:
+      - ./deploy/grafana/bootstrap-clickhouse-reader.sh:/bootstrap-clickhouse-reader.sh:ro
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+
   grafana:
     image: ${GRAFANA_IMAGE:-grafana/grafana:13.3.1}
     restart: unless-stopped
@@ -146,8 +161,12 @@ services:
       GF_SECURITY_COOKIE_SAMESITE: "lax"
       GF_ANALYTICS_REPORTING_ENABLED: "false"
       GF_SERVER_ENABLE_GZIP: "true"
+      GF_PLUGINS_PREINSTALL_SYNC: "grafana-clickhouse-datasource@4.23.5"
+      GF_PLUGINS_PREINSTALL_AUTO_UPDATE: "false"
       POSTGRES_DB: ${POSTGRES_DB:-monitor_me}
       GRAFANA_DB_PASSWORD: ${GRAFANA_DB_PASSWORD:-0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef}
+      CLICKHOUSE_DB: monitor_me
+      GRAFANA_CLICKHOUSE_PASSWORD: ${GRAFANA_CLICKHOUSE_PASSWORD:-abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789}
     ports:
       - "127.0.0.1:${GRAFANA_PORT:-3001}:3000"
     volumes:
@@ -155,6 +174,8 @@ services:
       - ./deploy/grafana/provisioning:/etc/grafana/provisioning:ro
     depends_on:
       grafana-db-setup:
+        condition: service_completed_successfully
+      grafana-clickhouse-setup:
         condition: service_completed_successfully
 
   web:
