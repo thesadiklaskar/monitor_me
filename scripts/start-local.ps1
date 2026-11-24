@@ -31,7 +31,14 @@ if (-not (Test-Path $certificate) -or -not (Test-Path $key)) {
 
 docker compose up --build -d
 if ($LASTEXITCODE -ne 0) {
-    throw "Docker Compose failed to start Monitor Me."
+    $composeExitCode = $LASTEXITCODE
+    Write-Host "Docker Compose failed. Recent service state:" -ForegroundColor Red
+    docker compose ps --all
+    Write-Host "Agent artifact builder output:" -ForegroundColor Yellow
+    docker compose logs --no-color --tail=200 agent-artifacts
+    Write-Host "Recent Compose output:" -ForegroundColor Yellow
+    docker compose logs --no-color --tail=100
+    throw "Docker Compose failed to start Monitor Me (exit code $composeExitCode)."
 }
 
 Write-Host "Waiting for the dashboard..."
