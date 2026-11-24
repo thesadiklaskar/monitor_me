@@ -158,7 +158,7 @@ export default function ProjectWorkspace({
       <header className="project-workspace-header">
         <div>
           <button className="detail-back-button" type="button" onClick={onBack}>← Back to servers</button>
-          <div className="eyebrow">Organization workspace</div>
+          <div className="eyebrow">Project and workload mapping</div>
           <h1>Projects and workload mappings</h1>
           <p>Assign Linux cgroup, container or Systemd selectors to projects. Host totals remain separate from mapped workload metrics.</p>
         </div>
@@ -233,7 +233,7 @@ export default function ProjectWorkspace({
       {loading ? (
         <div className="project-empty">Loading projects and workload mappings…</div>
       ) : projects.length === 0 ? (
-        <div className="project-empty">No projects have been created for this organization yet.</div>
+        <div className="project-empty">No projects have been created for this installation yet.</div>
       ) : (
         <div className="project-workspace-grid">
           {projects.map((project) => {
