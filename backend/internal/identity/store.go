@@ -933,6 +933,94 @@ func (s *Store) CreateDashboardPanel(ctx context.Context, principal Principal, d
 	return panel, nil
 }
 
+
+// MoveDashboardPanel updates the persisted ordering of panels within one dashboard.
+// The dashboard row is locked so concurrent reorder requests cannot interleave.
+func (s *Store) MoveDashboardPanel(ctx context.Context, principal Principal, panelID string, position int) error {
+	if !canAdminister(principal.Role) {
+		return ErrForbidden
+	}
+	if !validUUID(panelID) || position < 0 || position > 1000 {
+		return ErrInvalidInput
+	}
+
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin dashboard panel reorder: %w", err)
+	}
+	defer tx.Rollback()
+
+	var dashboardID string
+	var currentPosition int
+	err = tx.QueryRowContext(ctx, `
+		SELECT dashboard_id::text, position
+		FROM dashboard_panels
+		WHERE id = $1 AND organization_id = $2
+		FOR UPDATE
+	`, panelID, principal.OrganizationID).Scan(&dashboardID, &currentPosition)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrNotFound
+	}
+	if err != nil {
+		return fmt.Errorf("load dashboard panel position: %w", err)
+	}
+
+	var panelCount int
+	if err := tx.QueryRowContext(ctx, `
+		SELECT count(*)
+		FROM dashboard_panels
+		WHERE dashboard_id = $1 AND organization_id = $2
+	`, dashboardID, principal.OrganizationID).Scan(&panelCount); err != nil {
+		return fmt.Errorf("count dashboard panels: %w", err)
+	}
+	if position >= panelCount {
+		return ErrInvalidInput
+	}
+	if currentPosition == position {
+		return tx.Commit()
+	}
+
+	// Serialize all order changes for this dashboard, including moves of two
+	// different panels that would otherwise hold different panel row locks.
+	if _, err := tx.ExecContext(ctx, `
+		SELECT id FROM dashboards
+		WHERE id = $1 AND organization_id = $2
+		FOR UPDATE
+	`, dashboardID, principal.OrganizationID); err != nil {
+		return fmt.Errorf("lock dashboard for panel reorder: %w", err)
+	}
+
+	if position < currentPosition {
+		_, err = tx.ExecContext(ctx, `
+			UPDATE dashboard_panels
+			SET position = position + 1, updated_at = now()
+			WHERE dashboard_id = $1 AND organization_id = $2
+			  AND position >= $3 AND position < $4
+		`, dashboardID, principal.OrganizationID, position, currentPosition)
+	} else {
+		_, err = tx.ExecContext(ctx, `
+			UPDATE dashboard_panels
+			SET position = position - 1, updated_at = now()
+			WHERE dashboard_id = $1 AND organization_id = $2
+			  AND position > $3 AND position <= $4
+		`, dashboardID, principal.OrganizationID, currentPosition, position)
+	}
+	if err != nil {
+		return fmt.Errorf("shift dashboard panel positions: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx, `
+		UPDATE dashboard_panels
+		SET position = $3, updated_at = now()
+		WHERE id = $1 AND organization_id = $2
+	`, panelID, principal.OrganizationID, position); err != nil {
+		return fmt.Errorf("save dashboard panel position: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit dashboard panel reorder: %w", err)
+	}
+	return nil
+}
+
 // DeleteDashboardPanel removes a panel only when it belongs to the caller's organization.
 func (s *Store) DeleteDashboardPanel(ctx context.Context, principal Principal, panelID string) error {
 	if !canAdminister(principal.Role) {
