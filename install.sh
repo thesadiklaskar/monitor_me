@@ -216,15 +216,29 @@ rm -f /etc/nginx/conf.d/monitor-me-acme.conf
 nginx -t
 systemctl reload nginx
 
-log "Configuring UFW safely."
-SSH_PORT="$(sshd -T 2>/dev/null | awk '$1 == "port" {print $2; exit}' || true)"
-if [[ -z "$SSH_PORT" ]]; then SSH_PORT=22; fi
-if ufw status 2>/dev/null | grep -q '^Status: active'; then
+log "Checking the active host firewall without enabling competing managers."
+SSH_PORT=22
+if command -v sshd >/dev/null 2>&1; then
+  detected_ssh_port="$(sshd -T 2>/dev/null | awk '$1 == "port" {print $2; exit}' || true)"
+  [[ -z "$detected_ssh_port" ]] || SSH_PORT="$detected_ssh_port"
+fi
+UFW_ACTIVE=false
+FIREWALLD_ACTIVE=false
+if ufw status 2>/dev/null | grep -q '^Status: active'; then UFW_ACTIVE=true; fi
+if command -v firewall-cmd >/dev/null 2>&1 && firewall-cmd --state >/dev/null 2>&1; then FIREWALLD_ACTIVE=true; fi
+if [[ "$UFW_ACTIVE" == true && "$FIREWALLD_ACTIVE" == true ]]; then
+  fail "Both UFW and firewalld are active. Resolve the competing managers manually, then rerun the installer."
+elif [[ "$UFW_ACTIVE" == true ]]; then
   ufw allow 80/tcp
-  log "UFW is already active; deployment will add only required Monitor Me rules."
+  log "UFW is active; Monitor Me firewall rules will be added to UFW."
+elif [[ "$FIREWALLD_ACTIVE" == true ]]; then
+  firewall_zone="$(firewall-cmd --get-default-zone)"
+  firewall-cmd --permanent --zone="$firewall_zone" --add-port=80/tcp
+  firewall-cmd --reload
+  log "firewalld is active; the ACME HTTP challenge rule was added to zone $firewall_zone."
 else
-  printf 'UFW is inactive. It will be enabled with inbound deny, outbound allow and SSH restricted to %s.\n' "$ADMIN_CIDR"
-  read -r -p 'Enable this firewall policy? [Y/n]: ' ENABLE_FIREWALL
+  printf 'No active UFW/firewalld manager found. The installer can enable UFW with inbound deny, outbound allow and SSH restricted to %s.\n' "$ADMIN_CIDR"
+  read -r -p 'Enable UFW with this policy? [Y/n]: ' ENABLE_FIREWALL
   [[ "$ENABLE_FIREWALL" != "n" && "$ENABLE_FIREWALL" != "N" ]] || fail "A host firewall is required before exposing a no-login dashboard."
   ufw default deny incoming
   ufw default allow outgoing
