@@ -4,7 +4,7 @@ This folder contains the Monitor Me operator interface. It is a self-hosted Next
 
 ## Product surface
 
-The navigation is intentionally limited to four areas:
+The navigation is intentionally limited to five areas:
 
 - **Dashboard** — fleet cards for every enrolled machine; select a machine to view its live health, real CPU/core, memory, storage, disk, network and process graphs together with recent host logs.
 - **Logs** — time-bounded search, severity/source filters, event details and paged results.
