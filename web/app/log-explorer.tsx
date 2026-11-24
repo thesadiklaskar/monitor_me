@@ -74,6 +74,7 @@ export default function LogExplorer({
   const [error, setError] = useState("");
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const requestSequence = useRef(0);
+  const pageRequestSequence = useRef(0);
   const queryWindow = useRef<{ from: string; to: string } | null>(null);
 
   const selectedServer = useMemo(
@@ -82,7 +83,11 @@ export default function LogExplorer({
   );
 
   const loadLogs = useCallback(async () => {
+    pageRequestSequence.current += 1;
+    setLoadingMore(false);
     if (!serverId) {
+      queryWindow.current = null;
+      setHasMore(false);
       setEvents([]);
       setError("Add a machine before searching its logs.");
       setLoading(false);
@@ -132,6 +137,7 @@ export default function LogExplorer({
     return () => {
       window.clearTimeout(initial);
       requestSequence.current += 1;
+      pageRequestSequence.current += 1;
     };
   }, [loadLogs]);
 
@@ -150,6 +156,7 @@ export default function LogExplorer({
       return;
     }
 
+    const pageRequestId = ++pageRequestSequence.current;
     setLoadingMore(true);
     setError("");
     const query = new URLSearchParams({
@@ -168,6 +175,7 @@ export default function LogExplorer({
       const response = await apiRequest<LogResponse>(
         "/api/servers/" + encodeURIComponent(serverId) + "/logs?" + query.toString(),
       );
+      if (pageRequestId !== pageRequestSequence.current) return;
       if (!response || !Array.isArray(response.events)) {
         throw new Error("Older log page returned an invalid response.");
       }
@@ -177,9 +185,11 @@ export default function LogExplorer({
       });
       setHasMore(response.has_more === true);
     } catch (pageError) {
-      setError(pageError instanceof Error ? pageError.message : "Older log events could not be loaded.");
+      if (pageRequestId === pageRequestSequence.current) {
+        setError(pageError instanceof Error ? pageError.message : "Older log events could not be loaded.");
+      }
     } finally {
-      setLoadingMore(false);
+      if (pageRequestId === pageRequestSequence.current) setLoadingMore(false);
     }
   }, [serverId, events, hasMore, loadingMore, applied]);
 
