@@ -23,6 +23,16 @@ if [[ ! -s .data/certs/server.crt || ! -s .data/certs/server.key ]]; then
 fi
 
 docker compose up --build -d
+compose_exit_code=$?
+if [[ "$compose_exit_code" -ne 0 ]]; then
+  echo "Docker Compose failed. Recent service state:" >&2
+  docker compose ps --all >&2 || true
+  echo "Agent artifact builder output:" >&2
+  docker compose logs --no-color --tail=200 agent-artifacts >&2 || true
+  echo "Recent Compose output:" >&2
+  docker compose logs --no-color --tail=100 >&2 || true
+  exit "$compose_exit_code"
+fi
 echo "Waiting for the dashboard..."
 for _ in $(seq 1 40); do
   if curl -fsS http://localhost:3000/api/config >/dev/null; then
