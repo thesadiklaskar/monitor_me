@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/shirou/gopsutil/v4/disk"
 	"github.com/shirou/gopsutil/v4/host"
 )
 
@@ -201,6 +202,39 @@ func (c *ProcCollector) Collect(ctx context.Context) ([]Sample, error) {
 			}
 		}
 		c.previousDisk = current
+	}
+
+
+	// Filesystem capacity is collected per mounted volume so dashboards can
+	// distinguish physical capacity from block-device throughput. Pseudo
+	// filesystems and inaccessible mounts are omitted rather than reported as 0.
+	if partitions, partitionErr := disk.PartitionsWithContext(ctx, false); partitionErr == nil {
+		seenMounts := make(map[string]struct{}, len(partitions))
+		for _, partition := range partitions {
+			mountpoint := strings.TrimSpace(partition.Mountpoint)
+			if mountpoint == "" {
+				continue
+			}
+			mountKey := filepath.Clean(mountpoint)
+			if _, exists := seenMounts[mountKey]; exists {
+				continue
+			}
+			seenMounts[mountKey] = struct{}{}
+
+			usage, usageErr := disk.UsageWithContext(ctx, mountpoint)
+			if usageErr != nil || usage == nil || usage.Total == 0 {
+				continue
+			}
+			labels := map[string]string{
+				"mountpoint": mountpoint,
+				"device":     partition.Device,
+				"fstype":     partition.Fstype,
+			}
+			add("host.disk.total.bytes", float64(usage.Total), "bytes", labels)
+			add("host.disk.used.bytes", float64(usage.Used), "bytes", labels)
+			add("host.disk.available.bytes", float64(usage.Free), "bytes", labels)
+			add("host.disk.used.percent", usage.UsedPercent, "percent", labels)
+		}
 	}
 
 	networkRaw, err := os.ReadFile(filepath.Join(c.root, "net/dev"))
