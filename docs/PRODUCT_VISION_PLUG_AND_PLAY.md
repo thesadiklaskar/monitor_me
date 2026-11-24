@@ -16,7 +16,7 @@ The operator must not need to create a user, sign in, create an organization, ch
 - One installation command per supported control-plane OS. The installer detects Linux distribution/architecture, checks Docker Engine and Compose v2, creates strong per-install secrets and a local TLS identity, writes a private .env, starts the supported Compose profile, waits for database migrations and readiness, and prints/opens the dashboard URL.
 - Provide a first-run path for a local install and a public/VPS install. Local installs remain loopback-only by default. Public installs require HTTPS and an explicit, safe operator-network policy.
 - Preserve existing data when upgrading. Never delete Compose volumes, reset the database, or overwrite operator secrets as part of an upgrade.
-- Create one installation identity and one implicit workspace automatically. Organization membership, user administration, signup and login are not operator workflows in the default single-install product. Internal database tenancy keys may remain for migration and future multi-tenancy, but must be invisible in the operator UI.
+- Create one installation metadata record automatically. There is no hosted control plane, SaaS tenant, login/signup, customer profile, user administration, company/organization membership, organization selector, or organization-based API workflow. The target schema removes legacy users, organizations, organization_memberships, user_sessions, user actor references, and organization_id columns, filters, and foreign keys. Existing installations require an explicit, tested forward migration that preserves customer data; never drop records or Compose volumes to achieve the new schema.
 
 ### Monitored-node bootstrap
 
@@ -30,7 +30,7 @@ The operator must not need to create a user, sign in, create an organization, ch
 ### No-login single-install access
 
 - Do not show login, signup, create-organization or user-management screens in the default single-install UI.
-- The implicit workspace and generated installation identity are created automatically at first boot.
+- The installation descriptor is generated automatically at first boot; it is not a user, profile, organization, or hosted tenant.
 - No-login is a network access mode, not a claim that an internet-facing dashboard is safe. The local profile binds to loopback. A remote profile must use HTTPS and restrict operator UI access to an explicitly configured private/VPN/admin network. The public agent enrollment endpoint is separate and accepts only short-lived single-use enrollment tokens and established agent sessions.
 - Keep PostgreSQL, Redis, ClickHouse, internal API and internal web ports private. Never publish data-store ports.
 - Do not automatically alter cloud security groups or network ACLs without provider IAM credentials and an explicit policy. Host firewall automation must be idempotent, source-aware, additive by default, verified and reversible. Agent-only hosts require outbound connectivity only.
@@ -104,3 +104,12 @@ ClickHouse is installed in the Compose profiles and an initial MergeTree schema 
 5. Implement ClickHouse-backed durable log ingestion, native Linux/Windows log collection, indexing, filtering, live tail, retention and backup.
 6. Replace the prototype dashboard shell with the complete monitoring-console design and a virtualized Log Explorer.
 7. Run fault-injection, security, cross-platform and sustained load tests. Do not claim Grafana replacement or million-log reliability until gates pass.
+
+
+## Strict single-install architecture clarification — 2026-11-24
+
+This clarification supersedes any earlier wording that allowed organization tenancy keys to remain indefinitely as an invisible implementation detail. One installation is one owner's isolated product boundary and datastore. Monitor Me is not a hosted service and does not ask an operator to create a customer profile, user, company, organization, or workspace. Servers, metrics, logs, dashboards, alerts and operations belong directly to that installation. Optional grouping may exist only as a non-security label, never as a tenant or access-control boundary.
+
+The current source still contains legacy user/organization tables and organization_id query, key and foreign-key paths because the original relational schema and dependent resource tables rely on them. These are migration debt, not an accepted final design. Removal requires a numbered forward migration covering every dependent table, index, query, API payload, test fixture and retention path. It must preserve existing servers, agent identities, metric history, alert history, dashboards, audit rows and log idempotency records. It must stop safely on ambiguous legacy data instead of silently selecting an organization or deleting records. Do not use destructive volume resets as a migration strategy.
+
+A move to a different GitHub owner or repository name must not require source edits. Go module paths are stable internal import namespaces, not published repository URLs. Artifact origins, release channels and public download bases must be operator-configurable; source must not bake in a personal account, repository URL, deployment hostname or example customer URL.
