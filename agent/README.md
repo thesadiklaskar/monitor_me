@@ -4,7 +4,7 @@ The native Go agent runs directly on each monitored host. Linux host collection 
 
 ## Current implementation
 
-- Foreground process with JSON structured logs, environment validation, and signal-aware shutdown.
+- Foreground mode for development and native systemd/Windows Service lifecycle support for managed installation, with JSON structured logs, environment validation, and graceful stop handling.
 - Configurable 100ms–1m collection interval (500ms default).
 - Linux procfs aggregate/per-core CPU, memory, swap, disk throughput/IOPS, network throughput/packets/errors, uptime, process count, and up to 128 readable processes by RSS.
 - Initial Windows collector using native operating-system counters through gopsutil: aggregate/per-core CPU, memory and swap, mounted-volume capacity and usage, disk throughput/IOPS, network throughput/packets/errors, uptime, host identity/version, process count, and up to 128 readable processes by RSS.
@@ -14,9 +14,9 @@ The native Go agent runs directly on each monitored host. Linux host collection 
 - Bounded append-only JSONL spool, fsync on append, private 0700 directory/0600 WAL file, quota enforcement, recovery of a truncated final record, and atomic acknowledgement compaction.
 - Optional TLS gRPC enrollment, persisted session credentials, heartbeat, reconnect/backoff, and local batch delivery. A batch is removed from the WAL only after the backend reports a durable commit.
 - Agent-health telemetry includes process CPU utilization, collector errors per interval, persistent WAL byte size and unacknowledged batch depth. Last successful send is omitted until a matching durable ACK has been received.
-- A hardened Linux systemd unit is provided at `agent/deploy/systemd/monitor-me-agent.service`; the monitored machine needs systemd but does not need Docker.
+- A hardened Linux systemd unit is provided at `agent/deploy/systemd/monitor-me-agent.service`; the downloadable Linux installer creates the service. The Windows build includes a Service Control Manager entry point and a restart-enabled PowerShell installer. Monitored machines do not need Docker.
 
-macOS and other unsupported operating systems currently report only agent health/spool capabilities. Windows does not currently expose Linux TCP-state/listening-port inventory, cgroup/Systemd workload attribution, or per-process CPU through this collector. Windows Service lifecycle code and a target-side Windows Service installer are now present, but they have not yet passed runtime acceptance or publisher code-signing.
+macOS and other unsupported operating systems currently report only agent health/spool capabilities. Windows does not currently expose Linux TCP-state/listening-port inventory, cgroup/Systemd workload attribution, or per-process CPU through this collector. Windows Service lifecycle code and target-side Windows Service installer are now present. They still require runtime acceptance on supported Windows releases and publisher code-signing; Windows TCP/listening-port inventory and workload attribution are unsupported.
 
 ## Build and test
 
