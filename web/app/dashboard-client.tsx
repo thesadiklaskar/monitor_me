@@ -262,10 +262,13 @@ function EnrollmentDialog({
   }
 
   async function copySetupCommand(platform: "windows" | "linux") {
+    const baseUrl = window.location.origin;
     const endpoint = grpcAddress || "localhost:8443";
+    const quotePowerShell = (value: string) => "'" + value.replace(/'/g, "''") + "'";
+    const quoteShell = (value: string) => "'" + value.replace(/'/g, "'\\''") + "'";
     const command = platform === "windows"
-      ? `.\\scripts\\setup-windows-agent.ps1 -GrpcAddress ${endpoint}`
-      : `sudo ./scripts/setup-linux-agent.sh --grpc-address ${endpoint}`;
+      ? "& ([scriptblock]::Create((Invoke-RestMethod -Uri " + quotePowerShell(baseUrl + "/install/agent-windows.ps1") + "))) -ServerUrl " + quotePowerShell(baseUrl) + " -GrpcAddress " + quotePowerShell(endpoint)
+      : "curl -fsSL " + quoteShell(baseUrl + "/install/agent-linux.sh") + " | sudo bash -s -- --server-url " + quoteShell(baseUrl) + " --grpc-address " + quoteShell(endpoint);
     try {
       await navigator.clipboard.writeText(command);
       setCommandCopied(platform);
@@ -320,26 +323,26 @@ function EnrollmentDialog({
           </div>
           <p>Agent endpoint: <code>{grpcAddress || "localhost:8443"}</code></p>
           <div className="install-platform-block">
-            <strong>Windows · PowerShell</strong>
+            <strong>Windows · PowerShell (Administrator)</strong>
             <div className="install-command-wrap">
               <div className="install-command-row">
-                <code className="install-command">.\scripts\setup-windows-agent.ps1 -GrpcAddress {grpcAddress || "localhost:8443"}</code>
-                <button className="button button-table" type="button" onClick={() => void copySetupCommand("windows")}>{commandCopied === "windows" ? "Copied" : "Copy"}</button>
+                <code className="install-command">PowerShell bootstrap · detects Windows x64, verifies SHA-256, installs and starts the Windows Service</code>
+                <button className="button button-table" type="button" onClick={() => void copySetupCommand("windows")}>{commandCopied === "windows" ? "Copied" : "Copy one command"}</button>
               </div>
             </div>
-            <p>Run on the Windows target from a Monitor Me checkout. It builds the native Windows agent with Docker when absent and securely prompts for the one-time token. Use <code>-CaFile</code> when a remote control plane uses a separate trusted CA.</p>
+            <p>Run in an elevated PowerShell session on the Windows target. It detects the host, downloads the matching native agent, verifies SHA-256, installs a restart-enabled Windows Service and securely prompts for the one-time token.</p>
           </div>
           <div className="install-platform-block">
             <strong>Linux · Shell</strong>
             <div className="install-command-wrap">
               <div className="install-command-row">
-                <code className="install-command">sudo ./scripts/setup-linux-agent.sh --grpc-address {grpcAddress || "localhost:8443"}</code>
-                <button className="button button-table" type="button" onClick={() => void copySetupCommand("linux")}>{commandCopied === "linux" ? "Copied" : "Copy"}</button>
+                <code className="install-command">Shell bootstrap · detects Linux architecture, verifies SHA-256, installs and starts systemd</code>
+                <button className="button button-table" type="button" onClick={() => void copySetupCommand("linux")}>{commandCopied === "linux" ? "Copied" : "Copy one command"}</button>
               </div>
             </div>
             <p>Run on a systemd Linux target from a Monitor Me checkout. It builds the native agent, installs and starts the systemd service, then removes the one-time token after enrollment.</p>
           </div>
-          <p className="install-note">These are two shell launchers, not an OS choice saved in Monitor Me. The native agent reports the actual host OS and available VM/VPS metadata. Remote hosts must reach the advertised gRPC endpoint; <code>localhost</code> only works when the agent and control plane share a host. Source-checkout installers are an interim step before signed downloadable installers.</p>
+          <p className="install-note">Use the command for the shell available on the target machine; the installer itself detects that machine's OS and architecture. It downloads binaries and the public CA over the control-plane endpoint. Remote hosts must reach the advertised gRPC address; <code>localhost</code> only works when the agent and control plane share a host. The downloaded binaries are checksum-verified, but are not yet code-signed; OS publisher-signature verification remains a release gate.</p>
         </div>
 
         {error && <div className="notice notice-error" role="alert">{error}</div>}
