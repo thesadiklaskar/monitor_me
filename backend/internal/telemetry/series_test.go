@@ -8,13 +8,18 @@ import (
 func TestValidateRangeQueryBounds(t *testing.T) {
 	now := time.Now().UTC()
 	base := RangeQuery{
-		OrganizationID: "org", ServerID: "server", MetricName: "host.cpu.total",
+		OrganizationID: "org", ServerID: "2b6a8d10-9b4d-4e40-9a9c-0c8fc3af3b7f", MetricName: "host.cpu.total",
 		From: now.Add(-time.Hour), To: now, Step: time.Second, Limit: 5000,
 	}
 	if err := ValidateRangeQuery(base, now); err != nil {
 		t.Fatalf("valid range should pass: %v", err)
 	}
 	invalid := base
+	invalid.ServerID = "not-a-uuid"
+	if err := ValidateRangeQuery(invalid, now); err == nil {
+		t.Fatal("invalid server ID must be rejected")
+	}
+	invalid = base
 	invalid.Step = time.Millisecond
 	if err := ValidateRangeQuery(invalid, now); err == nil {
 		t.Fatal("sub-100ms aggregation step must be rejected")
