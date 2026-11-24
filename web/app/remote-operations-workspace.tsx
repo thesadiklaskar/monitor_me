@@ -159,7 +159,7 @@ export default function RemoteOperationsWorkspace({ servers, role, onBack }: {
             <p className="operations-help">The server must be online with a recent authenticated heartbeat. Commands expire after 60 seconds if the agent does not receive them.</p>
           )}
           <div className="operations-form-footer">
-            <span>Available only to organization owners and administrators.</span>
+            <span>Available to the installation operator and restricted by the server-operation allowlist.</span>
             <button className="button button-primary" type="submit" disabled={busy || !selectedServer || allowedTargets.length === 0 || allowedOperations.length === 0}>
               {busy ? "Queueing…" : "Queue operation"}
             </button>
@@ -168,7 +168,7 @@ export default function RemoteOperationsWorkspace({ servers, role, onBack }: {
       ) : <div className="notice notice-warning">Your role has read-only access to remote operation history.</div>}
 
       <section className="operations-list-card">
-        <div className="panel-heading"><div><h2>Recent operations</h2><p>Latest 100 organization-scoped commands</p></div></div>
+        <div className="panel-heading"><div><h2>Recent operations</h2><p>Latest 100 commands for this installation</p></div></div>
         {loading ? <div className="project-empty">Loading operation history…</div> : operations.length === 0 ? (
           <div className="project-empty">No remote operations have been queued.</div>
         ) : operations.map((item) => (
