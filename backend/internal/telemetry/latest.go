@@ -17,7 +17,6 @@ const (
 type LatestQuery struct {
 	OrganizationID string
 	ServerID       string
-	ProjectID      string
 }
 
 type LatestSample struct {
@@ -25,16 +24,12 @@ type LatestSample struct {
 	Value      float64           `json:"value"`
 	Unit       string            `json:"unit"`
 	Labels     map[string]string `json:"labels,omitempty"`
-	ProjectID  string            `json:"project_id,omitempty"`
 	ObservedAt time.Time         `json:"observed_at"`
 }
 
 func ValidateLatestQuery(query LatestQuery) error {
 	if query.OrganizationID == "" || !seriesUUID.MatchString(query.ServerID) {
 		return errors.New("organization and valid server ID are required")
-	}
-	if query.ProjectID != "" && !seriesUUID.MatchString(query.ProjectID) {
-		return errors.New("project ID must be a valid UUID")
 	}
 	return nil
 }
@@ -47,16 +42,15 @@ func QueryLatest(ctx context.Context, db *sql.DB, query LatestQuery) ([]LatestSa
 	}
 	rows, err := db.QueryContext(ctx, `
 		SELECT DISTINCT ON (metric_name, labels)
-			metric_name, value, unit, labels, COALESCE(project_id::text, ''), observed_at
+			metric_name, value, unit, labels, observed_at
 		FROM telemetry_samples
 		WHERE organization_id = $1
 		  AND server_id = $2
 		  AND observed_at >= now() - $3::interval
-		  AND ($4::uuid IS NULL OR project_id = $4::uuid)
 		ORDER BY metric_name, labels, observed_at DESC
 		LIMIT $5
 	`, query.OrganizationID, query.ServerID, fmt.Sprintf("%d seconds", int(latestMetricWindow.Seconds())),
-		nullableProjectID(query.ProjectID), latestMetricLimit)
+		latestMetricLimit)
 	if err != nil {
 		return nil, fmt.Errorf("query latest telemetry inventory: %w", err)
 	}
@@ -66,7 +60,7 @@ func QueryLatest(ctx context.Context, db *sql.DB, query LatestQuery) ([]LatestSa
 	for rows.Next() {
 		var sample LatestSample
 		var labelsJSON []byte
-		if err := rows.Scan(&sample.MetricName, &sample.Value, &sample.Unit, &labelsJSON, &sample.ProjectID, &sample.ObservedAt); err != nil {
+		if err := rows.Scan(&sample.MetricName, &sample.Value, &sample.Unit, &labelsJSON, &sample.ObservedAt); err != nil {
 			return nil, fmt.Errorf("scan latest telemetry inventory: %w", err)
 		}
 		if len(labelsJSON) > 0 {
