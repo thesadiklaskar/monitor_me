@@ -20,7 +20,7 @@ This file is the authoritative resume point for Monitor Me. Read it before makin
 | Implementation status | One self-hosted installation per owner is the target; no hosted SaaS, login, customer profile, organization, workspace or project workflow. The browser shell has no login. SQL tables, FKs and backend query paths still retain legacy users/organizations/organization_id plus project tables/project_id filters and need safe data-preserving forward migrations. Linux metrics and journald → bounded spool → TLS gRPC → ClickHouse search exist. Windows Application/System Event Log source exists but Windows runtime acceptance is pending; arbitrary file/syslog tail is missing. Log Explorer polls every 10 seconds; native push/replay is not implemented. Linux amd64/arm64 and Windows amd64 agent builds are targeted, but clean-host acceptance is pending; macOS logs are explicitly unsupported. Startup scripts check main/origin, dirty tree, Compose config, build images before start, start with --no-build and verify readiness. Backend Docker build no longer runs go mod tidy, builds only shipped binaries with -mod=mod, creates /out, and uses Go HTTP/1.1 transport with checksum verification still enabled. backend/go.sum and web/package-lock.json are absent and must be committed for reproducible builds. Go import namespace and installer sample-host cleanup were completed; source portability does not yet equal release certification. |
 | Last source commit covered by latest successful CI run | 9685e115113123d5f9f8e8a1b222804752f5a283 (Go, frontend and native-agent jobs passed in run #45203706343; Compose integration failed at the web proxy login probe; later commits are not covered) |
 | Latest CI run | #597 — all four jobs failed before any step with runner_id 0 and zero steps; no build/test command ran. No fresh green CI evidence; runner allocation cause remains unknown |
-| Latest source commit | `90e5dd70289870ca7b2f23f1b07986e8ec8d8006` — dark slate/teal UI, full-word Servers/Logs/Dashboards/Alerts navigation, larger readable menu/table typography and static self-hosted installation label. Project/remote-operation workspace components and browser API proxy routes were removed; project_id filters were removed from browser metric/log proxies and UI DTOs. Product contract, backlog, README, acceptance matrix, requirements and readiness audit now document monitoring-only scope. Frontend build/browser and agent OS runtime tests remain pending |
+| Latest source commit | `37ce9e254e4005265ed9282504b7d68e103219d1` — dark slate/teal UI, readable full-word Servers/Logs/Dashboards/Alerts navigation, project/remote-operation frontend surfaces and proxy routes removed, project_id removed from browser proxy filters/UI DTOs, unused login/profile CSS removed, host-detail organization field removed. Product contract, backlog, README, acceptance matrix, requirements and readiness audit document monitoring-only scope. Frontend build/browser and agent OS runtime tests remain pending |
 | Next action | Owner Windows checkout: run `git pull --ff-only origin main`, verify the local hash matches `origin/main`, then run `scripts/start-local.ps1`. Confirm the backend slugPattern compile fix and simplified web build. Review Servers / Logs / Dashboards / Alerts at desktop and mobile widths. Do not run `docker compose down -v`; keep existing data. |
 
 
@@ -396,7 +396,7 @@ Phase 1 and Phase 2 implementation/verification history is recorded above. The f
 
 ## Monitoring-only frontend and API cleanup — 2026-11-24
 
-**Source commit before this state update:** `90e5dd70289870ca7b2f23f1b07986e8ec8d8006`.
+**Initial source commit for this cleanup series:** `90e5dd70289870ca7b2f23f1b07986e8ec8d8006`; follow-up CSS/DTO cleanup through `37ce9e254e4005265ed9282504b7d68e103219d1`.
 
 - [x] Deleted the unmounted `ProjectWorkspace` component and the unused Next.js project/project-mapping API proxies.
 - [x] Removed `project_id` forwarding from browser metric and log proxies; host detail metric response types no longer expose project IDs.
@@ -407,4 +407,6 @@ Phase 1 and Phase 2 implementation/verification history is recorded above. The f
 - [ ] No fresh build, frontend lint/TypeScript/Next build, browser screenshot acceptance or OS runtime test has run after the changes.
 
 **Target UI contract:** four areas only — Servers, Logs, Dashboards, Alerts. This is a monitoring-only interface, not a remote administration console.
+
+- `254518d`: removed unused login/signup and user-profile CSS; `999e6b7` restored sidebar-brand flex alignment after the cleanup; `37ce9e2` removed the leftover organization_id field from the host-detail frontend response model.
 
