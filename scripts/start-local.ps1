@@ -79,7 +79,7 @@ function Assert-CurrentSource {
         $sourceChanges = @()
         foreach ($entry in $dirtyFiles) {
             if ([string]::IsNullOrWhiteSpace($entry) -or $entry.Length -lt 4) { continue }
-            $path = $entry.Substring(3).Trim().Replace("\\", "/")
+            $path = $entry.Substring(3).Trim().Replace('\', '/')
             if ($generatedPaths -contains $path) {
                 $generatedChanges += $path
             } else {
