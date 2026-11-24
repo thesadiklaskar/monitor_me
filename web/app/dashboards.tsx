@@ -379,7 +379,8 @@ export default function DashboardsView({ servers }: { servers: Server[] }) {
       const range = rangeOverride === "panel" ? panel.time_range : rangeOverride;
       const serverId = serverFilter === "all" ? panel.server_id : serverFilter;
       const duration = rangeMilliseconds[range];
-      const from = new Date(now - duration).toISOString();
+      const effectiveDuration = panel.visualization === "logs" ? Math.min(duration, 7 * 24 * 60 * 60 * 1000) : duration;
+      const from = new Date(now - effectiveDuration).toISOString();
       const to = new Date(now).toISOString();
       if (panel.visualization === "logs") {
         const query = new URLSearchParams({ from, to, limit: "201" });
@@ -468,7 +469,7 @@ export default function DashboardsView({ servers }: { servers: Server[] }) {
     }
     const metric = metricCatalog.find((item) => item.value === panelMetric);
     const body = {
-      title: panelTitle.trim() || metric?.label || panelMetric,
+      title: panelTitle.trim() || (panelVisualization === "logs" ? "Host logs" : metric?.label || panelMetric),
       visualization: panelVisualization,
       server_id: panelServerId,
       metric_name: panelVisualization === "logs" ? "host.logs.events" : panelMetric,
@@ -679,7 +680,7 @@ export default function DashboardsView({ servers }: { servers: Server[] }) {
                         <CardHeader className="dashboard-panel-heading dashboard-panel-heading-v2">
                           <div className="dashboard-panel-title">
                             <div className="dashboard-panel-title-line"><span className="dashboard-panel-grip" title="Drag to reorder"><GripVertical size={16} /></span><CardTitle>{panel.title}</CardTitle></div>
-                            <CardDescription>{selectedServerName} · {rangeLabels[effectiveRange]} · {panel.visualization === "logs" ? "Host log events" : metricCatalog.find((metric) => metric.value === panel.metric_name)?.label ?? panel.metric_name}</CardDescription>
+                            <CardDescription>{selectedServerName} · {panel.visualization === "logs" && effectiveRange === "30d" ? "Last 7 days (log limit)" : rangeLabels[effectiveRange]} · {panel.visualization === "logs" ? "Host log events" : metricCatalog.find((metric) => metric.value === panel.metric_name)?.label ?? panel.metric_name}</CardDescription>
                           </div>
                           <div className="dashboard-panel-actions dashboard-panel-actions-v2">
                             <Badge variant="secondary">{panel.visualization}</Badge>
