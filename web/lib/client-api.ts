@@ -22,7 +22,7 @@ export async function apiRequest<T>(
 ): Promise<T> {
   const response = await fetch(path, {
     ...init,
-    credentials: "same-origin",
+    credentials: "omit",
     cache: "no-store",
     headers: {
       Accept: "application/json",
