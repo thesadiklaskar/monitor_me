@@ -5,8 +5,8 @@ SERVER_URL=""
 GRPC_ADDRESS=""
 while [ "$#" -gt 0 ]; do
   case "$1" in
-    --server-url) SERVER_URL="\${2:?Missing --server-url value}"; shift 2 ;;
-    --grpc-address) GRPC_ADDRESS="\${2:?Missing --grpc-address value}"; shift 2 ;;
+    --server-url) SERVER_URL="$2"; shift 2 ;;
+    --grpc-address) GRPC_ADDRESS="$2"; shift 2 ;;
     -h|--help)
       echo "Monitor Me native Linux installer"
       echo "Usage: curl -fsSL https://monitor.example/install/agent-linux.sh | sudo bash -s -- --server-url https://monitor.example --grpc-address monitor.example:8443"
@@ -42,10 +42,10 @@ command -v systemctl >/dev/null 2>&1 || { echo "This installer requires systemd.
 command -v curl >/dev/null 2>&1 || { echo "curl is required." >&2; exit 2; }
 command -v sha256sum >/dev/null 2>&1 || { echo "sha256sum is required." >&2; exit 2; }
 
-SERVER_URL="\${SERVER_URL%/}"
+SERVER_URL="$(printf '%s' "$SERVER_URL" | sed 's#/$##')"
 if [ -z "$GRPC_ADDRESS" ]; then
   authority="$(printf '%s' "$SERVER_URL" | sed 's#^[A-Za-z]*://##' | cut -d/ -f1)"
-  host="\${authority%%:*}"
+  host="$(printf '%s' "$authority" | cut -d: -f1)"
   GRPC_ADDRESS="$host:8443"
 fi
 
