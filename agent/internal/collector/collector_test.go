@@ -107,6 +107,21 @@ func TestProcCollectorCollectsFixture(t *testing.T) {
 	if !foundMemory {
 		t.Fatal("expected the documented memory-used gauge")
 	}
+	foundHostInfo := false
+	for _, sample := range samples {
+		if sample.Name == "host.info" {
+			foundHostInfo = true
+			if sample.Labels["os"] != "linux" {
+				t.Errorf("host.info os label = %q, want linux", sample.Labels["os"])
+			}
+			if sample.Labels["environment_type"] == "" {
+				t.Error("host.info must include an environment_type classification")
+			}
+		}
+	}
+	if !foundHostInfo {
+		t.Fatal("expected Linux host system and virtualization metadata")
+	}
 	foundWorkload := false
 	for _, sample := range samples {
 		if sample.Name == "process.memory.rss" &&
