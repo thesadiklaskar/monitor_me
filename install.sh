@@ -1,0 +1,187 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+umask 077
+ROOT="$(cd -- "$(dirname -- "$0")" && pwd)"
+PROD="$ROOT/deploy/production"
+ENV_FILE="$ROOT/.env.production"
+CERT_DIR="/var/lib/monitor-me/certs"
+NGINX_SITE="/etc/nginx/conf.d/monitor-me.conf"
+NGINX_ACCESS="/etc/nginx/snippets/monitor-me-admin-allowlist.conf"
+log() { printf '\n[monitor-me] %s\n' "$*"; }
+fail() { printf '\n[monitor-me] ERROR: %s\n' "$*" >&2; exit 1; }
+prompt() {
+  local label="$1" default="$2" answer
+  if [[ -n "$default" ]]; then
+    read -r -p "$label [$default]: " answer
+    if [[ -z "$answer" ]]; then answer="$default"; fi
+  else
+    read -r -p "$label: " answer
+  fi
+  printf '%s' "$answer"
+}
+valid_domain() { [[ "$1" =~ ^([A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,63}$ ]]; }
+valid_cidr() {
+  python3 - "$1" <<'PYTHON'
+import ipaddress, sys
+try:
+    net = ipaddress.ip_network(sys.argv[1], strict=False)
+    if net.prefixlen == 0:
+        raise ValueError("unrestricted network")
+except ValueError as error:
+    print(error, file=sys.stderr)
+    raise SystemExit(1)
+PYTHON
+}
+[[ "$EUID" -eq 0 ]] || fail "Run with sudo: sudo ./install.sh"
+[[ -f "$PROD/compose.yml" && -f "$PROD/deploy.sh" ]] || fail "Run from the root of a complete Monitor Me checkout."
+[[ -f /etc/os-release ]] || fail "Cannot identify this Linux distribution."
+. /etc/os-release
+case "$ID" in ubuntu|debian) ;; *) fail "Automated control-plane installation currently supports Ubuntu/Debian only." ;; esac
+[[ "$(uname -m)" == "x86_64" ]] || fail "Production control plane currently targets Linux x86-64."
+
+log "Installing Docker, Compose, Nginx, Certbot, UFW and utilities."
+export DEBIAN_FRONTEND=noninteractive
+apt-get update
+apt-get install -y ca-certificates curl openssl python3 nginx certbot ufw docker.io
+if ! docker compose version >/dev/null 2>&1; then
+  apt-get install -y docker-compose-v2 || apt-get install -y docker-compose-plugin || fail "Docker Compose v2 could not be installed."
+fi
+systemctl enable --now docker nginx
+docker compose version >/dev/null 2>&1 || fail "Docker Compose v2 is unavailable."
+
+PUBLIC_IPV4="$(curl -4 --connect-timeout 5 --max-time 12 -fsS https://api.ipify.org 2>/dev/null || true)"
+SSH_CLIENT_VALUE="$(printenv SSH_CLIENT 2>/dev/null || true)"
+SSH_CLIENT_IP="$(printf '%s\n' "$SSH_CLIENT_VALUE" | awk '{print $1}')"
+if [[ -z "$SSH_CLIENT_IP" ]]; then SSH_CLIENT_IP="$PUBLIC_IPV4"; fi
+DEFAULT_ADMIN=""
+if [[ -n "$SSH_CLIENT_IP" ]]; then
+  if [[ "$SSH_CLIENT_IP" == *:* ]]; then DEFAULT_ADMIN="$SSH_CLIENT_IP/128"; else DEFAULT_ADMIN="$SSH_CLIENT_IP/32"; fi
+fi
+
+if [[ -f "$ENV_FILE" ]]; then
+  log "Existing .env.production found; preserving its secrets."
+  PUBLIC_HOSTNAME="$(sed -n 's/^PUBLIC_HOSTNAME=//p' "$ENV_FILE" | tail -n 1 | tr -d '"' | tr -d '\r')"
+  ADMIN_CIDR="$(sed -n 's/^ADMIN_CIDR=//p' "$ENV_FILE" | tail -n 1 | tr -d '"' | tr -d '\r')"
+  LE_EMAIL="$(sed -n 's/^LE_EMAIL=//p' "$ENV_FILE" | tail -n 1 | tr -d '"' | tr -d '\r')"
+  [[ -n "$PUBLIC_HOSTNAME" && -n "$ADMIN_CIDR" ]] || fail "Existing .env.production must define PUBLIC_HOSTNAME and ADMIN_CIDR."
+else
+  printf '\nA DNS hostname with an A record pointing to this VPS is required for trusted HTTPS.\n'
+  printf 'The dashboard has no login and will be restricted to the administrator CIDR.\n\n'
+  PUBLIC_HOSTNAME="$(prompt 'Public DNS hostname (example monitor.example.com)' '')"
+  valid_domain "$PUBLIC_HOSTNAME" || fail "Enter a valid fully-qualified DNS hostname."
+  ADMIN_CIDR="$(prompt 'Administrator public IP/CIDR' "$DEFAULT_ADMIN")"
+  valid_cidr "$ADMIN_CIDR" || fail "ADMIN_CIDR must be a specific IPv4/IPv6 CIDR, not a default route."
+  LE_EMAIL="$(prompt 'Email for TLS certificate expiry notices' '')"
+  [[ "$LE_EMAIL" == *@*.* ]] || fail "Enter a valid email address."
+  if [[ -n "$PUBLIC_IPV4" ]]; then
+    RESOLVED_IPV4="$(getent ahostsv4 "$PUBLIC_HOSTNAME" | awk 'NR==1 {print $1}' || true)"
+    [[ -n "$RESOLVED_IPV4" ]] || fail "DNS for $PUBLIC_HOSTNAME does not resolve. Add an A record pointing to $PUBLIC_IPV4."
+    [[ "$RESOLVED_IPV4" == "$PUBLIC_IPV4" ]] || fail "$PUBLIC_HOSTNAME resolves to $RESOLVED_IPV4, not $PUBLIC_IPV4."
+  fi
+  POSTGRES_PASSWORD="$(openssl rand -hex 32)"
+  REDIS_PASSWORD="$(openssl rand -hex 32)"
+  CLICKHOUSE_PASSWORD="$(openssl rand -hex 32)"
+  CERT_GROUP_ID="$(getent group monitor-me-cert | cut -d: -f3 || true)"
+  if [[ -z "$CERT_GROUP_ID" ]]; then
+    CERT_GROUP_ID=15001
+    while getent group "$CERT_GROUP_ID" >/dev/null 2>&1; do CERT_GROUP_ID=$((CERT_GROUP_ID + 1)); done
+  fi
+  cat > "$ENV_FILE" <<ENV
+MONITOR_ME_RELEASE=0.1.0
+PUBLIC_HOSTNAME=$PUBLIC_HOSTNAME
+LE_EMAIL=$LE_EMAIL
+AGENT_GRPC_PUBLIC_ADDRESS=$PUBLIC_HOSTNAME:8443
+ADMIN_CIDR=$ADMIN_CIDR
+AGENT_GRPC_BIND_ADDRESS=0.0.0.0
+AGENT_GRPC_PORT=8443
+API_HTTP_BIND_PORT=18080
+WEB_BIND_PORT=13000
+AGENT_TLS_CERT_DIR=$CERT_DIR
+CERT_GROUP_ID=$CERT_GROUP_ID
+POSTGRES_DB=monitor_me
+POSTGRES_USER=monitor_me
+POSTGRES_PASSWORD=$POSTGRES_PASSWORD
+REDIS_PASSWORD=$REDIS_PASSWORD
+CLICKHOUSE_PASSWORD=$CLICKHOUSE_PASSWORD
+CLICKHOUSE_IMAGE=clickhouse/clickhouse-server:26.8.44.3
+DATABASE_URL=postgres://monitor_me:$POSTGRES_PASSWORD@postgres:5432/monitor_me?sslmode=disable
+REMOTE_ALLOWED_SYSTEMD_UNITS=
+ENV
+  chmod 600 "$ENV_FILE"
+fi
+
+valid_domain "$PUBLIC_HOSTNAME" || fail "PUBLIC_HOSTNAME in .env.production must be a valid FQDN."
+valid_cidr "$ADMIN_CIDR" || fail "ADMIN_CIDR in .env.production is invalid or unrestricted."
+if [[ -z "$LE_EMAIL" ]]; then LE_EMAIL="$(prompt 'Email for TLS certificate expiry notices' '')"; fi
+[[ "$LE_EMAIL" == *@*.* ]] || fail "Enter a valid LE_EMAIL in .env.production."
+if [[ -n "$PUBLIC_IPV4" ]]; then
+  RESOLVED_IPV4="$(getent ahostsv4 "$PUBLIC_HOSTNAME" | awk 'NR==1 {print $1}' || true)"
+  [[ "$RESOLVED_IPV4" == "$PUBLIC_IPV4" ]] || fail "DNS for $PUBLIC_HOSTNAME must resolve to $PUBLIC_IPV4."
+fi
+
+CERT_GROUP_ID="$(sed -n 's/^CERT_GROUP_ID=//p' "$ENV_FILE" | tail -n 1)"
+[[ "$CERT_GROUP_ID" =~ ^[0-9]+$ ]] || fail "CERT_GROUP_ID in .env.production must be numeric."
+if ! getent group "$CERT_GROUP_ID" >/dev/null 2>&1; then groupadd --system --gid "$CERT_GROUP_ID" monitor-me-cert; fi
+CERT_GROUP_ID="$(getent group "$CERT_GROUP_ID" | cut -d: -f3)"
+install -d -o root -g "$CERT_GROUP_ID" -m 0750 "$CERT_DIR"
+install -d -m 0755 /var/www/certbot /etc/nginx/snippets
+
+log "Obtaining trusted HTTPS certificate for $PUBLIC_HOSTNAME."
+if [[ ! -s "/etc/letsencrypt/live/$PUBLIC_HOSTNAME/fullchain.pem" ]]; then
+  sed "s/REPLACE_WITH_PUBLIC_HOSTNAME/$PUBLIC_HOSTNAME/g" "$PROD/nginx-acme-bootstrap.conf.example" > /etc/nginx/conf.d/monitor-me-acme.conf
+  nginx -t
+  systemctl reload nginx
+  certbot certonly --webroot -w /var/www/certbot -d "$PUBLIC_HOSTNAME" --email "$LE_EMAIL" --agree-tos --non-interactive --keep-until-expiring || fail "Let's Encrypt failed. Verify DNS and public TCP 80, then rerun."
+fi
+
+log "Installing restricted certificate copy and renewal hook."
+RENEWAL_HOOK="/etc/letsencrypt/renewal-hooks/deploy/monitor-me.sh"
+install -m 0750 "$PROD/certbot-deploy-hook.sh" "$RENEWAL_HOOK"
+RENEWED_LINEAGE="/etc/letsencrypt/live/$PUBLIC_HOSTNAME" CERT_GROUP_ID="$CERT_GROUP_ID" AGENT_TLS_CERT_DIR="$CERT_DIR" "$RENEWAL_HOOK"
+
+log "Installing HTTPS Nginx site and administrator CIDR allowlist."
+sed "s/REPLACE_WITH_PUBLIC_HOSTNAME/$PUBLIC_HOSTNAME/g" "$PROD/nginx.conf.example" > "$NGINX_SITE"
+printf 'allow %s;\ndeny all;\n' "$ADMIN_CIDR" > "$NGINX_ACCESS"
+chmod 0644 "$NGINX_SITE" "$NGINX_ACCESS"
+rm -f /etc/nginx/conf.d/monitor-me-acme.conf
+nginx -t
+systemctl reload nginx
+
+log "Configuring UFW safely."
+SSH_PORT="$(sshd -T 2>/dev/null | awk '$1 == "port" {print $2; exit}')"
+if [[ -z "$SSH_PORT" ]]; then SSH_PORT=22; fi
+if ufw status 2>/dev/null | grep -q '^Status: active'; then
+  log "UFW is already active; deployment will add only required Monitor Me rules."
+else
+  printf 'UFW is inactive. It will be enabled with inbound deny, outbound allow and SSH restricted to %s.\n' "$ADMIN_CIDR"
+  read -r -p 'Enable this firewall policy? [Y/n]: ' ENABLE_FIREWALL
+  [[ "$ENABLE_FIREWALL" != "n" && "$ENABLE_FIREWALL" != "N" ]] || fail "A host firewall is required before exposing a no-login dashboard."
+  ufw default deny incoming
+  ufw default allow outgoing
+  ufw allow from "$ADMIN_CIDR" to any port "$SSH_PORT" proto tcp
+  ufw allow 80/tcp
+  ufw allow 443/tcp
+  ufw allow 8443/tcp
+  ufw --force enable
+fi
+
+log "Building and starting Monitor Me, applying SQL migrations and checking readiness."
+cd "$ROOT"
+./deploy/production/deploy.sh
+
+cat <<SUMMARY
+
+Monitor Me is installed.
+
+Dashboard: https://$PUBLIC_HOSTNAME
+Admin network: $ADMIN_CIDR
+Agent gRPC endpoint: $PUBLIC_HOSTNAME:8443
+Data: persistent PostgreSQL, Redis and ClickHouse Docker volumes.
+
+The dashboard has no application login. Access is restricted by Nginx/UFW to ADMIN_CIDR.
+Open the dashboard, select Add machine, then run the generated install command on each target host.
+
+Also allow TCP 80, 443 and 8443 in your VPS/cloud provider firewall.
+Provider security groups cannot be changed without provider credentials.
+Keep .env.production private and back it up securely.
+SUMMARY
