@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { Activity, Bell, Copy, FileText, LayoutDashboard, Plus, RefreshCw, Server as ServerIcon } from "lucide-react";
+import { Bell, Copy, FileText, LayoutDashboard, PanelLeftClose, PanelLeftOpen, Plus, RefreshCw, Server as ServerIcon } from "lucide-react";
 import { apiRequest } from "@/lib/client-api";
 import { ServerDetail } from "./server-detail";
 import AlertsWorkspace from "./alerts-workspace";
@@ -331,6 +331,7 @@ export default function DashboardClient() {
   const [showDashboards, setShowDashboards] = useState(false);
   const [showLogs, setShowLogs] = useState(false);
   const [showAlerts, setShowAlerts] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const loadServers = useCallback(async () => {
     setInventoryBusy(true);
     setInventoryError("");
@@ -400,13 +401,13 @@ export default function DashboardClient() {
   }
 
   if (view === "checking") {
-    return <main className="loading-screen"><div className="loading-mark">M</div><p>Connecting to your Monitor Me installation…</p></main>;
+    return <main className="loading-screen"><span className="loading-wordmark">MONITOR ME</span><span className="loading-indicator" aria-hidden="true" /><p>Connecting to monitoring services…</p></main>;
   }
 
   if (view === "unavailable") {
     return (
       <main className="loading-screen">
-        <div className="loading-mark">M</div>
+        <span className="loading-wordmark">MONITOR ME</span>
         <h1>Monitoring service unavailable</h1>
         <p>Monitor Me could not connect to its local services. Check that the API, database, and Docker services are healthy.</p>
         <button className="button button-primary" type="button" onClick={() => window.location.reload()}>Retry connection</button>
@@ -416,14 +417,12 @@ export default function DashboardClient() {
 
   return (
     <div className="app-shell">
-      <aside className="sidebar">
+      <aside className={sidebarCollapsed ? "sidebar sidebar-collapsed" : "sidebar"}>
         <div className="sidebar-brand">
-          <div className="brand-mark">M</div>
-          <div className="sidebar-brand-copy"><p className="brand-name">MONITOR ME</p><p className="brand-subtitle">Observability</p></div>
-        </div>
-        <div className="installation-indicator" title="This self-hosted installation">
-          <span className="installation-indicator-icon"><Activity size={15} strokeWidth={1.8} /></span>
-          <div className="installation-indicator-copy"><strong>Monitor Me installation</strong><span>Self-hosted monitoring</span></div>
+          <span className="brand-name">MONITOR ME</span>
+          <button className="sidebar-toggle" type="button" onClick={() => setSidebarCollapsed((value) => !value)} aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"} aria-pressed={sidebarCollapsed} title={sidebarCollapsed ? "Expand menu" : "Collapse menu"}>
+            {sidebarCollapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
+          </button>
         </div>
         <nav className="side-nav" aria-label="Main navigation">
           <span className="nav-section-label">Monitoring</span>
@@ -432,27 +431,24 @@ export default function DashboardClient() {
           <button title="Dashboards" aria-label="Dashboards" className={showDashboards ? "nav-item nav-item-active" : "nav-item"} type="button" onClick={() => {  setShowLogs(false); setShowAlerts(false);  setSelectedServer(null); setShowDashboards(true); }}><span className="nav-item-icon"><LayoutDashboard size={18} strokeWidth={1.8} /></span><span className="nav-item-label">Dashboards</span></button>
                     <button title="Alerts" aria-label="Alerts" className={showAlerts ? "nav-item nav-item-active" : "nav-item"} type="button" onClick={() => {  setShowDashboards(false); setShowLogs(false);  setSelectedServer(null); setShowAlerts(true); }}><span className="nav-item-icon"><Bell size={18} strokeWidth={1.8} /></span><span className="nav-item-label">Alerts</span></button>
         </nav>
-        <div className="sidebar-bottom">
-          <div className="sidebar-status" title="Self-hosted single installation"><span className="status-dot status-dot-online" /><span className="sidebar-status-label">Self-hosted · Single install</span></div>
-        </div>
       </aside>
 
       <main className="dashboard-main" id="servers">
         {showLogs ? (
-          <LogExplorer servers={servers} onBack={() => setShowLogs(false)} />
+          <LogExplorer servers={servers} />
         ) : showAlerts ? (
-          <AlertsWorkspace servers={servers} role="owner" onBack={() => setShowAlerts(false)} />
+          <AlertsWorkspace servers={servers} role="owner" />
         ) : showDashboards ? (
-          <DashboardsWorkspace servers={servers} role="owner" onBack={() => setShowDashboards(false)} />
+          <DashboardsWorkspace servers={servers} role="owner" />
         ) : selectedServer ? (
           <ServerDetail server={selectedServer} apiPublicURL={publicAPIURL} onBack={() => setSelectedServer(null)} />
         ) : <>
         <header className="topbar">
-          <div><span className="breadcrumbs">Monitoring / Machines</span><h1>Overview</h1></div>
+          <div><span className="breadcrumbs">Infrastructure / Servers</span><h1>Servers</h1><p className="page-subtitle">Monitor machine health, resource usage and agent connectivity.</p></div>
           <div className="topbar-actions">
-            <span className="live-label">
+            <span className="live-label" title={apiStatus === "online" ? "Monitoring API is connected" : "Monitoring API connection status"}>
               <span className={`status-dot ${apiStatus === "online" ? "status-dot-online" : apiStatus === "offline" ? "status-dot-unavailable" : "status-dot-pending"}`} />
-              {apiStatus === "online" ? "API connected" : apiStatus === "offline" ? "API unavailable" : "Checking API"}
+              {apiStatus === "online" ? "Connected" : apiStatus === "offline" ? "Service unavailable" : "Connecting"}
             </span>
             <button className="button button-secondary" type="button" onClick={() => void loadServers()} disabled={inventoryBusy}><RefreshCw size={15} /> {inventoryBusy ? "Refreshing…" : "Refresh"}</button>
             {canCreate && <button className="button button-primary" type="button" onClick={() => setShowAdd(true)}><Plus size={16} /> Add machine</button>}
@@ -485,7 +481,7 @@ export default function DashboardClient() {
             {canCreate && <button className="button button-secondary" type="button" onClick={() => setShowAdd(true)}>Register a host</button>}
           </div>
           {inventoryBusy && servers.length === 0 ? (
-            <div className="empty-state"><div className="loading-mark small">M</div><h3>Loading server inventory</h3><p>Retrieving connected machines in this installation.</p></div>
+            <div className="empty-state"><span className="loading-indicator" aria-hidden="true" /><h3>Loading server inventory</h3><p>Retrieving connected machines.</p></div>
           ) : servers.length === 0 ? (
             <div className="empty-state">
               <div className="empty-icon">+</div><h3>No servers enrolled yet</h3>
