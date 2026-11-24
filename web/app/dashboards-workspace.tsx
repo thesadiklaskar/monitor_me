@@ -35,6 +35,7 @@ type Dashboard = {
 };
 type SeriesPoint = { bucket: string; average: number; minimum: number; maximum: number; sample_count: number };
 type SeriesResponse = { points: SeriesPoint[] };
+type PanelSeries = { points: SeriesPoint[]; error?: string };
 
 const metricCatalog = [
   { value: "host.cpu.utilization", label: "CPU utilization", unit: "%" },
@@ -87,20 +88,21 @@ function chartPath(points: SeriesPoint[]): string {
 
 function DashboardPanelCard({
   panel,
-  points,
+  series,
   serverName,
   projectName,
   canEdit,
   onDelete,
 }: {
   panel: DashboardPanel;
-  points: SeriesPoint[] | undefined;
+  series: PanelSeries | undefined;
   serverName: string;
   projectName: string;
   canEdit: boolean;
   onDelete: () => void;
 }) {
   const metric = metricCatalog.find((item) => item.value === panel.metric_name);
+  const points = series?.points;
   const latest = points?.[points.length - 1];
   const hasData = !!points && points.length > 0;
   const path = points ? chartPath(points) : "";
@@ -119,6 +121,8 @@ function DashboardPanelCard({
       <CardContent className="dashboard-panel-content">
         {points === undefined ? (
           <div className="dashboard-chart-loading"><Skeleton className="h-28 w-full" /></div>
+        ) : series?.error ? (
+          <div className="dashboard-chart-error" role="alert">{series.error}</div>
         ) : !hasData ? (
           <div className="dashboard-chart-empty">No metric samples in this time range.</div>
         ) : panel.visualization === "stat" ? (
@@ -156,7 +160,7 @@ export default function DashboardsWorkspace({
 }) {
   const [dashboards, setDashboards] = useState<Dashboard[]>([]);
   const [selectedId, setSelectedId] = useState("");
-  const [seriesByPanel, setSeriesByPanel] = useState<Record<string, SeriesPoint[]>>({});
+  const [seriesByPanel, setSeriesByPanel] = useState<Record<string, PanelSeries>>({});
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -218,9 +222,9 @@ export default function DashboardsWorkspace({
         const response = await apiRequest<SeriesResponse>(
           "/api/servers/" + encodeURIComponent(panel.server_id) + "/metrics?" + query.toString(),
         );
-        return [panel.id, Array.isArray(response.points) ? response.points : []] as const;
-      } catch {
-        return [panel.id, []] as const;
+        return [panel.id, { points: Array.isArray(response.points) ? response.points : [] }] as const;
+      } catch (queryError) {
+        return [panel.id, { points: [], error: queryError instanceof Error ? queryError.message : "Metric history could not be loaded." }] as const;
       }
     }));
     setSeriesByPanel(Object.fromEntries(results));
@@ -347,7 +351,7 @@ export default function DashboardsWorkspace({
           <p>Build persistent metric views from real server history. Panels refresh automatically and respect organization and project scope.</p>
         </div>
         <div className="dashboards-header-actions">
-          <Button variant="secondary" onClick={() => { void loadDashboards(); }} disabled={loading}><RefreshCw size={14} /> Refresh</Button>
+          <Button variant="secondary" onClick={() => { void loadDashboards(); void refreshSeries(); }} disabled={loading}><RefreshCw size={14} /> Refresh</Button>
           {canEdit && <Button onClick={() => setShowDashboardForm((value) => !value)}><Plus size={15} /> New dashboard</Button>}
         </div>
       </header>
@@ -446,7 +450,7 @@ export default function DashboardsWorkspace({
                     <DashboardPanelCard
                       key={panel.id}
                       panel={panel}
-                      points={seriesByPanel[panel.id]}
+                      series={seriesByPanel[panel.id]}
                       serverName={serverLabel(panel.server_id)}
                       projectName={projectLabel(panel.project_id)}
                       canEdit={canEdit}
