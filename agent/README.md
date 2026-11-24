@@ -124,7 +124,7 @@ Follow logs with `journalctl -u monitor-me-agent -f`. Use `systemctl restart mon
 2. On the monitored Windows x64 host, open PowerShell as Administrator and run the copied command:
 
    ```powershell
-   & ([scriptblock]::Create((Invoke-RestMethod -Uri 'https://monitor.example/install/agent-windows.ps1'))) -ServerUrl 'https://monitor.example' -GrpcAddress 'monitor.example:8443'
+   & ([scriptblock]::Create((Invoke-RestMethod -Uri 'https://YOUR_MONITOR_HOST/install/agent-windows.ps1'))) -ServerUrl 'https://YOUR_MONITOR_HOST' -GrpcAddress 'YOUR_MONITOR_HOST:8443'
    ```
 
 3. Paste the token at the hidden prompt. The installer downloads the Windows binary and public control-plane CA, verifies SHA-256, installs a restart-enabled Windows Service, stores the private session under ProgramData and removes the one-time token after enrollment.
