@@ -6,6 +6,9 @@
 ## 0. Release-blocking stability gate — first
 
 - [ ] Pull the exact latest `main` revision and verify the local source hash before building. The Windows and POSIX startup scripts now reject a stale/diverged checkout, validate Compose configuration, build every image first, and only then start services with `--no-build`.
+- [ ] Generate and commit `backend/go.sum` from a trusted successful Go module resolution; do not disable `GOSUMDB` or checksum validation. The backend currently has `go.mod` but no committed `go.sum`.
+- [ ] Generate and commit `web/package-lock.json`, then change the web Dockerfile and CI from `npm install` to `npm ci` so clean builds use a deterministic dependency tree.
+- [ ] Confirm Go module resolution and the Linux/Windows agent cross-build on a clean network path. The backend image no longer runs `go mod tidy`; it builds only the shipped API/migration packages with `-mod=mod`, HTTP/1.1 module transport, and the standard checksum database still enabled.
 - [ ] Pass backend and migration Go builds, Go unit/race tests, vet and formatting checks.
 - [ ] Pass Linux amd64/arm64 and Windows amd64 agent artifact builds; confirm the artifact bundle and manifest checksums.
 - [ ] Pass frontend lint, TypeScript typecheck and production Next.js build.
