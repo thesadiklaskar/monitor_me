@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/shirou/gopsutil/v4/disk"
 )
 
 func TestCounterRateRejectsResetAndInvalidElapsed(t *testing.T) {
@@ -254,5 +256,37 @@ func TestClassifyEnvironmentTypeUsesExplicitHostSignals(t *testing.T) {
 				t.Fatalf("classifyEnvironmentType() = %q, want %q", got, test.want)
 			}
 		})
+	}
+}
+
+func TestFilesystemCapacitySamplesPreserveMountIdentityAndOmitInvalidUsage(t *testing.T) {
+	usage := &disk.UsageStat{Total: 1000, Used: 250, Free: 750, UsedPercent: 25}
+	samples := filesystemCapacitySamples("/data", "/dev/vdb1", "ext4", usage, 1234)
+	if len(samples) != 4 {
+		t.Fatalf("expected 4 filesystem gauges, got %d", len(samples))
+	}
+	wantNames := []string{
+		"host.disk.total.bytes",
+		"host.disk.used.bytes",
+		"host.disk.available.bytes",
+		"host.disk.used.percent",
+	}
+	wantValues := []float64{1000, 250, 750, 25}
+	for index, sample := range samples {
+		if sample.Name != wantNames[index] || sample.Value != wantValues[index] {
+			t.Errorf("sample[%d] = %s/%v, want %s/%v", index, sample.Name, sample.Value, wantNames[index], wantValues[index])
+		}
+		if sample.Labels["mountpoint"] != "/data" || sample.Labels["device"] != "/dev/vdb1" || sample.Labels["fstype"] != "ext4" {
+			t.Errorf("filesystem labels were lost: %#v", sample.Labels)
+		}
+		if sample.ObservedAtUnixNanos != 1234 {
+			t.Errorf("observed timestamp = %d, want 1234", sample.ObservedAtUnixNanos)
+		}
+	}
+	if got := filesystemCapacitySamples("/empty", "/dev/zero", "ext4", &disk.UsageStat{}, 1234); len(got) != 0 {
+		t.Fatalf("zero-capacity mount must be omitted, got %#v", got)
+	}
+	if got := filesystemCapacitySamples(" ", "/dev/zero", "ext4", usage, 1234); len(got) != 0 {
+		t.Fatalf("empty mountpoint must be omitted, got %#v", got)
 	}
 }

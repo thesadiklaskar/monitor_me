@@ -225,15 +225,9 @@ func (c *ProcCollector) Collect(ctx context.Context) ([]Sample, error) {
 			if usageErr != nil || usage == nil || usage.Total == 0 {
 				continue
 			}
-			labels := map[string]string{
-				"mountpoint": mountpoint,
-				"device":     partition.Device,
-				"fstype":     partition.Fstype,
-			}
-			add("host.disk.total.bytes", float64(usage.Total), "bytes", labels)
-			add("host.disk.used.bytes", float64(usage.Used), "bytes", labels)
-			add("host.disk.available.bytes", float64(usage.Free), "bytes", labels)
-			add("host.disk.used.percent", usage.UsedPercent, "percent", labels)
+			samples = append(samples, filesystemCapacitySamples(
+				mountpoint, partition.Device, partition.Fstype, usage, observedAt,
+			)... )
 		}
 	}
 
@@ -390,6 +384,25 @@ func (c *ProcCollector) Collect(ctx context.Context) ([]Sample, error) {
 		return samples, errors.Join(collectionErrors...)
 	}
 	return samples, nil
+}
+
+// filesystemCapacitySamples returns actual mounted-volume capacity gauges.
+// Empty, inaccessible or unmounted filesystems are omitted rather than reported as zero.
+func filesystemCapacitySamples(mountpoint, device, filesystem string, usage *disk.UsageStat, observedAt int64) []Sample {
+	if strings.TrimSpace(mountpoint) == "" || usage == nil || usage.Total == 0 {
+		return nil
+	}
+	labels := map[string]string{
+		"mountpoint": mountpoint,
+		"device":     device,
+		"fstype":     filesystem,
+	}
+	return []Sample{
+		{Name: "host.disk.total.bytes", Value: float64(usage.Total), Unit: "bytes", Labels: labels, ObservedAtUnixNanos: observedAt},
+		{Name: "host.disk.used.bytes", Value: float64(usage.Used), Unit: "bytes", Labels: labels, ObservedAtUnixNanos: observedAt},
+		{Name: "host.disk.available.bytes", Value: float64(usage.Free), Unit: "bytes", Labels: labels, ObservedAtUnixNanos: observedAt},
+		{Name: "host.disk.used.percent", Value: usage.UsedPercent, Unit: "percent", Labels: labels, ObservedAtUnixNanos: observedAt},
+	}
 }
 
 type memoryCounters struct {
