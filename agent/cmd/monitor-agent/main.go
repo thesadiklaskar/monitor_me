@@ -4,11 +4,14 @@ import (
 	"context"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"time"
 
 	"example.com/monitor-me/agent/internal/collector"
 	"example.com/monitor-me/agent/internal/config"
 	"example.com/monitor-me/agent/internal/health"
+	"example.com/monitor-me/agent/internal/logcollector"
+	"example.com/monitor-me/agent/internal/logspool"
 	"example.com/monitor-me/agent/internal/spool"
 	"example.com/monitor-me/agent/internal/state"
 	"example.com/monitor-me/agent/internal/transport"
@@ -56,20 +59,34 @@ func run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		return err
 	}
 	hostCollector := collector.NewProcCollector(cfg.ProcRoot)
+	logStore, err := logspool.Open(cfg.LogSpoolDirectory, cfg.LogSpoolMaxBytes)
+	if err != nil {
+		return err
+	}
+	journal := logcollector.NewJournal()
+	capabilities := append([]string(nil), hostCollector.Capabilities()...)
+	if journal.Available() {
+		capabilities = append(capabilities, "logs.journald")
+		logger.Info("Linux journald collection enabled", "log_spool_directory", cfg.LogSpoolDirectory)
+	} else if runtime.GOOS == "linux" {
+		logger.Warn("journalctl not found; host metrics remain active but journald collection is unavailable")
+	}
 	healthState := health.New()
 	logger.Info("native monitoring agent started",
 		"version", cfg.Version,
 		"collection_interval", cfg.CollectionInterval.String(),
-		"capabilities", hostCollector.Capabilities(),
+		"capabilities", capabilities,
 		"spool_directory", cfg.SpoolDirectory,
 		"transport_enabled", cfg.GRPCAddress != "",
 	)
 	if cfg.GRPCAddress != "" {
-		go runRemote(ctx, cfg, hostCollector.Capabilities(), store, healthState, logger)
+		go runRemote(ctx, cfg, capabilities, store, logStore, journal, healthState, logger)
 	}
 
 	ticker := time.NewTicker(cfg.CollectionInterval)
 	defer ticker.Stop()
+	logTicker := time.NewTicker(10 * time.Second)
+	defer logTicker.Stop()
 	for {
 		select {
 		case <-ctx.Done():
@@ -79,6 +96,40 @@ func run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 			}
 			logger.Info("agent shutdown complete", "pending_batches", batches, "spool_bytes", bytes)
 			return nil
+		case <-logTicker.C:
+			if !journal.Available() || cfg.GRPCAddress == "" {
+				continue
+			}
+			pending, pendingErr := logStore.Peek(1)
+			if pendingErr != nil {
+				logger.Error("could not inspect durable log queue", "error", pendingErr)
+				continue
+			}
+			if len(pending) > 0 {
+				// Do not advance the journal cursor while an older batch is unacknowledged.
+				continue
+			}
+			cursor, cursorErr := logStore.Cursor()
+			if cursorErr != nil {
+				logger.Error("could not read acknowledged journal cursor", "error", cursorErr)
+				continue
+			}
+			events, nextCursor, collectErr := journal.Collect(ctx, cursor, 32)
+			if collectErr != nil {
+				logger.Warn("journald collection failed", "error", collectErr)
+				continue
+			}
+			if len(events) > 0 {
+				batch, batchErr := logspool.NewBatch(events, nextCursor, time.Now().UTC().UnixNano())
+				if batchErr == nil {
+					batchErr = logStore.Append(batch)
+				}
+				if batchErr != nil {
+					logger.Error("could not persist local log batch", "error", batchErr, "event_count", len(events))
+				} else {
+					logger.Debug("journald batch persisted locally", "batch_id", batch.ID, "event_count", len(events))
+				}
+			}
 		case <-ticker.C:
 			samples, collectErr := hostCollector.Collect(ctx)
 			if collectErr != nil {
@@ -109,7 +160,7 @@ func run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	}
 }
 
-func runRemote(ctx context.Context, cfg config.Config, capabilities []string, store *spool.Store, healthState *health.State, logger *slog.Logger) {
+func runRemote(ctx context.Context, cfg config.Config, capabilities []string, store *spool.Store, logs *logspool.Store, journal *logcollector.Journal, healthState *health.State, logger *slog.Logger) {
 	backoff := time.Second
 	for ctx.Err() == nil {
 		client, err := transport.Dial(cfg.GRPCAddress, cfg.TLSCAFile)
@@ -190,6 +241,17 @@ func runRemote(ctx context.Context, cfg config.Config, capabilities []string, st
 					healthState.MarkSuccessfulSend(time.Now().UTC())
 					logger.Debug("telemetry batches acknowledged by control plane", "batch_count", sent)
 				}
+				if sendErr == nil && journal.Available() {
+					logSent, logErr := client.SendPendingLogs(callContext, session, logs)
+					if logSent > 0 {
+						healthState.MarkSuccessfulSend(time.Now().UTC())
+						logger.Debug("log batches acknowledged by control plane", "batch_count", logSent)
+					}
+					if logErr != nil {
+						sendErr = logErr
+					}
+				}
+				cancel()
 				if sendErr != nil {
 					logger.Warn("telemetry delivery failed; reconnecting", "error", sendErr)
 					if status.Code(sendErr) == codes.Unauthenticated && cfg.EnrollmentToken != "" {

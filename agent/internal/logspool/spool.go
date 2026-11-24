@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -352,9 +351,6 @@ func validateBatch(batch Batch) error {
 		}
 		if _, err := hex.DecodeString(event.ID); err != nil || strings.ToLower(event.ID) != event.ID {
 			return errors.New("log event ID must be lowercase hexadecimal")
-		}
-		if math.IsNaN(float64(event.EventTimeUnixNanos)) {
-			return errors.New("log event timestamp is invalid")
 		}
 		for key, value := range event.Attributes {
 			if key == "" || len(key) > 64 || len(value) > 256 ||

@@ -13,6 +13,7 @@ import (
 
 	monitorv1 "example.com/monitor-me/agent/gen/monitor/v1"
 	"example.com/monitor-me/agent/internal/config"
+	"example.com/monitor-me/agent/internal/logspool"
 	"example.com/monitor-me/agent/internal/operations"
 	"example.com/monitor-me/agent/internal/spool"
 	"example.com/monitor-me/agent/internal/state"
@@ -181,6 +182,63 @@ func (c *Client) SendPending(ctx context.Context, session state.Credentials, sto
 	}
 	if err := stream.CloseSend(); err != nil {
 		return sent, fmt.Errorf("close telemetry stream: %w", err)
+	}
+	return sent, nil
+}
+
+// SendPendingLogs streams durable journal batches and removes each local
+// batch only after the ClickHouse-backed control plane acknowledges it.
+func (c *Client) SendPendingLogs(ctx context.Context, session state.Credentials, store *logspool.Store) (int, error) {
+	batches, err := store.Peek(4)
+	if err != nil {
+		return 0, err
+	}
+	if len(batches) == 0 {
+		return 0, nil
+	}
+	stream, err := c.rpc.Stream(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("open log delivery stream: %w", err)
+	}
+	sent := 0
+	for _, batch := range batches {
+		events := make([]*monitorv1.LogEvent, 0, len(batch.Events))
+		for _, event := range batch.Events {
+			events = append(events, &monitorv1.LogEvent{
+				EventId: event.ID, EventTimeUnixNanos: event.EventTimeUnixNanos,
+				ObservedAtUnixNanos: event.ObservedAtUnixNanos, Source: event.Source,
+				Severity: event.Severity, Body: event.Body, Attributes: event.Attributes,
+			})
+		}
+		message := &monitorv1.AgentToServerMessage{
+			AgentId: session.AgentID, SessionToken: session.SessionToken,
+			Payload: &monitorv1.AgentToServerMessage_LogBatch{LogBatch: &monitorv1.LogBatch{
+				BatchId: batch.ID, CollectedAtUnixNanos: batch.CollectedAtUnixNanos,
+				SchemaVersion: batch.SchemaVersion, Events: events,
+			}},
+		}
+		if err := stream.Send(message); err != nil {
+			return sent, fmt.Errorf("send log batch %s: %w", batch.ID, err)
+		}
+		response, err := stream.Recv()
+		if err != nil {
+			return sent, fmt.Errorf("receive log acknowledgement for %s: %w", batch.ID, err)
+		}
+		ack := response.GetAcknowledgement()
+		if ack == nil || ack.GetBatchId() != batch.ID {
+			return sent, fmt.Errorf("control plane returned an invalid acknowledgement for log batch %s", batch.ID)
+		}
+		if !ack.GetAccepted() {
+			return sent, fmt.Errorf("control plane rejected log batch %s: %s (%s)",
+				batch.ID, ack.GetMessage(), ack.GetRejectionCode())
+		}
+		if err := store.Ack(batch.ID); err != nil {
+			return sent, fmt.Errorf("acknowledge durable local log batch %s: %w", batch.ID, err)
+		}
+		sent++
+	}
+	if err := stream.CloseSend(); err != nil {
+		return sent, fmt.Errorf("close log delivery stream: %w", err)
 	}
 	return sent, nil
 }

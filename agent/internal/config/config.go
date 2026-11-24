@@ -18,6 +18,8 @@ type Config struct {
 	ProcRoot            string
 	SpoolDirectory      string
 	SpoolMaxBytes       int64
+	LogSpoolDirectory   string
+	LogSpoolMaxBytes    int64
 	LogLevel            string
 	GRPCAddress         string
 	TLSCAFile           string
@@ -34,12 +36,14 @@ func Load() (Config, error) {
 		ProcRoot:           env("MONITOR_PROC_ROOT", "/proc"),
 		SpoolDirectory:     env("MONITOR_SPOOL_DIR", "./.monitor-me/spool"),
 		SpoolMaxBytes:      64 << 20,
+		LogSpoolMaxBytes:   128 << 20,
 		LogLevel:           strings.ToLower(env("MONITOR_LOG_LEVEL", "info")),
 		GRPCAddress:        os.Getenv("MONITOR_GRPC_ADDRESS"),
 		TLSCAFile:          os.Getenv("MONITOR_TLS_CA_FILE"),
 		EnrollmentToken:    os.Getenv("MONITOR_ENROLLMENT_TOKEN"),
 	}
 	cfg.StateFile = env("MONITOR_AGENT_STATE_FILE", filepath.Join(cfg.SpoolDirectory, "agent-state.json"))
+	cfg.LogSpoolDirectory = env("MONITOR_LOG_SPOOL_DIR", filepath.Join(cfg.SpoolDirectory, "logs"))
 	allowedUnits, err := parseAllowedSystemdUnits(os.Getenv("MONITOR_ALLOWED_SYSTEMD_UNITS"))
 	if err != nil {
 		return Config{}, err
@@ -59,6 +63,13 @@ func Load() (Config, error) {
 			return Config{}, fmt.Errorf("MONITOR_SPOOL_MAX_BYTES must be between 1MiB and 10GiB")
 		}
 		cfg.SpoolMaxBytes = size
+	}
+	if raw := os.Getenv("MONITOR_LOG_SPOOL_MAX_BYTES"); raw != "" {
+		size, err := strconv.ParseInt(raw, 10, 64)
+		if err != nil || size < 1<<20 || size > 2<<30 {
+			return Config{}, fmt.Errorf("MONITOR_LOG_SPOOL_MAX_BYTES must be between 1MiB and 2GiB")
+		}
+		cfg.LogSpoolMaxBytes = size
 	}
 	if cfg.Version == "" || len(cfg.Version) > 64 {
 		return Config{}, fmt.Errorf("MONITOR_AGENT_VERSION must contain 1 to 64 characters")

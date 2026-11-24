@@ -163,8 +163,8 @@ func normalizeRecord(record journalRecord, observedAt time.Time) (logspool.Event
 		source = source[:128]
 	}
 	body := strings.ReplaceAll(record.Message, "\x00", "")
-	body = assignmentSecret.ReplaceAllString(body, "$1$2[REDACTED]")
 	body = bearerSecret.ReplaceAllString(body, "Bearer [REDACTED]")
+	body = assignmentSecret.ReplaceAllString(body, "$1$2[REDACTED]")
 	if len(body) > 16<<10 {
 		body = body[:16<<10]
 	}
